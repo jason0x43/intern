@@ -24,8 +24,13 @@ else {
 	define([
 		'./lib/args',
 		'./lib/util',
-		'require'
-	], function (args, util, parentRequire) {
+		'require',
+		'dojo/has!host-node?dojo/node!source-map-support'
+	], function (args, util, parentRequire, sourceMapSupport) {
+		if (sourceMapSupport) {
+			sourceMapSupport.install();
+		}
+
 		if (!args.config) {
 			throw new Error('Missing "config" argument');
 		}
