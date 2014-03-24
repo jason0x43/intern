@@ -38,8 +38,7 @@ else {
 		'dojo/lang',
 		'dojo/topic',
 		'./lib/EnvironmentType',
-		'./lib/reporterManager',
-		'dojo/has!host-node?dojo/node!source-map-support'
+		'./lib/reporterManager'
 	], function (
 		require,
 		main,
@@ -55,13 +54,8 @@ else {
 		lang,
 		topic,
 		EnvironmentType,
-		reporterManager,
-		sourceMapSupport
+		reporterManager
 	) {
-		if (sourceMapSupport) {
-			sourceMapSupport.install();
-		}
-
 		if (!args.config) {
 			throw new Error('Required option "config" not specified');
 		}
