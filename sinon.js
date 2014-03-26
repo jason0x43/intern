@@ -1,15 +1,10 @@
-define([ 'sinon/sinon' ], function (sinon) {
+define([ 'sinon', 'sinon/spy', 'sinon/call' ], function (sinon) {
 	return {
 		/**
-		 * AMD plugin API interface for easy loading of chai assertion interfaces.
+		 * AMD plugin API interface for easy loading of sinon interfaces.
 		 */
 		load: function (id, parentRequire, callback) {
-			require([
-				'sinon/sinon/spy',
-				'sinon/sinon/call'
-			], function () {
-				callback(id ? sinon[id] : sinon);
-			});
+			callback(id ? sinon[id] : sinon);
 		}
 	};
 });
