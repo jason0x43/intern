@@ -11,7 +11,7 @@
 		{ "type": "BSD-3-Clause", "url": "https://github.com/theintern/intern/blob/geezer/LICENSE" }
 	],
 	"dependencies": {
-		"istanbul": "0.2.11",
+		"istanbul": "https://github.com/jason0x43/istanbul/archive/verify-filename.tar.gz",
 		"source-map": "0.1.33",
 		"dojo": "1.9.3",
 		"leadfoot": "1.0.0",
