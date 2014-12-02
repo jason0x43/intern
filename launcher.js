@@ -233,7 +233,7 @@ else {
 				// var proc = childProcess.spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
 				// 	['http://localhost:9000/__intern/client.html?config=' + args.config +
 				// 	'&reporters=webdriver']);
-				var proc = childProcess.spawn('/Applications/Firefox.app/Contents/MacOS/firefox-bin',
+				var proc = childProcess.spawn('/Applications/Firefox.app/Contents/MacOS/firefox',
 					['http://localhost:9000/__intern/client.html?config=' + args.config +
 					'&reporters=webdriver']);
 
