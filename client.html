@@ -5,7 +5,7 @@
 		<title>Browser test runner</title>
 		<script src="node_modules/dojo/loader.js"></script>
 		<script>
-			(function () {
+			window.onload = function () {
 				var internPath = location.pathname.replace(/\/+[^\/]*$/, '/');
 				var initialBaseUrl = (function () {
 					var result = /[?&]initialBaseUrl=([^&]*)/.exec(location.search);
@@ -43,7 +43,7 @@
 				};
 
 				require(internConfig, [ 'intern/client' ]);
-			})();
+			};
 		</script>
 	</head>
 	<body></body>
