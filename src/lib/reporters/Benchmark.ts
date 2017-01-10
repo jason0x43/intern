@@ -18,7 +18,7 @@
  * hz: Hertz (number of executions of a function per second). 1/Hz is the mean execution time of function.
  */
 import * as fs from 'fs';
-import * as util from '../util';
+import { getErrorMessage } from '../node/util';
 import { Reporter, ReporterConfig } from '../../common';
 import Test from '../Test';
 import Suite from '../Suite';
@@ -363,6 +363,6 @@ export default class Benchmark implements Reporter {
 		suiteInfo.numFailedBenchmarks++;
 
 		this.error('ERROR: ' + test.id);
-		this.error(util.getErrorMessage(test.error));
+		this.error(getErrorMessage(test.error));
 	}
 }

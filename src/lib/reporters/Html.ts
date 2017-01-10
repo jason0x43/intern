@@ -1,5 +1,5 @@
 import { IRequire } from 'dojo/loader';
-import * as util from '../util';
+import { getErrorMessage } from '../browser/util';
 import { Reporter, ReporterConfig } from '../../common';
 import Test from '../Test';
 import Suite from '../Suite';
@@ -225,7 +225,7 @@ export default class Html implements Reporter {
 	}
 
 	fatalError(error: Error): void {
-		let htmlError = util.getErrorMessage(error).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+		let htmlError = getErrorMessage(error).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 		let errorNode = document.createElement('div');
 		errorNode.style.cssText = 'color: red; font-family: sans-serif;';
 		errorNode.innerHTML = '<h1>Fatal error</h1>' +

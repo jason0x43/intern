@@ -1,16 +1,15 @@
 import Suite, { SuiteConfig } from './Suite';
 import { Config, InternError } from '../common';
+import { mixin } from 'dojo/lang';
+import Promise  = require('dojo/Promise');
+import { objectToQuery } from 'dojo/io-query';
+import { parse } from 'url';
+import { relative } from 'path';
 
-// AMD modules
-import * as lang from 'dojo/lang';
-import * as Promise from 'dojo/Promise';
-import * as ioQuery from 'dojo/io-query';
-
-// Node modules
-import * as urlUtil from 'dojo/node!url';
-import * as pathUtil from 'dojo/node!path';
-
-export default class ClientSuite extends Suite {
+/**
+ * A root suite class used by the Runner executor to manage remotely-run suites.
+ */
+export default class RemoteSuite extends Suite {
 	config: Config;
 
 	args: any[];
@@ -129,23 +128,23 @@ export default class ClientSuite extends Suite {
 			});
 		}
 
-		const proxyBasePath = urlUtil.parse(config.proxyUrl).pathname;
+		const proxyBasePath = parse(config.proxyUrl).pathname;
 
 		let clientReporter = this.config.runnerClientReporter;
 		if (typeof clientReporter === 'object') {
 			// Need to mixin the properties of `clientReporter` to a new object before stringify because
 			// stringify only serialises an object’s own properties
-			clientReporter = JSON.stringify(lang.mixin({}, clientReporter));
+			clientReporter = JSON.stringify(mixin({}, clientReporter));
 		}
 		else {
 			clientReporter = 'WebDriver';
 		}
 
-		const options = lang.mixin({}, this.args, {
+		const options = mixin({}, this.args, {
 			// the proxy always serves the baseUrl from the loader configuration as the root of the proxy,
 			// so ensure that baseUrl is always set to that root on the client
 			basePath: proxyBasePath,
-			initialBaseUrl: proxyBasePath + pathUtil.relative(config.basePath, process.cwd()),
+			initialBaseUrl: proxyBasePath + relative(config.basePath, process.cwd()),
 			reporters: clientReporter,
 			rootSuiteName: self.id,
 			sessionId: sessionId
@@ -161,7 +160,7 @@ export default class ClientSuite extends Suite {
 		}
 
 		remote
-			.get(config.proxyUrl + '__intern/client.html?' + ioQuery.objectToQuery(options))
+			.get(config.proxyUrl + '__intern/client.html?' + objectToQuery(options))
 			.catch(function (error: InternError) {
 				handle.remove();
 				remote.setHeartbeatInterval(0).then(function () {

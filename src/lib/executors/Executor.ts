@@ -1,19 +1,12 @@
-import ReporterManager, { ReporterDescriptor } from '../ReporterManager';
+import ReporterManager from '../ReporterManager';
 import { Config } from '../../common';
-import PreExecutor from './PreExecutor';
 import Suite from '../Suite';
 import * as util from '../util';
+import * as lang from 'dojo/lang';
+import * as Promise from 'dojo/Promise';
 
 // Legacy imports
 import * as intern from '../../main';
-
-// AMD modules
-import * as has from 'dojo/has';
-import * as lang from 'dojo/lang';
-import * as Promise from 'dojo/Promise';
-import { IRequire } from 'dojo/loader';
-
-declare const require: IRequire;
 
 const globalOrWindow = Function('return this')();
 
@@ -24,8 +17,6 @@ export default class Executor {
 	/** The type of the executor. */
 	mode: string;
 
-	preExecutor: PreExecutor;
-
 	/** The reporter manager for this test execution. */
 	reporterManager: ReporterManager;
 
@@ -34,7 +25,7 @@ export default class Executor {
 
 	protected _hasSuiteErrors = false;
 
-	constructor(config: Config, preExecutor: PreExecutor) {
+	constructor(config: Config) {
 		this.config = lang.deepMixin({
 			instrumenterOptions: {
 				coverageVariable: '__internCoverage'
@@ -42,20 +33,6 @@ export default class Executor {
 			defaultTimeout: 30000,
 			reporters: []
 		}, config);
-
-		this.reporterManager = new ReporterManager();
-		this.preExecutor = preExecutor;
-
-		if (has('host-node') && this.config.benchmark) {
-			this.config.benchmarkConfig.id = 'Benchmark';
-
-			if (!this.config.reporters || !this.config.reporters.length) {
-				this.config.reporters = [ this.config.benchmarkConfig ];
-			}
-			else if (!this.config.reporters.some(reporter => reporter === 'Benchmark' || (<ReporterDescriptor> reporter).id === 'Benchmark')) {
-				this.config.reporters.push(this.config.benchmarkConfig);
-			}
-		}
 	}
 
 	/**
@@ -66,10 +43,8 @@ export default class Executor {
 	 * instrumented.
 	 * @param instrumenterOptions Extra options for the instrumenter
 	 */
-	enableInstrumentation(basePath: string, excludePaths: RegExp, instrumenterOptions: { [key: string]: string }) {
-		if (has('host-node')) {
-			return util.setInstrumentationHooks(excludePaths, basePath, instrumenterOptions);
-		}
+	enableInstrumentation(_basePath: string, _excludePaths: RegExp, _instrumenterOptions: { [key: string]: string }) {
+		// Does nothing by default
 	}
 
 	/**
@@ -84,33 +59,15 @@ export default class Executor {
 	 * should typically override `_runTests` to execute tests.
 	 */
 	run() {
-		const self = this;
+		const emitFatalError = (error: Error) => this._handleError(error).then(function () {
+			throw error;
+		});
 
-		function emitFatalError(error: Error) {
-			return self._handleError(error).then(function () {
-				throw error;
-			});
-		}
-
-		function emitRunEnd() {
-			return self.reporterManager.emit('runEnd', self);
-		}
-
-		function emitRunStart() {
-			return self.reporterManager.emit('runStart', self);
-		}
-
-		function runConfigSetup() {
-			return Promise.resolve(self.config.setup && self.config.setup(self));
-		}
-
-		function runConfigTeardown() {
-			return Promise.resolve(self.config.teardown && self.config.teardown(self));
-		}
-
-		function runTests() {
-			return self._runTests(self.config.maxConcurrency);
-		}
+		const emitRunEnd = () => this.reporterManager.emit('runEnd', this);
+		const emitRunStart = () => this.reporterManager.emit('runStart', this);
+		const runConfigSetup = () => Promise.resolve(this.config.setup && this.config.setup(this));
+		const runConfigTeardown = () => Promise.resolve(this.config.teardown && this.config.teardown(this));
+		const runTests = () => this._runTests(this.config.maxConcurrency);
 
 		const promise = this._beforeRun()
 			.then(function () {
@@ -119,17 +76,17 @@ export default class Executor {
 						.then(runTests)
 						.finally(emitRunEnd);
 				})
-				.finally(runConfigTeardown);
+					.finally(runConfigTeardown);
 			})
-			.finally(function () {
-				return self._afterRun();
+			.finally(() => {
+				return this._afterRun();
 			})
-			.then(function () {
-				if (self._hasSuiteErrors) {
+			.then(() => {
+				if (this._hasSuiteErrors) {
 					throw new Error('One or more suite errors occurred during testing');
 				}
 
-				return self.suites.reduce(function (numFailedTests, suite) {
+				return this.suites.reduce(function (numFailedTests, suite) {
 					return numFailedTests + suite.numFailedTests;
 				}, 0);
 			})
@@ -161,7 +118,7 @@ export default class Executor {
 			if (config.excludeInstrumentation !== true) {
 				return self.enableInstrumentation(
 					config.basePath,
-					(<RegExp> config.excludeInstrumentation),
+					(<RegExp>config.excludeInstrumentation),
 					config.instrumenterOptions
 				);
 			}
@@ -171,13 +128,9 @@ export default class Executor {
 			self.reporterManager.on('suiteError', function () {
 				self._hasSuiteErrors = true;
 			});
-			return self.preExecutor.registerErrorHandler((error: Error) => {
-				return self._handleError(error);
-			});
 		}
 
-		return this._loadReporters(config.reporters)
-			.then(registerErrorHandler)
+		return Promise.resolve(registerErrorHandler())
 			.then(enableInstrumentation);
 	}
 
@@ -188,126 +141,6 @@ export default class Executor {
 	 */
 	protected _handleError(error: Error) {
 		return Promise.resolve(this.reporterManager && this.reporterManager.emit('fatalError', error));
-	}
-
-	/**
-	 * Loads reporters into the reporter manager.
-	 *
-	 * @param reporters An array of reporter configuration objects.
-	 */
-	protected _loadReporters(reporters: (ReporterDescriptor|String)[]) {
-		const reporterManager = this.reporterManager;
-
-		const LEGACY_REPORTERS: { [name: string]: (string|ReporterDescriptor) } = {
-			'cobertura': { id: 'Cobertura', filename: 'cobertura-coverage.xml' },
-			'combined': 'Combined',
-			'console': 'Console',
-			'html': 'Html',
-			'junit': { id: 'JUnit', filename: 'report.xml' },
-			'lcov': { id: 'Lcov', filename: 'lcov.info' },
-			'lcovhtml': { id: 'LcovHtml', directory: 'html-report' },
-			'pretty': 'Pretty',
-			'runner': 'Runner',
-			'teamcity': 'TeamCity',
-			'webdriver': 'WebDriver'
-		};
-
-		const reporterModuleIds = reporters.map(function (reporter) {
-			let id: string;
-
-			if (typeof reporter === 'string') {
-				const replacementReporter = LEGACY_REPORTERS[<string> reporter];
-				if (replacementReporter) {
-					id = (<ReporterDescriptor> replacementReporter).id || (<string> replacementReporter);
-
-					reporterManager.emit(
-						'deprecated',
-						'The reporter ID "' + reporter + '"',
-						JSON.stringify(replacementReporter)
-					);
-				}
-				else {
-					id = reporter;
-				}
-			}
-			else {
-				id = (<ReporterDescriptor> reporter).id;
-			}
-
-			if (id.indexOf('/') === -1) {
-				id = '../reporters/' + id;
-			}
-
-			if (has('host-browser')) {
-				util.assertSafeModuleId(id);
-			}
-
-			return id;
-		});
-
-		return new Promise((resolve, reject) => {
-			const config = this.config;
-
-			require(reporterModuleIds, function () {
-				try {
-					Array.prototype.slice.call(arguments).forEach(function (Reporter: any, i: number) {
-						const rawArgs = reporters[i];
-						let kwArgs: ReporterDescriptor;
-
-						// reporter was simply specified as a string
-						if (typeof rawArgs === 'string') {
-							const reporterName = <string> rawArgs;
-							const replacementReporter = LEGACY_REPORTERS[reporterName];
-							if (replacementReporter && typeof replacementReporter !== 'string') {
-								kwArgs = <ReporterDescriptor> LEGACY_REPORTERS[reporterName];
-							}
-							else {
-								kwArgs = <ReporterDescriptor> {};
-							}
-						}
-						else {
-							kwArgs = <ReporterDescriptor> rawArgs;
-						}
-
-						if (Reporter.default && typeof Reporter.default === 'function') {
-							Reporter = Reporter.default;
-						}
-
-						// pass each reporter the full intern config as well as its own options
-						kwArgs.internConfig = config;
-						reporterManager.add(Reporter, kwArgs);
-					});
-
-					resolve(reporterManager.run());
-				}
-				catch (error) {
-					reject(error);
-				}
-			});
-		});
-	}
-
-	/**
-	 * Loads test modules, which register suites for testing within the test system.
-	 *
-	 * @param moduleIds The IDs of the test modules to load.
-	 */
-	protected _loadTestModules(moduleIds: string[]) {
-		if (!moduleIds || !moduleIds.length) {
-			return Promise.resolve();
-		}
-
-		if (has('host-browser')) {
-			moduleIds.forEach(util.assertSafeModuleId);
-		}
-
-		return new Promise(function (resolve, reject) {
-			// TODO: require doesn't support reject
-			(<any> require)(moduleIds, function () {
-				// resolve should receive no arguments
-				resolve();
-			}, reject);
-		});
 	}
 
 	/**

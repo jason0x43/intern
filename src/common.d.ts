@@ -1,7 +1,6 @@
 import 'chai';
 import Tunnel from 'digdug/Tunnel';
 import Executor from './lib/executors/Executor';
-import { ReporterDescriptor } from './lib/ReporterManager';
 import EnvironmentType from './lib/EnvironmentType';
 import { IConfig } from 'dojo/loader';
 import Test from './lib/Test';
@@ -9,11 +8,19 @@ import Suite from './lib/Suite';
 import Command = require('leadfoot/Command');
 import Promise = require('dojo/Promise');
 
+type BenchmarkMode = 'test' | 'baseline';
+
+export interface BenchmarkReporterDescriptor extends ReporterDescriptor {
+	mode: BenchmarkMode;
+}
+
 export interface Config {
 	bail?: boolean;
 	basePath?: string;
+	baseline?: boolean;
 	benchmark?: boolean;
-	benchmarkConfig?: ReporterDescriptor;
+	benchmarkConfig?: BenchmarkReporterDescriptor;
+	benchmarkSuites?: Suite[];
 	capabilities?: {
 		name?: string,
 		build?: string,
@@ -26,7 +33,7 @@ export interface Config {
 	environmentRetries?: number;
 	excludeInstrumentation?: boolean|RegExp;
 	filterErrorStack?: boolean;
-	functionalSuites?: string[];
+	functionalSuites?: Suite[];
 	grep?: RegExp;
 	instrumenterOptions?: any;
 	leaveRemoteOpen?: 'fail'|boolean;
@@ -40,16 +47,16 @@ export interface Config {
 	proxyOnly?: boolean;
 	proxyPort?: number;
 	proxyUrl?: string;
-	reporters?: (string|ReporterDescriptor)[];
+	reporters?: Reporter[];
 	runnerClientReporter?: {
 		waitForRunner?: boolean
 	};
 	rootSuiteName?: string;
 	sessionId?: string;
 	setup?: (executor: Executor) => Promise<any>;
-	suites?: string[];
+	suites?: Suite[];
 	teardown?: (executor: Executor) => Promise<any>;
-	tunnel?: string;
+	tunnel?: typeof Tunnel;
 	tunnelOptions?: {
 		servers?: string[],
 		[key: string]: any
@@ -105,20 +112,6 @@ export interface Proxy {
 	server: Object; // http.Server; start(): Promise<void>; }
 }
 
-export interface ReporterOutput {
-	write(chunk: string | Buffer, encoding?: string, callback?: Function): void;
-	end(chunk: string | Buffer, encoding?: string, callback?: Function): void;
-}
-
-export interface ReporterConfig {
-	console?: any; // Console
-	watermarks?: any; // Watermarks;
-	filename?: string;
-	output?: ReporterOutput;
-	projectRoot?: string;
-	directory?: string;
-}
-
 export interface Reporter {
 	console?: any;
 	destroy?: () => void;
@@ -145,4 +138,25 @@ export interface Reporter {
 	tunnelStart?: (tunnel: Tunnel) => Promise<any> | void;
 	tunnelStatus?: (tunnel: Tunnel, status: string) => Promise<any> | void;
 	$others?: (...args: any[]) => Promise<any> | void;
+}
+
+export interface ReporterOutput {
+	write(chunk: string | Buffer, encoding?: string, callback?: Function): void;
+	end(chunk: string | Buffer, encoding?: string, callback?: Function): void;
+}
+
+export interface ReporterConfig {
+	console?: any; // Console
+	watermarks?: any; // Watermarks;
+	filename?: string;
+	output?: ReporterOutput;
+	projectRoot?: string;
+	directory?: string;
+}
+
+export interface ReporterDescriptor {
+	id: string;
+	filename?: string;
+	directory?: string;
+	internConfig?: Config;
 }

@@ -1,6 +1,6 @@
 import * as Promise from 'dojo/Promise';
 import * as sendData from '../sendData';
-import * as util from '../util';
+import { getErrorMessage, getShouldWait } from '../browser/util';
 import { IRequire } from 'dojo/loader';
 import { Reporter, ReporterConfig, Config } from '../../common';
 import Suite from '../Suite';
@@ -91,7 +91,7 @@ export default class WebDriver implements Reporter {
 			this.suiteNode.style.color = 'red';
 
 			const errorNode = document.createElement('pre');
-			errorNode.appendChild(document.createTextNode(util.getErrorMessage(error)));
+			errorNode.appendChild(document.createTextNode(getErrorMessage(error)));
 			this.suiteNode.appendChild(errorNode);
 			this._scroll();
 		}
@@ -139,7 +139,7 @@ export default class WebDriver implements Reporter {
 			this.testNode.style.color = 'red';
 
 			const errorNode = document.createElement('pre');
-			errorNode.appendChild(document.createTextNode(<string> (util.getErrorMessage(test.error))));
+			errorNode.appendChild(document.createTextNode(<string> (getErrorMessage(test.error))));
 			this.testNode.appendChild(errorNode);
 			this._scroll();
 		}
@@ -149,7 +149,7 @@ export default class WebDriver implements Reporter {
 
 	private _sendEvent(name: string, args: IArguments | any[]): Promise<any> | void {
 		const data = [ name ].concat(Array.prototype.slice.call(args, 0));
-		const shouldWait = util.getShouldWait(this.waitForRunner, data);
+		const shouldWait = getShouldWait(this.waitForRunner, data);
 		const promise = sendData.send(this.url, data, this.sessionId);
 
 		if (shouldWait) {

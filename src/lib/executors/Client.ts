@@ -1,6 +1,6 @@
 import { Config } from '../../common';
+import ReporterManager from '../node/ReporterManager';
 import Executor from './Executor';
-import PreExecutor from './PreExecutor';
 import Suite from '../Suite';
 
 // AMD modules
@@ -16,12 +16,15 @@ import * as lang from 'dojo/lang';
 export default class Client extends Executor {
 	mode: 'client';
 
-	constructor(config: Config, preExecutor: PreExecutor) {
+	constructor(config: Config) {
 		config = lang.deepMixin({
-			reporters: [ 'Console' ]
+			reporters: ['Console']
 		}, config);
 
-		super(config, preExecutor);
+		super(config);
+
+		this.suites = [new Suite({})];
+		this.reporterManager = new ReporterManager();
 
 		if (has('host-browser')) {
 			this.config.reporters.push('Html');
@@ -35,21 +38,14 @@ export default class Client extends Executor {
 	}
 
 	_beforeRun() {
-		const config = this.config;
-		const suite = new Suite({
-			// rootSuiteName is provided by ClientSuite
-			name: config.rootSuiteName || null,
-			grep: config.grep,
-			sessionId: config.sessionId,
-			timeout: config.defaultTimeout,
-			reporterManager: this.reporterManager,
-			bail: config.bail
-		});
+		const suite = this.suites[0];
+		suite.name = this.config.rootSuiteName || null;
+		suite.grep = this.config.grep;
+		suite.sessionId = this.config.sessionId;
+		suite.timeout = this.config.defaultTimeout;
+		suite.reporterManager = this.reporterManager;
+		suite.bail = this.config.bail;
 
-		this.suites = [ suite ];
-
-		return super._beforeRun.apply(this, arguments).then(() => {
-			return this._loadTestModules(config.suites);
-		});
+		return super._beforeRun.apply(this, arguments);
 	}
 }

@@ -236,6 +236,10 @@ export default class Suite {
 		this._timeout = value;
 	}
 
+	add(testOrSuite: Test | Suite) {
+		this.tests.push(testOrSuite);
+	}
+
 	/**
 	 * Runs test suite in order:
 	 *

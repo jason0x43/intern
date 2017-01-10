@@ -1,12 +1,11 @@
-import { CommandLineArguments } from '../common';
+import { BenchmarkMode, CommandLineArguments, Config } from '../common';
+import * as lang from 'dojo/lang';
 
-export let fromCommandLine = function(rawArgs: string[]) {
-	return parseArguments(rawArgs || process.argv.slice(2), function (str: string) {
-		return str;
-	});
+export function parseCommandLine(rawArgs: string[]) {
+	return parseArguments(rawArgs || process.argv.slice(2));
 };
 
-export let fromQueryString = function(query: string) {
+export function parseQueryString(query: string) {
 	return parseArguments(query.replace(/^\?/, '').split('&'), function (str) {
 		// Boolean properties should not be coerced into strings, but will be if they are passed to
 		// decodeURIComponent
@@ -18,17 +17,73 @@ export let fromQueryString = function(query: string) {
 	});
 };
 
-// exported for testing purposes
-export function _setFromQueryString(fn: Function) {
-	fromQueryString = <any> fn;
-};
+export function newConfig(config: Config, args?: CommandLineArguments) {
+	args = args || {};
 
-// exported for testing purposes
-export function _setFromCommandLine(fn: Function) {
-	fromCommandLine = <any> fn;
-};
+	/* jshint maxcomplexity:20 */
+	config = lang.deepMixin(config, args);
 
-function parseArguments(rawArgs: string[], decode: (str: string) => any) {
+	if (args['grep']) {
+		let grep = /^\/(.*)\/([gim]*)$/.exec(args['grep']);
+
+		if (grep) {
+			config.grep = new RegExp(grep[1], grep[2]);
+		}
+		else {
+			config.grep = new RegExp(args['grep'], 'i');
+		}
+	}
+
+	if (config.grep == null) {
+		config.grep = new RegExp('');
+	}
+
+	config.instrumenterOptions = config.instrumenterOptions || {};
+
+	if (config.coverageVariable) {
+		config.instrumenterOptions.coverageVariable = config.coverageVariable;
+	}
+
+	if (config.proxyPort == null) {
+		config.proxyPort = 9000;
+	}
+	else if (typeof config.proxyPort === 'string') {
+		if (isNaN(config.proxyPort)) {
+			throw new Error('proxyPort must be a number');
+		}
+		config.proxyPort = Number(config.proxyPort);
+	}
+
+	// If the user doesn't specify a proxy URL, construct one using the proxy port.
+	if (config.proxyUrl == null) {
+		config.proxyUrl = 'http://localhost:' + config.proxyPort + '/';
+	}
+
+	let benchmarkConfig = config.benchmarkConfig = lang.deepMixin({
+		id: 'Benchmark',
+		filename: 'baseline.json',
+		mode: <BenchmarkMode>'test',
+		thresholds: {
+			warn: { rme: 3, mean: 5 },
+			fail: { rme: 6, mean: 10 }
+		},
+		verbosity: 0
+	}, config.benchmarkConfig);
+
+	if (config.benchmark) {
+		if (config.baseline) {
+			benchmarkConfig.mode = 'baseline';
+		}
+
+		config.suites = config.benchmarkSuites || [];
+		config.functionalSuites = [];
+		config.excludeInstrumentation = true;
+	}
+
+	return config;
+}
+
+function parseArguments(rawArgs: string[], decoder?: (name: string) => any) {
 	let args: CommandLineArguments = {};
 	rawArgs.forEach(function (arg) {
 		const parts = arg.split('=');
@@ -41,7 +96,9 @@ function parseArguments(rawArgs: string[], decode: (str: string) => any) {
 			value = true;
 		}
 		else {
-			value = decode(parts[1]);
+			if (decoder) {
+				value = decoder(value);
+			}
 
 			// Support JSON-encoded properties for reporter configuration
 			if (value.charAt(0) === '{') {
@@ -55,7 +112,7 @@ function parseArguments(rawArgs: string[], decode: (str: string) => any) {
 		// Support multiple arguments with the same name
 		if (key in args) {
 			if (!Array.isArray(args[key])) {
-				args[key] = [ args[key] ];
+				args[key] = [args[key]];
 			}
 
 			args[key].push(value);

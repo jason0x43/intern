@@ -2,13 +2,13 @@ import { Reporter, ReporterConfig, Config } from '../../common';
 import Suite from '../Suite';
 import Test from '../Test';
 import Tunnel from 'digdug/Tunnel';
-import charm = require('dojo/node!charm');
-import encode = require('dojo/node!charm/lib/encode');
-import * as nodeUtil from 'dojo/node!util';
+import charm = require('charm');
+import encode = require('charm/lib/encode');
+import { format } from 'util';
 import * as lang from 'dojo/lang';
-import * as internUtil from '../util';
-import Collector = require('dojo/node!istanbul/lib/collector');
-import TextReport = require('dojo/node!istanbul/lib/report/text');
+import { getErrorMessage } from '../node/util';
+import Collector = require('istanbul/lib/collector');
+import TextReport = require('istanbul/lib/report/text');
 
 export type Charm = charm.Charm;
 
@@ -228,7 +228,7 @@ export default class Pretty implements Reporter {
 		this._record(suite.sessionId, FAIL);
 
 		const message = '! ' + suite.id;
-		this.log.push(message + '\n' + internUtil.getErrorMessage(error));
+		this.log.push(message + '\n' + getErrorMessage(error));
 	}
 
 	testSkip(test: Test): void {
@@ -244,7 +244,7 @@ export default class Pretty implements Reporter {
 	testFail(test: Test): void {
 		const message = '× ' + test.id;
 		this._record(test.sessionId, FAIL);
-		this.log.push(message + '\n' + internUtil.getErrorMessage(test.error));
+		this.log.push(message + '\n' + getErrorMessage(test.error));
 	}
 
 	tunnelStart(): void {
@@ -265,7 +265,7 @@ export default class Pretty implements Reporter {
 
 	fatalError(error: Error): void {
 		const message = '! ' + error.message;
-		this.log.push(message + '\n' + internUtil.getErrorMessage(error));
+		this.log.push(message + '\n' + getErrorMessage(error));
 		// stop the render timeout on a fatal error so Intern can exit
 		clearTimeout(this._renderTimeout);
 	}
@@ -421,7 +421,7 @@ export default class Pretty implements Reporter {
 
 		charm.write(title);
 		this._drawProgressBar(report, this.dimensions.width - title.length);
-		charm.write(nodeUtil.format('\nPassed: %s  Failed: %s  Skipped: %d\n',
+		charm.write(format('\nPassed: %s  Failed: %s  Skipped: %d\n',
 			fit(report.numPassed, totalTextSize), fit(report.numFailed, totalTextSize), report.numSkipped));
 	}
 }

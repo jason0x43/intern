@@ -1,4 +1,4 @@
-import request = require('dojo/has!host-browser?dojo/request');
+import request = require('dojo/request');
 import Promise = require('dojo/Promise');
 
 // Send a message, or schedule it to be sent. Return a promise that resolves when the message has been sent.

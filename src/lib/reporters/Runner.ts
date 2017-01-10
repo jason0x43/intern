@@ -1,10 +1,10 @@
-import * as charm from 'dojo/node!charm';
-import * as nodeUtil from 'dojo/node!util';
-import Collector = require('dojo/has!host-node?dojo/node!istanbul/lib/collector');
-import TextSummaryReport = require('dojo/has!host-node?dojo/node!istanbul/lib/report/text-summary');
-import TextReport = require('dojo/has!host-node?dojo/node!istanbul/lib/report/text');
+import * as charm from 'charm';
+import * as nodeUtil from 'util';
+import Collector = require('istanbul/lib/collector');
+import TextSummaryReport = require('istanbul/lib/report/text-summary');
+import TextReport = require('istanbul/lib/report/text');
 import * as intern from '../../main';
-import * as util from '../util';
+import * as util from '../node/util';
 import Test from '../Test';
 import Suite from '../Suite';
 import { Reporter, ReporterConfig, Config, Proxy } from '../../common';

@@ -1,31 +1,12 @@
 import * as intern from '../main';
 import * as diffUtil from 'diff';
 import { Deferred, InternError } from '../common';
-
-// AMD imports
-import has = require('dojo/has');
-import * as lang from 'dojo/lang';
 import Promise = require('dojo/Promise');
-import { IRequire, IRequireCallback } from 'dojo/loader';
 
-// Node imports
-import fs = require('dojo/has!host-node?dojo/node!fs');
-import glob = require('dojo/has!host-node?dojo/node!glob');
-import pathUtil = require('dojo/has!host-node?dojo/node!path');
-import { hook, Instrumenter } from 'dojo/has!host-node?dojo/node!istanbul';
-import { SourceMapConsumer, MappingItem } from 'dojo/has!host-node?dojo/node!source-map';
-
-declare const require: IRequire;
-
-has.add('function-name', function () {
+export const hasFunctionName = function () {
 	function foo() {}
 	return (<any> foo).name === 'foo';
-});
-
-let instrumentationSourceMap: { [path: string]: SourceMapConsumer } = {};
-let fileSourceMaps: { [path: string]: SourceMapConsumer } = {};
-let fileSources: { [path: string]: string } = {};
-let instrumenters: { [name: string]: Instrumenter } = {};
+}();
 
 /**
  * Creates a unified diff to explain the difference between two objects.
@@ -65,16 +46,6 @@ export function createDiff(actual: Object, expected: Object): string {
 	return diff;
 }
 
-export function assertSafeModuleId(moduleId: string) {
-	if (isAbsoluteUrl(moduleId)) {
-		throw new Error('Cross-origin loading of test modules is not allowed for security reasons');
-	}
-}
-
-export function isAbsoluteUrl(url: string) {
-	return /^(?:\w+:)?\/\//.test(url);
-}
-
 /**
  * Create a Deferred with some additional utility methods.
  */
@@ -110,6 +81,22 @@ export function createDeferred(): Deferred<any> {
 	};
 
 	return <Deferred<any>> dfd;
+}
+
+export function defineLazyProperty(object: Object, property: string, getter: () => any) {
+	Object.defineProperty(object, property, {
+		get: function (this: any) {
+			const value = getter.apply(this, arguments);
+			Object.defineProperty(object, property, {
+				value: value,
+				configurable: true,
+				enumerable: true
+			});
+			return value;
+		},
+		configurable: true,
+		enumerable: true
+	});
 }
 
 export interface Queuer {
@@ -167,77 +154,6 @@ export function escapeRegExp(str: any) {
 	return String(str).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 }
 
-/**
- * Generates a full error message from a plain Error object, avoiding duplicate error messages that might be
- * caused by different opinions on what a stack trace should look like.
- *
- * @param error An object describing the error.
- * @returns A string message describing the error.
- */
-export function getErrorMessage(error: string|Error|InternError): string {
-	/* jshint maxcomplexity:14 */
-	if (typeof error !== 'string' && (error.message || error.stack)) {
-		let message = (error.name || 'Error') + ': ' + (error.message || 'Unknown error');
-		let stack = error.stack;
-
-		if (stack) {
-			// V8 puts the original error at the top of the stack too; avoid redundant output that may
-			// cause confusion about how many times an assertion was actually called
-			if (stack.indexOf(message) === 0) {
-				stack = stack.slice(message.length);
-			}
-			else if (stack.indexOf(error.message) === 0) {
-				stack = stack.slice(String(error.message).length);
-			}
-
-			const filterStack = intern && intern.config && intern.config.filterErrorStack;
-			stack = normalizeStackTrace(stack, filterStack);
-		}
-
-		const anyError: any = error;
-
-		if (anyError.showDiff && typeof anyError.actual === 'object' && typeof anyError.expected === 'object') {
-			const diff = createDiff(anyError.actual, anyError.expected);
-			if (diff) {
-				message += '\n\n' + diff + '\n';
-			}
-		}
-
-		if (stack && /\S/.test(stack)) {
-			message += stack;
-		}
-		else if (anyError.fileName) {
-			message += '\n  at ' + anyError.fileName;
-			if (anyError.lineNumber != null) {
-				message += ':' + anyError.lineNumber;
-
-				if (anyError.columnNumber != null) {
-					message += ':' + anyError.columnNumber;
-				}
-			}
-
-			message += '\nNo stack';
-		}
-		else {
-			message += '\nNo stack or location';
-		}
-
-		return message;
-	}
-	else {
-		return String(error);
-	}
-}
-
-/**
- * Return the module for a given module ID
- */
-export function getModule(moduleId: string, loader?: IRequire) {
-	return getModules([ moduleId ], loader).then(function (modules: any[]) {
-		return modules[0];
-	});
-}
-
 export function getShouldWait(waitMode: (string|boolean), message: string|any[]) {
 	let shouldWait = false;
 	let eventName = message[0];
@@ -259,134 +175,6 @@ export function getShouldWait(waitMode: (string|boolean), message: string|any[])
 	}
 
 	return shouldWait;
-}
-
-/**
- * Instrument a given file, saving its coverage source map.
- *
- * @param filedata Text of file being instrumented
- * @param filepath Full path of file being instrumented
- * @param instrumenterOptions Extra options for the instrumenter
- *
- * @returns {string} A string of instrumented code
- */
-export function instrument(filedata: string, filepath: string, instrumenterOptions?: any) {
-	const instrumenter = getInstrumenter(instrumenterOptions);
-	let options = (<any> instrumenter).opts;
-
-	// Assign to options.codeGenerationOptions to handle the case where codeGenerationOptions is null
-	options.codeGenerationOptions = lang.mixin(options.codeGenerationOptions, {
-		sourceMap: pathUtil.normalize(filepath),
-		sourceMapWithCode: true
-	});
-
-	const code = instrumenter.instrumentSync(filedata, pathUtil.normalize(filepath));
-	const map = (<any> instrumenter).lastSourceMap();
-
-	if (map) {
-		instrumentationSourceMap[filepath] = loadSourceMap(map.toString());
-		fileSources[filepath] = filedata;
-	}
-
-	return code;
-}
-
-/**
- * Return true if the module ID is a glob expression. This is similar to node-glob.hasMagic, but considers some
- * special cases for AMD identifiers, like 'dojo/has!host-node?fs'.
- */
-export function isGlobModuleId(moduleId: string) {
-	// Ignore empty moduleIds, absolute URLs, and loader plugins, where a loader plugin MID contains a '!' after a
-	// word character, and the '!' is not immediately followed by a parenthesized expression.
-	if (!moduleId || isAbsoluteUrl(moduleId) || /\w!(?!\([^)]+\))/.test(moduleId)) {
-		return false;
-	}
-
-	// Return true if a glob special character or pattern is present in the module ID. Recognized patterns are
-	// approximately those of node-glob (see https://github.com/isaacs/node-glob).
-	return moduleId.indexOf('*') !== -1 ||
-		moduleId.indexOf('?') !== -1 ||
-		/\[[^\]]+\]/.test(moduleId) ||
-		/{[^}]+}/.test(moduleId) ||
-		/[!?+*@]\([^)]+\)/.test(moduleId);
-}
-
-/**
- * Normalize a path (e.g., resolve '..')
- */
-export function normalizePath(path: string) {
-	if (pathUtil) {
-		return pathUtil.normalize(path).replace(/\\/g, '/');
-	}
-
-	const parts = path.replace(/\\/g, '/').split('/');
-	let result: string[] = [];
-	for (let i = 0; i < parts.length; ++i) {
-		let part = parts[i];
-
-		if (!part || part === '.') {
-			if (i === 0 || i === parts.length - 1) {
-				result.push('');
-			}
-
-			continue;
-		}
-
-		if (part === '..') {
-			if (result.length && result[result.length - 1] !== '..') {
-				result.pop();
-			}
-			else {
-				result.push(part);
-			}
-		}
-		else {
-			result.push(part);
-		}
-	}
-
-	return result.join('/');
-}
-
-/**
- * Resolve a module ID that contains a glob expression.
- */
-export function resolveModuleIds(moduleIds: string[]): string[] {
-	function moduleIdToPath(moduleId: string, pkg: string, packageLocation: string) {
-		return packageLocation + moduleId.slice(pkg.length);
-	}
-
-	function pathToModuleId(path: string, pkg: string, packageLocation: string) {
-		return pkg + path.slice(packageLocation.length, path.length - 3);
-	}
-
-	if (!moduleIds) {
-		return moduleIds;
-	}
-
-	// The module ID has a glob character
-	return moduleIds.reduce(function (resolved, moduleId) {
-		if (isGlobModuleId(moduleId)) {
-			const pkg = moduleId.slice(0, moduleId.indexOf('/'));
-			const packageLocation = require.toUrl(pkg);
-			let modulePath = moduleIdToPath(moduleId, pkg, packageLocation);
-
-			// Ensure only JS files are considered
-			if (!/\.js$/.test(modulePath)) {
-				modulePath += '.js';
-			}
-
-			glob.sync(modulePath).forEach(function (file) {
-				resolved.push(pathToModuleId(file, pkg, packageLocation));
-			});
-		}
-		// The module ID is an actual ID
-		else {
-			resolved.push(moduleId);
-		}
-
-		return resolved;
-	}, []);
 }
 
 /**
@@ -434,7 +222,7 @@ export function serialize(object: Object): string {
 			output += '[';
 		}
 		else if (isFunction) {
-			output += (has('function-name') ? (object.name || '<anonymous>') : '<function>') + '({';
+			output += (hasFunctionName ? (object.name || '<anonymous>') : '<function>') + '({';
 		}
 		else {
 			output += '{';
@@ -543,48 +331,9 @@ export function serialize(object: Object): string {
 }
 
 /**
- * Adds hooks for code coverage instrumentation in the Node.js loader.
- *
- * @param excludeInstrumentation A RegExp or boolean used to decide whether to apply
- * instrumentation
- * @param basePath The base path for all code
- * @param instrumenterOptions Extra options for the instrumenter
- */
-export function setInstrumentationHooks(excludeInstrumentation: (RegExp|boolean), basePath: string, instrumenterOptions: any) {
-	basePath = normalizePath(pathUtil.resolve(basePath || '') + pathUtil.sep);
-
-	function hookMatcher(filename: string) {
-		filename = normalizePath(filename);
-
-		return !excludeInstrumentation || (
-			filename.indexOf(basePath) === 0 &&
-			// if the string passed to `excludeInstrumentation` changes here, it must also change in
-			// `lib/Proxy.js`
-			!(<RegExp> excludeInstrumentation).test(filename.slice(basePath.length))
-		);
-	}
-
-	function hookTransformer(code: string, filename: string) {
-		return instrument(code, pathUtil.resolve(filename), instrumenterOptions);
-	}
-
-	const anyHook: any = hook;
-	anyHook.hookRunInThisContext(hookMatcher, hookTransformer);
-	anyHook.hookRequire(hookMatcher, hookTransformer);
-
-	return {
-		remove: function (this: any) {
-			this.remove = function () {};
-			anyHook.unhookRunInThisContext();
-			anyHook.unhookRequire();
-		}
-	};
-}
-
-/**
  * Return a trace line in a standardized format.
  */
-function formatLine(data: { func?: string, source: string }) {
+function formatLine(data: { func?: string, source: string }, getSource: (name: string) => string) {
 	if (!data.func) {
 		return '  at <' + getSource(data.source) + '>';
 	}
@@ -592,228 +341,71 @@ function formatLine(data: { func?: string, source: string }) {
 }
 
 /**
- * Return the instrumenter, creating it if necessary.
- */
-function getInstrumenter(instrumenterOptions: any) {
-	instrumenterOptions = instrumenterOptions || {};
-
-	const coverageVariable = instrumenterOptions.coverageVariable;
-
-	if (!instrumenters[coverageVariable]) {
-		const options = lang.mixin({
-			// coverage variable is changed primarily to avoid any jshint complaints, but also to make
-			// it clearer where the global is coming from
-			coverageVariable: coverageVariable,
-
-			// compacting code makes it harder to look at but it does not really matter
-			noCompact: true,
-
-			// auto-wrap breaks code
-			noAutoWrap: true
-		}, instrumenterOptions);
-
-		instrumenters[coverageVariable] = new Instrumenter(options);
-	}
-	return instrumenters[coverageVariable];
-}
-
-/**
- * Get modules corresponding to the given list of module IDs
- */
-function getModules(moduleIds: string[], loader: IRequire) {
-	if (!loader) {
-		loader = <IRequire> require;
-	}
-
-	return new Promise(function (resolve, reject) {
-		(<any> loader)(moduleIds, <IRequireCallback> function () {
-			resolve(Array.prototype.slice.call(arguments, 0).map((module: any) => {
-				return (module && module.__esModule) ? module.default : module;
-			}));
-		}, reject);
-	});
-}
-
-/**
- * Get the original position of line:column based on map.
+ * Generates a full error message from a plain Error object, avoiding duplicate error messages that might be
+ * caused by different opinions on what a stack trace should look like.
  *
- * Assumes mappings are is in order by generatedLine, then by generatedColumn; maps created with
- * SourceMapConsumer.eachMapping should be in this order by default.
+ * @param error An object describing the error.
+ * @returns A string message describing the error.
  */
-function getOriginalPosition(map: any, line: number, column: number): { line: number, column: number, source?: string } {
-	let originalPosition = map.originalPositionFor({ line: line, column: column});
+export function getErrorMessage(error: string|Error|InternError, getSource: (name: string) => string): string {
+	/* jshint maxcomplexity:14 */
+	if (typeof error !== 'string' && (error.message || error.stack)) {
+		let message = (error.name || 'Error') + ': ' + (error.message || 'Unknown error');
+		let stack = error.stack;
 
-	// if the SourceMapConsumer was able to find a location, return it
-	if (originalPosition.line !== null) {
-		return originalPosition;
-	}
+		if (stack) {
+			// V8 puts the original error at the top of the stack too; avoid redundant output that may
+			// cause confusion about how many times an assertion was actually called
+			if (stack.indexOf(message) === 0) {
+				stack = stack.slice(message.length);
+			}
+			else if (stack.indexOf(error.message) === 0) {
+				stack = stack.slice(String(error.message).length);
+			}
 
-	const entries: MappingItem[] = [];
-
-	// find all map entries that apply to the given line in the generated output
-	map.eachMapping(function (entry: MappingItem) {
-		if (entry.generatedLine === line) {
-			entries.push(entry);
+			const filterStack = intern && intern.config && intern.config.filterErrorStack;
+			stack = normalizeStackTrace(stack, filterStack, getSource);
 		}
-	}, null, map.GENERATED_ORDER);
 
-	if (entries.length === 0) {
-		// no valid mappings exist -- return the line and column arguments
-		return { line: line, column: column };
-	}
+		const anyError: any = error;
 
-	originalPosition = entries[0];
-
-	// Chrome/Node.js column is at the start of the term that generated the exception
-	// IE column is at the beginning of the expression/line with the exceptional term
-	// Safari column number is just after the exceptional term
-	//   - need to go back one element in the mapping
-	// Firefox, PhantomJS have no column number
-	//   - for no col number, find the largest original line number for the generated line
-
-	if (column !== null) {
-		// find the most likely mapping for the given generated line and column
-		let entry: MappingItem;
-		for (let i = 1; i < entries.length; i++) {
-			entry = entries[i];
-			if (column > originalPosition.generatedColumn && column >= entry.generatedColumn) {
-				originalPosition = entry;
+		if (anyError.showDiff && typeof anyError.actual === 'object' && typeof anyError.expected === 'object') {
+			const diff = createDiff(anyError.actual, anyError.expected);
+			if (diff) {
+				message += '\n\n' + diff + '\n';
 			}
 		}
-	}
 
-	return {
-		line: originalPosition.originalLine,
-		column: originalPosition.originalColumn,
-		source: originalPosition.source
-	};
-}
-
-/**
- * Dereference the source from a traceline.
- */
-function getSource(tracepath: string) {
-	/* jshint maxcomplexity:13 */
-	let match: RegExpMatchArray;
-	let source: string;
-	let line: number;
-	let col: number;
-	let map: SourceMapConsumer;
-	let originalPos: { source?: string, line: number, column: number };
-	let result: string;
-
-	if (tracepath === '<anonymous>') {
-		return 'anonymous';
-	}
-
-	if (!(match = /^(.*?):(\d+)(:\d+)?$/.exec(tracepath))) {
-		// no line or column data
-		return tracepath;
-	}
-
-	tracepath = match[1];
-	line = Number(match[2]);
-	col = match[3] ? Number(match[3].substring(1)) : null;
-
-	// strip the host when we have a URL
-
-	if ((match = /^\w+:\/\/[^\/]+\/(.*)$/.exec(tracepath))) {
-		// resolve the URL path to a filesystem path
-		tracepath = pathUtil ? pathUtil.resolve(match[1]) : match[1];
-	}
-
-	if (has('host-browser')) {
-		// no further processing in browser environments
-		return tracepath + ':' + line + (col == null ? '' : ':' + col);
-	}
-
-	source = pathUtil.relative('.', tracepath);
-
-	// first, check for an instrumentation source map
-	if (tracepath in instrumentationSourceMap) {
-		map = instrumentationSourceMap[tracepath];
-		originalPos = getOriginalPosition(map, line, col);
-		line = originalPos.line;
-		col = originalPos.column;
-		if (originalPos.source) {
-			source = originalPos.source;
+		if (stack && /\S/.test(stack)) {
+			message += stack;
 		}
-	}
+		else if (anyError.fileName) {
+			message += '\n  at ' + anyError.fileName;
+			if (anyError.lineNumber != null) {
+				message += ':' + anyError.lineNumber;
 
-	// next, check for original source map
-	if ((map = getSourceMap(tracepath))) {
-		originalPos = getOriginalPosition(map, line, col);
-		line = originalPos.line;
-		col = originalPos.column;
-		if (originalPos.source) {
-			source = pathUtil.join(pathUtil.dirname(source), originalPos.source);
-		}
-	}
+				if (anyError.columnNumber != null) {
+					message += ':' + anyError.columnNumber;
+				}
+			}
 
-	result = source + ':' + line;
-	if (col !== null) {
-		result += ':' + col;
-	}
-	return result;
-}
-
-/**
- * Load and process the source map for a given file.
- */
-function getSourceMap(filepath: string) {
-	let data: string;
-	let lines: string[];
-	let lastLine: string;
-	let match: RegExpMatchArray;
-	const sourceMapRegEx = /(?:\/{2}[#@]{1,2}|\/\*)\s+sourceMappingURL\s*=\s*(data:(?:[^;]+;)+base64,)?(\S+)/;
-
-	if (filepath in fileSourceMaps) {
-		return fileSourceMaps[filepath];
-	}
-
-	try {
-		if (filepath in fileSources) {
-			data = fileSources[filepath];
+			message += '\nNo stack';
 		}
 		else {
-			data = fs.readFileSync(filepath).toString('utf-8');
-			fileSources[filepath] = data;
+			message += '\nNo stack or location';
 		}
 
-		lines = data.trim().split('\n');
-		lastLine = lines[lines.length - 1];
-
-		if ((match = sourceMapRegEx.exec(lastLine))) {
-			if (match[1]) {
-				data = JSON.parse((new Buffer(match[2], 'base64').toString('utf8')));
-				fileSourceMaps[filepath] = loadSourceMap(data);
-			}
-			else {
-				// treat map file path as relative to the source file
-				const mapFile = pathUtil.join(pathUtil.dirname(filepath), match[2]);
-				data = fs.readFileSync(mapFile, { encoding: 'utf8' });
-				fileSourceMaps[filepath] = loadSourceMap(data);
-			}
-			return fileSourceMaps[filepath];
-		}
+		return message;
 	}
-	catch (error) {
-		// this is normal for files like node.js -- just return null
-		return null;
+	else {
+		return String(error);
 	}
-}
-
-/**
- * Return a new SourceMapConsumer for a given source map string.
- */
-function loadSourceMap(data: any) {
-	return new SourceMapConsumer(data);
 }
 
 /**
  * Parse a stack trace, apply any source mappings, and normalize its format.
  */
-function normalizeStackTrace(stack: string, filterStack: boolean) {
+function normalizeStackTrace(stack: string, filterStack: boolean, getSource: (name: string) => string) {
 	let lines = stack.replace(/\s+$/, '').split('\n');
 	let firstLine = '';
 
@@ -828,7 +420,7 @@ function normalizeStackTrace(stack: string, filterStack: boolean) {
 		lines = lines.slice(1);
 	}
 
-	let stackLines = /^\s*at /.test(lines[0]) ? processChromeTrace(lines) : processSafariTrace(lines);
+	let stackLines = /^\s*at /.test(lines[0]) ? processChromeTrace(lines, getSource) : processSafariTrace(lines, getSource);
 
 	if (filterStack) {
 		stackLines = stackLines.filter(function (line) {
@@ -846,14 +438,14 @@ function normalizeStackTrace(stack: string, filterStack: boolean) {
 /**
  * Process Chrome, Opera, and IE traces.
  */
-function processChromeTrace(lines: string[]) {
+function processChromeTrace(lines: string[], getSource: (name: string) => string) {
 	return lines.map(function (line) {
 		let match: RegExpMatchArray;
 		if ((match = /^\s*at (.+?) \(([^)]+)\)$/.exec(line))) {
-			return formatLine({ func: match[1], source: match[2] });
+			return formatLine({ func: match[1], source: match[2] }, getSource);
 		}
 		else if ((match = /^\s*at (.*)/.exec(line))) {
-			return formatLine({ source: match[1] });
+			return formatLine({ source: match[1] }, getSource);
 		}
 		else {
 			return line;
@@ -864,17 +456,18 @@ function processChromeTrace(lines: string[]) {
 /**
  * Process Safari and Firefox traces.
  */
-function processSafariTrace(lines: string[]) {
+function processSafariTrace(lines: string[], getSource: (name: string) => string) {
 	return lines.map(function (line) {
 		let match: RegExpMatchArray;
 		if ((match = /^([^@]+)@(.*)/.exec(line))) {
-			return formatLine({ func: match[1], source: match[2] });
+			return formatLine({ func: match[1], source: match[2] }, getSource);
 		}
 		else if ((match = /^(\w+:\/\/.*)/.exec(line))) {
-			return formatLine({ source: match[1] });
+			return formatLine({ source: match[1] }, getSource);
 		}
 		else {
 			return line;
 		}
 	});
 }
+

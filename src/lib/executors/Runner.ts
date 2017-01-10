@@ -1,5 +1,4 @@
-import ClientSuite from '../ClientSuite';
-import PreExecutor from './PreExecutor';
+import RemoteSuite from '../RemoteSuite';
 import { Config, Remote } from '../../common';
 import EnvironmentType from '../EnvironmentType';
 import Executor from './Executor';
@@ -8,18 +7,13 @@ import Proxy from '../Proxy';
 import Suite from '../Suite';
 import * as util from '../util';
 import resolveEnvironments from '../resolveEnvironments';
-import { IRequire } from 'dojo/loader';
 import Tunnel from 'digdug/Tunnel';
-
-// AMD modules
-import * as lang from 'dojo/lang';
-import * as DojoPromise from 'dojo/Promise';
-
-// Legacy imports
-import Server = require('dojo/node!leadfoot/Server');
-import Command = require('dojo/node!leadfoot/Command');
-
-declare const require: IRequire;
+import NullTunnel from 'digdug/NullTunnel';
+import RunnerReporter from '../reporters/Runner';
+import { deepMixin } from 'dojo/lang';
+import DojoPromise = require('dojo/Promise');
+import Server = require('leadfoot/Server');
+import Command = require('leadfoot/Command');
 
 /**
  * The Runner executor is used to run unit & functional tests in remote environments loaded through a WebDriver
@@ -32,25 +26,25 @@ export default class Runner extends Executor {
 
 	tunnel: Tunnel;
 
-	constructor(config: Config, preExecutor: PreExecutor) {
-		config = lang.deepMixin({
+	constructor(config: Config) {
+		config = deepMixin({
 			capabilities: {
 				'idle-timeout': 60
 			},
 			environmentRetries: 3,
 			environments: [],
 			maxConcurrency: Infinity,
-			reporters: [ 'Runner' ],
+			reporters: [ RunnerReporter ],
 			runnerClientReporter: {
 				id: 'WebDriver'
 			},
-			tunnel: 'NullTunnel',
+			tunnel: NullTunnel,
 			tunnelOptions: {
 				tunnelId: String(Date.now())
 			}
 		}, config);
 
-		super(config, preExecutor);
+		super(config);
 
 		this._fixConfig();
 	}
@@ -112,21 +106,17 @@ export default class Runner extends Executor {
 			});
 		}
 
-		function loadTunnel() {
-			return self._loadTunnel(config).then(function (tunnel) {
-				self.tunnel = tunnel;
-			});
-		}
-
-		function loadTestModules() {
-			return self._createSuites(config, self.tunnel, self.preExecutor.getArguments()).then(function (suites) {
-				self.suites = suites;
-				return self._loadTestModules(config.functionalSuites);
-			});
-		}
-
 		function startTunnel() {
 			const tunnel = self.tunnel;
+			tunnel.on('downloadprogress', function (progress: any) {
+				reporterManager.emit('tunnelDownloadProgress', tunnel, progress);
+			});
+			tunnel.on('status', function (status: any) {
+				reporterManager.emit('tunnelStatus', tunnel, status);
+			});
+
+			config.capabilities = deepMixin(tunnel.extraCapabilities, config.capabilities);
+
 			return tunnel.start().then(function () {
 				return reporterManager.emit('tunnelStart', tunnel);
 			});
@@ -151,8 +141,6 @@ export default class Runner extends Executor {
 		}
 
 		return promise
-			.then(loadTunnel)
-			.then(loadTestModules)
 			.then(startTunnel);
 	}
 
@@ -240,7 +228,7 @@ export default class Runner extends Executor {
 				// on environment), so we require users to explicitly set it to a falsy value to assure the test
 				// system that it should not run the client
 				if (config.suites) {
-					suite.tests.push(new ClientSuite({
+					suite.tests.push(new RemoteSuite({
 						args: overrides,
 						config: config,
 						parent: suite,
@@ -289,10 +277,6 @@ export default class Runner extends Executor {
 
 		config.proxyUrl = config.proxyUrl.replace(/\/*$/, '/');
 
-		if (config.tunnel.indexOf('/') === -1) {
-			config.tunnel = 'dojo/node!digdug/' + config.tunnel;
-		}
-
 		config.tunnelOptions.servers = (config.tunnelOptions.servers || []).concat(config.proxyUrl);
 	}
 
@@ -302,24 +286,24 @@ export default class Runner extends Executor {
 	 * @param config The Intern configuration object.
 	 * @returns {module:digdug/Tunnel} A Dig Dug tunnel.
 	 */
-	protected _loadTunnel(config: Config) {
-		const reporterManager = this.reporterManager;
-		return util.getModule(config.tunnel, <IRequire> require).then(function (Tunnel) {
-			// Tunnel only copies own property values from the config object, so make a flat
-			// copy of config.tunnelOptions (it's a delegate)
-			const tunnelOptions = lang.deepMixin({}, config.tunnelOptions);
-			const tunnel = new Tunnel(tunnelOptions);
+	// protected _loadTunnel(config: Config) {
+	// 	const reporterManager = this.reporterManager;
+	// 	const TunnelClass = this.tunnel;
 
-			tunnel.on('downloadprogress', function (progress: any) {
-				reporterManager.emit('tunnelDownloadProgress', tunnel, progress);
-			});
-			tunnel.on('status', function (status: any) {
-				reporterManager.emit('tunnelStatus', tunnel, status);
-			});
+	// 	// Tunnel only copies own property values from the config object, so make a flat
+	// 	// copy of config.tunnelOptions (it's a delegate)
+	// 	const tunnelOptions = deepMixin({}, config.tunnelOptions);
+	// 	const tunnel = new TunnelClass(tunnelOptions);
 
-			config.capabilities = lang.deepMixin(tunnel.extraCapabilities, config.capabilities);
+	// 	tunnel.on('downloadprogress', function (progress: any) {
+	// 		reporterManager.emit('tunnelDownloadProgress', tunnel, progress);
+	// 	});
+	// 	tunnel.on('status', function (status: any) {
+	// 		reporterManager.emit('tunnelStatus', tunnel, status);
+	// 	});
 
-			return tunnel;
-		});
-	}
+	// 	config.capabilities = deepMixin(tunnel.extraCapabilities, config.capabilities);
+
+	// 	return tunnel;
+	// }
 }

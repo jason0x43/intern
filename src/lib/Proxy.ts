@@ -1,21 +1,12 @@
-import * as util from './util';
-
-// AMD modules
+import * as util from './node/util';
 import * as lang from 'dojo/lang';
 import * as Promise from 'dojo/Promise';
 import * as aspect from 'dojo/aspect';
-import { IRequire } from 'dojo/loader';
-
-// Node modules
-import * as http from 'dojo/node!http';
-import * as path from 'dojo/node!path';
-import * as fs from 'dojo/node!fs';
-import * as mimetype from 'dojo/node!mimetype';
-import * as url from 'dojo/node!url';
-import * as net from 'dojo/node!net';
-
-// Assumes we're running under an AMD loader
-declare const require: IRequire;
+import * as http from 'http';
+import * as path from 'path';
+import * as fs from 'fs';
+import { lookup } from 'mime-types';
+import * as net from 'net';
 
 export type ProxyConfig = {
 	basePath?: string;
@@ -108,10 +99,7 @@ export default class Proxy {
 
 	private _handler(request: http.IncomingMessage, response: http.ServerResponse) {
 		if (request.method === 'GET') {
-			if (/\/__resolveSuites__\?/.test(request.url)) {
-				this._resolveSuites(request, response);
-			}
-			else if (/\.js(?:$|\?)/.test(request.url)) {
+			if (/\.js(?:$|\?)/.test(request.url)) {
 				this._handleFile(request, response, this.config.instrument);
 			}
 			else {
@@ -185,7 +173,7 @@ export default class Proxy {
 		let wholePath: string;
 
 		if (/^__intern\//.test(file)) {
-			const basePath = path.resolve(path.join(require.toUrl('intern/'), ''));
+			const basePath = path.resolve(path.join(__dirname, '..'));
 			wholePath = path.join(basePath, file.replace(/^__intern\//, ''));
 			instrument = false;
 		}
@@ -210,7 +198,7 @@ export default class Proxy {
 			instrument = false;
 		}
 
-		const contentType = mimetype.lookup(path.basename(wholePath)) || 'application/octet-stream';
+		const contentType = lookup(path.basename(wholePath)) || 'application/octet-stream';
 		fs.stat(wholePath, (error, stats) => {
 			// The proxy server was stopped before this file was served
 			if (!this.server) {
@@ -304,17 +292,6 @@ export default class Proxy {
 		while ((message = session.queue[message.sequence + 1]));
 
 		return triggerMessage.resolver.promise;
-	}
-
-	private _resolveSuites(request: http.IncomingMessage, response: http.ServerResponse) {
-		const query = url.parse(request.url, true).query;
-		const suites = JSON.parse(query.suites);
-		const resolvedSuites = JSON.stringify(util.resolveModuleIds(suites));
-		response.writeHead(200, {
-			'Content-Type': 'application/json',
-			'Content-Length': resolvedSuites.length
-		});
-		response.end(resolvedSuites);
 	}
 
 	private _send404(response: http.ServerResponse) {

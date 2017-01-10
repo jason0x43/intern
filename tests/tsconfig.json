@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "baseUrl": "..",
+    "declaration": false,
     "module": "umd",
     "paths": {
       "src/*": [

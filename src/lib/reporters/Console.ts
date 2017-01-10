@@ -1,9 +1,9 @@
-import * as util from '../util';
+import { getErrorMessage } from '../node/util';
 import has = require('dojo/has');
 import Suite from '../Suite';
 import Test from '../Test';
-import Collector = require('dojo/has!host-node?dojo/node!istanbul/lib/collector');
-import TextReporter = require('dojo/has!host-node?dojo/node!istanbul/lib/report/text');
+import Collector = require('istanbul/lib/collector');
+import TextReporter = require('istanbul/lib/report/text');
 import { Reporter, ReporterConfig } from '../../common';
 
 /**
@@ -39,12 +39,12 @@ export default class Console implements Reporter {
 
 	fatalError(error: Error): void {
 		this.console.warn('FATAL ERROR');
-		this.console.error(util.getErrorMessage(error));
+		this.console.error(getErrorMessage(error));
 	}
 
 	reporterError(_reporter: Reporter, error: Error): void {
 		this.console.error('REPORTER ERROR');
-		this.console.error(util.getErrorMessage(error));
+		this.console.error(getErrorMessage(error));
 	}
 
 	suiteEnd(suite: Suite): void {
@@ -71,7 +71,7 @@ export default class Console implements Reporter {
 			return;
 		}
 		this.console.warn('SUITE ERROR');
-		this.console.error(util.getErrorMessage(suite.error));
+		this.console.error(getErrorMessage(suite.error));
 	}
 
 	suiteStart(suite: Suite): void {
@@ -81,7 +81,7 @@ export default class Console implements Reporter {
 
 	testFail(test: Test): void {
 		this.console.error('FAIL: ' + (<{ [key: string]: any }> test)[this.testId] + ' (' + test.timeElapsed + 'ms)');
-		this.console.error(util.getErrorMessage(test.error));
+		this.console.error(getErrorMessage(test.error));
 	}
 
 	testPass(test: Test): void {

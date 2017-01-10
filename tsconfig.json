@@ -14,10 +14,19 @@
     "removeComments": true,
     "rootDir": ".",
     "sourceMap": true,
-    "target": "ES5"
+    "target": "ES5",
+    "typeRoots": [
+      "./types",
+      "./node_modules/@types"
+    ]
+  },
+  "formatCodeOptions": {
+    "convertTabsToSpaces": false,
+    "insertSpaceAfterCommaDelimiter": true,
+    "insertSpaceAfterFunctionKeywordForAnonymousFunctions": true,
+    "insertSpaceAfterSemicolonInForStatements": true
   },
   "include": [
-    "./types/**/*.d.ts",
     "./src/**/*.ts"
   ]
 }

@@ -1,15 +1,7 @@
-import { Config, Reporter } from '../common';
-
-// AMD modules
-import * as has from 'dojo/has';
+import { Reporter } from '../common';
 import * as lang from 'dojo/lang';
 import * as aspect from 'dojo/aspect';
 import * as Promise from 'dojo/Promise';
-
-// Node modules
-import * as fs from 'dojo/has!host-node?dojo/node!fs';
-import * as pathUtil from 'dojo/has!host-node?dojo/node!path';
-import * as istanbulDefaults from 'dojo/has!host-node?dojo/node!istanbul/lib/report/common/defaults';
 import { Watermarks } from 'istanbul';
 
 export interface ReporterConfig {
@@ -17,13 +9,6 @@ export interface ReporterConfig {
 	watermarks?: Watermarks;
 	filename?: string;
 	output?: NodeJS.WritableStream;
-}
-
-export interface ReporterDescriptor {
-	id: string;
-	filename?: string;
-	directory?: string;
-	internConfig?: Config;
 }
 
 export interface ReporterConstructor {
@@ -79,72 +64,6 @@ export default class ReporterManager {
 		else {
 			config = Object.create(config);
 			config.console = this._getConsole();
-
-			// https://github.com/gotwarlost/istanbul/issues/358
-			if ('watermarks' in config) {
-				config.watermarks = lang.mixin(istanbulDefaults.watermarks(), config.watermarks);
-			}
-
-			if (has('host-node')) {
-				/* jshint node:true */
-				if (config.filename) {
-					if (pathUtil.dirname(config.filename) !== '.') {
-						mkdir(pathUtil.dirname(config.filename));
-					}
-
-					// Lazily create the writable stream so we do not open an extra fd for reporters that use
-					// `filename` directly and never touch `config.output`
-					defineLazyProperty(config, 'output', function () {
-						return fs.createWriteStream(config.filename);
-					});
-				}
-				else {
-					// See theintern/intern#454; all \r must be replaced by \x1b[1G (cursor move to column 1)
-					// on Windows due to a libuv bug
-					let write: (data: string) => any;
-					if (process.platform === 'win32') {
-						write = function (data) {
-							let args: (any[]|IArguments);
-							if (typeof data === 'string' && data.indexOf('\r') !== -1) {
-								data = data.replace(/\r/g, '\x1b[1G');
-								args = [ data ].concat(Array.prototype.slice.call(arguments, 1));
-							}
-							else {
-								args = arguments;
-							}
-
-							return process.stdout.write.apply(process.stdout, args);
-						};
-					}
-					else {
-						write = process.stdout.write.bind(process.stdout);
-					}
-
-					config.output = lang.delegate(process.stdout, {
-						write: write,
-						// Allow reporters to call `end` regardless of whether or not they are outputting to file,
-						// without an error for stdout (which cannot be closed)
-						end: write
-					});
-				}
-			}
-			else if (has('host-browser')) {
-				defineLazyProperty(config, 'output', function () {
-					const element = document.createElement('pre');
-
-					return {
-						write: function (chunk: string, _encoding: string, callback: Function) {
-							element.appendChild(document.createTextNode(chunk));
-							callback();
-						},
-						end: function (chunk: string, _encoding: string, callback: Function) {
-							element.appendChild(document.createTextNode(chunk));
-							document.body.appendChild(element);
-							callback();
-						}
-					};
-				});
-			}
 
 			reporter = new Reporter(config);
 		}
@@ -316,40 +235,5 @@ const TOPIC_TO_EVENT: { [key: string]: string } = {
 	start: 'run',
 	stop: 'destroy'
 };
-
-function defineLazyProperty(object: Object, property: string, getter: () => any) {
-	Object.defineProperty(object, property, {
-		get: function (this: any) {
-			const value = getter.apply(this, arguments);
-			Object.defineProperty(object, property, {
-				value: value,
-				configurable: true,
-				enumerable: true
-			});
-			return value;
-		},
-		configurable: true,
-		enumerable: true
-	});
-}
-
-function isDirectory(pathname: string) {
-	try {
-		return fs.statSync(pathname).isDirectory();
-	}
-	catch (error) {
-		return false;
-	}
-}
-
-function mkdir(dirname: string) {
-	dirname.split(pathUtil.sep).reduce(function (currentPath, part) {
-		currentPath = pathUtil.join(currentPath, part);
-		if (!isDirectory(currentPath)) {
-			fs.mkdirSync(currentPath);
-		}
-		return currentPath;
-	}, '');
-}
 
 function noop() {}
