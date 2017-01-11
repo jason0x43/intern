@@ -145,15 +145,6 @@ export interface ReporterOutput {
 	end(chunk: string | Buffer, encoding?: string, callback?: Function): void;
 }
 
-export interface ReporterConfig {
-	console?: any; // Console
-	watermarks?: any; // Watermarks;
-	filename?: string;
-	output?: ReporterOutput;
-	projectRoot?: string;
-	directory?: string;
-}
-
 export interface ReporterDescriptor {
 	id: string;
 	filename?: string;

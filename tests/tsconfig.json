@@ -13,7 +13,6 @@
   },
   "extends": "../tsconfig.json",
   "include": [
-    "../types/**/*.d.ts",
-    "./**/*.ts"
+    "./tester.ts"
   ]
 }

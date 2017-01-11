@@ -1,5 +1,6 @@
 import Promise = require('dojo/Promise');
-import Test from './Test';
+import Executor from './executors/Executor';
+import Test, { SKIP } from './Test';
 import { InternError, Remote } from '../common';
 import * as util from './util';
 
@@ -59,25 +60,23 @@ export default class Suite {
 
 	private _bail: boolean;
 
+	private _executor: Executor;
+
 	private _grep: RegExp;
 
 	private _remote: Remote;
-
-	private _reporterManager: any;
 
 	private _sessionId: string;
 
 	private _timeout: number;
 
-	constructor(config: SuiteConfig)  {
+	constructor(config: SuiteConfig) {
 		this.tests = [];
 
-		const anyThis = <any> this;
+		const anyThis = <any>this;
 		for (let k in config) {
 			anyThis[k] = config[k];
 		}
-
-		this.reporterManager && this.reporterManager.emit('newSuite', this);
 	}
 
 	/**
@@ -89,6 +88,20 @@ export default class Suite {
 
 	set bail(value: boolean) {
 		this._bail = value;
+	}
+
+	/**
+	 * The executor used to run this Suite.
+	 */
+	get executor(): Executor {
+		return this._executor || (this.parent && this.parent._executor);
+	}
+
+	set executor(value: Executor) {
+		if (this._executor) {
+			throw new Error('AlreadyAssigned: an executor may only be set once per suite');
+		}
+		this._executor = value;
 	}
 
 	/**
@@ -144,28 +157,13 @@ export default class Suite {
 	}
 
 	/**
-	 * The reporter manager that should receive lifecycle events from the Suite.
-	 */
-	get reporterManager(): any {
-		return this._reporterManager || (this.parent && this.parent.reporterManager);
-	}
-
-	set reporterManager(value: any) {
-		if (this._reporterManager) {
-			throw new Error('reporterManager may only be set once per suite');
-		}
-
-		this._reporterManager = value;
-	}
-
-	/**
 	 * The sessionId of the environment in which the suite executed.
 	 */
 	get sessionId(): string {
 		return this.parent ? this.parent.sessionId :
 			this._sessionId ? this._sessionId :
-			this.remote ? this.remote.session.sessionId :
-			null;
+				this.remote ? this.remote.session.sessionId :
+					null;
 	}
 
 	/**
@@ -191,10 +189,11 @@ export default class Suite {
 	 * The total number of tests in this test suite and any sub-suites that have failed.
 	 */
 	get numFailedTests() {
-		function reduce(numFailedTests: number, test: (Suite|Test)): number {
-			return (<Suite> test).tests ?
-				(<Suite> test).tests.reduce(reduce, numFailedTests) :
-				((<Test> test).hasPassed || test.skipped != null ? numFailedTests : numFailedTests + 1);
+		function reduce(numFailedTests: number, testOrSuite: (Suite | Test)): number {
+			const suite = <Suite>testOrSuite;
+			const test = <Test>testOrSuite;
+			return suite.tests ? suite.tests.reduce(reduce, numFailedTests) :
+				(test.hasPassed || test.skipped != null ? numFailedTests : numFailedTests + 1);
 		}
 
 		return this.tests.reduce(reduce, 0);
@@ -204,9 +203,9 @@ export default class Suite {
 	 * The total number of tests in this test suite and any sub-suites that were skipped.
 	 */
 	get numSkippedTests() {
-		function reduce(numSkippedTests: number, test: (Suite|Test)): number {
-			return (<Suite> test).tests ?
-				(<Suite> test).tests.reduce(reduce, numSkippedTests) :
+		function reduce(numSkippedTests: number, test: (Suite | Test)): number {
+			return (<Suite>test).tests ?
+				(<Suite>test).tests.reduce(reduce, numSkippedTests) :
 				(test.skipped != null ? numSkippedTests + 1 : numSkippedTests);
 		}
 
@@ -237,6 +236,7 @@ export default class Suite {
 	}
 
 	add(testOrSuite: Test | Suite) {
+		testOrSuite.parent = this;
 		this.tests.push(testOrSuite);
 	}
 
@@ -256,7 +256,7 @@ export default class Suite {
 	 * @returns {module:dojo/Promise}
 	 */
 	run(): Promise<any> {
-		const reporterManager = this.reporterManager;
+		const executor = this.executor;
 		const self = this;
 		let startTime: number;
 
@@ -279,7 +279,7 @@ export default class Suite {
 					return dfd;
 				};
 
-				const suiteFunc: () => Promise<any> = (<any> suite)[name];
+				const suiteFunc: () => Promise<any> = (<any>suite)[name];
 				let returnValue = suiteFunc && suiteFunc.apply(suite, args);
 
 				if (dfd) {
@@ -315,7 +315,7 @@ export default class Suite {
 				// Remove the async method since it should only be available within a lifecycle function call
 				suite.async = undefined;
 
-				if (error !== Test.SKIP) {
+				if (error !== SKIP) {
 					return reportSuiteError(error);
 				}
 			});
@@ -323,22 +323,12 @@ export default class Suite {
 
 		function end() {
 			self.timeElapsed = Date.now() - startTime;
-			return report('suiteEnd');
-		}
-
-		function report(eventName: string, ...args: any[]) {
-			if (reporterManager) {
-				args = [ eventName, self ].concat(args);
-				return reporterManager.emit.apply(reporterManager, args);
-			}
-			else {
-				return Promise.resolve();
-			}
+			return self.executor.emit('suiteEnd', self);
 		}
 
 		function reportSuiteError(error: InternError) {
 			self.error = error;
-			return report('suiteError', error).then(function () {
+			return self.executor.emit('suiteError', self).then(function () {
 				throw error;
 			});
 		}
@@ -353,7 +343,7 @@ export default class Suite {
 			let suite: Suite = self;
 
 			do {
-				(<any> suiteQueue)[orderMethod](suite);
+				(<any>suiteQueue)[orderMethod](suite);
 			}
 			while ((suite = suite.parent));
 
@@ -391,11 +381,7 @@ export default class Suite {
 						return;
 					}
 
-					function runWithCatch() {
-						return runLifecycleMethod(suite, name, test);
-					}
-
-					current = runWithCatch().then(next, handleError);
+					current = runLifecycleMethod(suite, name, test).then(next, handleError);
 				}
 
 				next();
@@ -434,8 +420,9 @@ export default class Suite {
 						// An error may be associated with a deeper test already, in which case we do not
 						// want to reassociate it with a more generic parent
 						if (!error.relatedTest) {
-							error.relatedTest = <Test> test;
+							error.relatedTest = <Test>test;
 						}
+						return Promise.resolve();
 					}
 
 					function runWithCatch() {
@@ -456,7 +443,7 @@ export default class Suite {
 					}
 
 					// test is a suite
-					if ((<Suite> test).tests) {
+					if ((<Suite>test).tests) {
 						current = runWithCatch();
 					}
 					// test is a single test
@@ -466,14 +453,14 @@ export default class Suite {
 						}
 
 						if (test.skipped != null) {
-							reporterManager.emit('testSkip', test).then(next);
+							executor.emit('testEnd', <Test>test).then(next);
 							return;
 						}
 
-						current = runTestLifecycle('beforeEach', <Test> test)
+						current = runTestLifecycle('beforeEach', <Test>test)
 							.then(runWithCatch)
 							.finally(function () {
-								return runTestLifecycle('afterEach', <Test> test);
+								return runTestLifecycle('afterEach', <Test>test);
 							})
 							.catch(function (error: InternError) {
 								firstError = firstError || error;
@@ -488,7 +475,7 @@ export default class Suite {
 
 						// If the test was a suite and the suite was skipped due to bailing, skip the rest of this
 						// suite
-						if ((<Suite> test).tests && test.skipped === BAIL_REASON) {
+						if ((<Suite>test).tests && test.skipped === BAIL_REASON) {
 							skipRestOfSuite();
 						}
 						// If the test errored and bail mode is enabled, skip the rest of this suite
@@ -509,7 +496,7 @@ export default class Suite {
 		}
 
 		function start() {
-			return report('suiteStart').then(function () {
+			return self.executor.emit('suiteStart', self).then(function () {
 				startTime = Date.now();
 			});
 		}
@@ -531,18 +518,18 @@ export default class Suite {
 				return setup().then(start);
 			}
 		})()
-		.then(runTests)
-		.finally(function () {
-			if (self.publishAfterSetup) {
-				return end().then(teardown);
-			}
-			else {
-				return teardown().then(end);
-			}
-		})
-		.then(function () {
-			return self.numFailedTests;
-		});
+			.then(runTests)
+			.finally(function () {
+				if (self.publishAfterSetup) {
+					return end().then(teardown);
+				}
+				else {
+					return teardown().then(end);
+				}
+			})
+			.then(function () {
+				return self.numFailedTests;
+			});
 	}
 
 	/**
@@ -554,7 +541,7 @@ export default class Suite {
 	skip(message: string = 'suite skipped') {
 		this.skipped = message;
 		// Use the SKIP constant from Test so that calling Suite#skip from a test won't fail the test.
-		throw Test.SKIP;
+		throw SKIP;
 	}
 
 	toJSON(): Object {
@@ -579,7 +566,7 @@ export default class Suite {
 				// relatedTest can be the Suite itself in the case of nested suites (a nested Suite's error is
 				// caught by a parent Suite, which assigns the nested Suite as the relatedTest, resulting in
 				// nestedSuite.relatedTest === nestedSuite); in that case, don't serialize it
-				relatedTest: this.error.relatedTest === <any> this ? undefined : this.error.relatedTest
+				relatedTest: this.error.relatedTest === <any>this ? undefined : this.error.relatedTest
 			} : null
 		};
 	}

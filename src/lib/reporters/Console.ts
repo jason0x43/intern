@@ -1,40 +1,22 @@
 import { getErrorMessage } from '../node/util';
-import has = require('dojo/has');
+import Executor from '../executors/Executor';
 import Suite from '../Suite';
 import Test from '../Test';
-import Collector = require('istanbul/lib/collector');
-import TextReporter = require('istanbul/lib/report/text');
-import { Reporter, ReporterConfig } from '../../common';
+import Reporter, { ReporterConfig } from './Reporter';
 
 /**
  * The console reporter outputs to the current environment's console.
  */
-export default class Console implements Reporter {
-	console: any; // TODO: fix
+export default class ConsoleReporter extends Reporter {
+	console: Console;
 	hasGrouping: boolean;
 	testId: string;
-	private _coverageReporter: TextReporter;
 
-	constructor(config: ReporterConfig = {}) {
-		this.console = config.console;
+	constructor(config: ReporterConfig = {}, executor: Executor) {
+		super(config, executor);
+		this.console = this.config.console;
 		this.hasGrouping = 'group' in this.console && 'groupEnd' in this.console;
 		this.testId = this.hasGrouping ? 'name' : 'id';
-
-		if (has('host-node')) {
-			this._coverageReporter = new TextReporter({
-				watermarks: config.watermarks
-			});
-		}
-	}
-
-	deprecated(name: string, replacement: string, extra: string): void {
-		this.console.warn(name + ' is deprecated.' +
-			(replacement ?
-				' Use ' + replacement + ' instead.' :
-				' Please open a ticket at https://github.com/theintern/intern/issues if you still require access ' +
-				'to this feature.') +
-			(extra ? ' ' + extra : '')
-		);
 	}
 
 	fatalError(error: Error): void {
@@ -63,7 +45,7 @@ export default class Console implements Reporter {
 		}
 
 		this.console[numFailedTests ? 'warn' : 'info'](message);
-		this.hasGrouping && this.console.groupEnd(suite.name);
+		this.hasGrouping && this.console.groupEnd();
 	}
 
 	suiteError(suite: Suite): void {
@@ -90,17 +72,5 @@ export default class Console implements Reporter {
 
 	testSkip(test: Test): void {
 		this.console.log('SKIP: ' + (<{ [key: string]: any }> test)[this.testId] + (test.skipped ? ' (' + test.skipped + ')' : ''));
-	}
-
-	coverage(_sessionId: string, coverage: Object): void {
-		if (!has('host-node')) {
-			return;
-		}
-		const collector = new Collector();
-		collector.add(coverage);
-
-		// add a newline between test results and coverage results for prettier output
-		this.console.log('');
-		this._coverageReporter.writeReport(collector, true);
 	}
 }
