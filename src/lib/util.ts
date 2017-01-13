@@ -44,25 +44,6 @@ export function createDiff(actual: Object, expected: Object): string {
 }
 
 /**
- * Add a property to an object that isn't evaluated until it's accessed
- */
-export function defineLazyProperty(object: Object, property: string, getter: () => any) {
-	Object.defineProperty(object, property, {
-		get: function (this: any) {
-			const value = getter.apply(this, arguments);
-			Object.defineProperty(object, property, {
-				value: value,
-				configurable: true,
-				enumerable: true
-			});
-			return value;
-		},
-		configurable: true,
-		enumerable: true
-	});
-}
-
-/**
  * Indicate whether Proxy or WebDriver should wait for an event to process
  * before continuing.
  */

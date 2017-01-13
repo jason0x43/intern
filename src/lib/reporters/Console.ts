@@ -1,32 +1,42 @@
-import { getErrorMessage } from '../node/util';
 import Executor from '../executors/Executor';
 import Suite from '../Suite';
 import Test from '../Test';
-import Reporter, { ReporterConfig } from './Reporter';
+import Reporter, { ReporterOptions } from './Reporter';
 
 /**
- * The console reporter outputs to the current environment's console.
+ * The console reporter outputs to the browser console.
  */
 export default class ConsoleReporter extends Reporter {
-	console: Console;
 	hasGrouping: boolean;
 	testId: string;
 
-	constructor(config: ReporterConfig = {}, executor: Executor) {
-		super(config, executor);
-		this.console = this.config.console;
+	constructor(options: ReporterOptions = {}) {
+		super(options);
 		this.hasGrouping = 'group' in this.console && 'groupEnd' in this.console;
 		this.testId = this.hasGrouping ? 'name' : 'id';
 	}
 
-	fatalError(error: Error): void {
-		this.console.warn('FATAL ERROR');
-		this.console.error(getErrorMessage(error));
+	get output() {
+		if (!this._output) {
+			const element = document.createElement('pre');
+			this._output = {
+				write(chunk: string, _encoding: string, callback: Function) {
+					element.appendChild(document.createTextNode(chunk));
+					callback();
+				},
+				end(chunk: string, _encoding: string, callback: Function) {
+					element.appendChild(document.createTextNode(chunk));
+					document.body.appendChild(element);
+					callback();
+				}
+			};
+		}
+		return this._output;
 	}
 
-	reporterError(_reporter: Reporter, error: Error): void {
-		this.console.error('REPORTER ERROR');
-		this.console.error(getErrorMessage(error));
+	error(error: Error): void {
+		this.console.warn('FATAL ERROR');
+		this.console.error(this.formatter.format(error));
 	}
 
 	suiteEnd(suite: Suite): void {
@@ -35,25 +45,24 @@ export default class ConsoleReporter extends Reporter {
 			return;
 		}
 
-		const numTests = suite.numTests;
-		const numFailedTests = suite.numFailedTests;
-		const numSkippedTests = suite.numSkippedTests;
-		let message = numFailedTests + '/' + numTests + ' tests failed';
+		if (suite.error) {
+			this.console.warn('SUITE ERROR');
+			this.console.error(this.formatter.format(suite.error));
+		}
+		else {
+			const numTests = suite.numTests;
+			const numFailedTests = suite.numFailedTests;
+			const numSkippedTests = suite.numSkippedTests;
+			let message = numFailedTests + '/' + numTests + ' tests failed';
 
-		if (numSkippedTests > 0) {
-			message += ' (' + numSkippedTests + ' skipped)';
+			if (numSkippedTests > 0) {
+				message += ' (' + numSkippedTests + ' skipped)';
+			}
+
+			this.console[numFailedTests ? 'warn' : 'info'](message);
 		}
 
-		this.console[numFailedTests ? 'warn' : 'info'](message);
 		this.hasGrouping && this.console.groupEnd();
-	}
-
-	suiteError(suite: Suite): void {
-		if (!this.console) {
-			return;
-		}
-		this.console.warn('SUITE ERROR');
-		this.console.error(getErrorMessage(suite.error));
 	}
 
 	suiteStart(suite: Suite): void {
@@ -61,16 +70,16 @@ export default class ConsoleReporter extends Reporter {
 		this.hasGrouping && suite.hasParent && this.console.group(suite.name);
 	}
 
-	testFail(test: Test): void {
-		this.console.error('FAIL: ' + (<{ [key: string]: any }> test)[this.testId] + ' (' + test.timeElapsed + 'ms)');
-		this.console.error(getErrorMessage(test.error));
-	}
-
-	testPass(test: Test): void {
-		this.console.log('PASS: ' + (<{ [key: string]: any }> test)[this.testId] + ' (' + test.timeElapsed + 'ms)');
-	}
-
-	testSkip(test: Test): void {
-		this.console.log('SKIP: ' + (<{ [key: string]: any }> test)[this.testId] + (test.skipped ? ' (' + test.skipped + ')' : ''));
+	testEnd(test: Test): void {
+		if (test.error) {
+			this.console.error(`FAIL: ${test[this.testId]} (${test.timeElapsed}ms)`);
+			this.console.error(this.formatter.format(test.error));
+		}
+		else if (test.skipped) {
+			this.console.log(`SKIP: ${test[this.testId]} (${test.skipped})`);
+		}
+		else {
+			this.console.log(`PASS: ${test[this.testId]} (${test.timeElapsed})ms)`);
+		}
 	}
 }

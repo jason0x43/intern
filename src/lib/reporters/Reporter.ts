@@ -19,11 +19,11 @@ export interface ReporterOutput {
 export default class Reporter implements ReporterProperties {
 	console: Console;
 
-	output: ReporterOutput;
-
 	executor: Executor;
 
 	protected _defaultFormatter: Formatter;
+
+	protected _output: ReporterOutput;
 
 	constructor(config: ReporterOptions = {}) {
 		mixin(this, config);
@@ -45,6 +45,27 @@ export default class Reporter implements ReporterProperties {
 
 	get internConfig(): Config {
 		return this.executor.config;
+	}
+
+	get output() {
+		if (!this._output) {
+			const _console = this.console;
+			this._output = {
+				write(chunk: string, _encoding: string, callback: Function) {
+					_console.log(chunk);
+					callback();
+				},
+				end(chunk: string, _encoding: string, callback: Function) {
+					_console.log(chunk);
+					callback();
+				}
+			};
+		}
+		return this._output;
+	}
+
+	set output(value: ReporterOutput) {
+		this._output = value;
 	}
 }
 

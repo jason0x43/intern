@@ -4,7 +4,7 @@ import Coverage from './Coverage';
 import { CoverageMessage } from '../executors/Executor';
 
 /**
- * The console reporter outputs to the current environment's console.
+ * The Simple reporter outputs to the terminal console.
  */
 export default class Simple extends Coverage {
 	console: Console;
