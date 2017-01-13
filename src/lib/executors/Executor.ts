@@ -1,5 +1,5 @@
 import { Config } from '../../common';
-import Suite, { SuiteOptions } from '../Suite';
+import Suite, { isSuiteOptions, SuiteOptions } from '../Suite';
 import Test, { isTestOptions, TestOptions } from '../Test';
 import { mixin } from 'dojo-core/lang';
 import Task from 'dojo-core/async/Task';
@@ -163,8 +163,11 @@ export default class Executor {
 			if (isTestOptions(suiteOrTest)) {
 				suiteOrTest = new Test(suiteOrTest);
 			}
-			else {
+			else if (isSuiteOptions(suiteOrTest)) {
 				suiteOrTest = new Suite(suiteOrTest);
+			}
+			else {
+				throw new Error('InvalidTest: argument is not a valid suite or test');
 			}
 		}
 		this._rootSuites.forEach(suite => {
