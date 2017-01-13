@@ -1,8 +1,17 @@
 import Executor from './executors/Executor';
-import Promise = require('dojo/Promise');
-import * as util from './util';
-import { InternError, Remote, Deferred } from '../common';
+import Deferred from './Deferred';
+import Task, { isTask } from 'dojo-core/async/Task';
+import { InternError, Remote } from '../common';
 import Suite from './Suite';
+import { mixin } from 'dojo-core/lang';
+
+export function isTest(value: any): value is Test {
+	return value instanceof Test;
+}
+
+export function isTestOptions(value: any): value is TestOptions {
+	return !(value instanceof Test) && value.test != null;
+}
 
 export interface TestFunction {
 	(): void | Promise<any>;
@@ -16,7 +25,7 @@ export interface TestProperties {
 	test: TestFunction;
 }
 
-export type TestConfig = Partial<TestProperties>;
+export type TestOptions = Partial<TestProperties>;
 
 export const SKIP: any = {};
 
@@ -39,16 +48,14 @@ export default class Test implements TestProperties {
 
 	protected _timeout: number;
 
-	protected _runTask: Promise<any>;
+	protected _runTask: Task<any>;
 
 	protected _timer: number;
 
 	protected _usesRemote = false;
 
-	constructor(config: TestConfig) {
-		for (let key in config) {
-			(<{ [key: string]: any }> this)[key] = (<{ [key: string]: any }> config)[key];
-		}
+	constructor(options: TestOptions) {
+		mixin(this, options);
 	}
 
 	get executor(): Executor {
@@ -60,7 +67,7 @@ export default class Test implements TestProperties {
 	 */
 	get id() {
 		let name: string[] = [];
-		let object: (Suite|Test) = this;
+		let object: (Suite | Test) = this;
 
 		do {
 			object.name != null && name.unshift(object.name);
@@ -128,7 +135,7 @@ export default class Test implements TestProperties {
 			numCallsUntilResolution = 1;
 		}
 
-		const dfd = util.createDeferred();
+		const dfd = new Deferred();
 		const oldResolve = dfd.resolve;
 
 		/**
@@ -163,12 +170,10 @@ export default class Test implements TestProperties {
 			clearTimeout(this._timer);
 			const timer = setTimeout(() => {
 				if (this._runTask) {
-					let reason = new Error('Timeout reached on ' + this.id);
-					reason.name = 'CancelError';
-					this._runTask.cancel(reason);
+					this._runTask.cancel();
 				}
 			}, timeout);
-			this._timer = <number> (<any> timer);
+			this._timer = <number>(<any>timer);
 		}
 		else {
 			this.timeout = timeout;
@@ -187,8 +192,11 @@ export default class Test implements TestProperties {
 		// TODO: Test
 		this.async = Object.getPrototypeOf(this).async;
 		this._usesRemote = false;
-		this.hasPassed = this.isAsync = false;
-		this.error = this.skipped = this.timeElapsed = null;
+		this.hasPassed = false;
+		this.isAsync = false;
+		this.error = null;
+		this.skipped = null;
+		this.timeElapsed = null;
 
 		return this.executor.emit('testStart', this)
 			.then(() => {
@@ -213,26 +221,24 @@ export default class Test implements TestProperties {
 
 					// The `result` promise is wrapped in order to allow timeouts to work when a user returns a
 					// Promise from somewhere else that does not support cancellation
-					this._runTask = new Promise(function (resolve, reject, _progress, setCanceler) {
-						setCanceler(function (reason) {
+					this._runTask = new Task(
+						(resolve, reject) => {
+							resultPromise.then(resolve, reject);
+
+							if (isTask(resultPromise)) {
+								resultPromise.finally(reject);
+							}
+						},
+						() => {
 							// Dojo 2 promises are designed to allow extra signalling if a task has to perform
 							// cleanup when it is cancelled; some others, including Dojo 1 promises, do not. In
 							// order to ensure that a timed out test is never accidentally resolved, always throw
 							// or re-throw the cancel reason
-							if (resultPromise.cancel) {
-								let returnValue = resultPromise.cancel(reason);
-								if (returnValue && returnValue.finally) {
-									return returnValue.finally(function () {
-										throw reason;
-									});
-								}
+							if (isTask(resultPromise)) {
+								resultPromise.cancel();
 							}
-
-							throw reason;
-						});
-
-						resultPromise.then(resolve, reject);
-					});
+						}
+					);
 
 					this.restartTimeout();
 					return this._runTask;
@@ -243,23 +249,27 @@ export default class Test implements TestProperties {
 				clearTimeout(this._timer);
 				this._timer = this._runTask = null;
 			})
-			.then(() => {
-				if (this._usesRemote && !this.isAsync) {
-					throw new Error('Remote used in synchronous test! Tests using this.remote must return a ' +
-									'promise or resolve a this.async deferred.');
-				}
-				this.hasPassed = true;
-			})
-			.catch(error => {
-				if (error === SKIP) {
-					if (!this.skipped) {
-						this.skipped = error.message;
+			.then(
+				// Test completed successfully -- potentially passed
+				() => {
+					if (this._usesRemote && !this.isAsync) {
+						throw new Error('Remote used in synchronous test! Tests using this.remote must ' +
+							'return a promise or resolve a this.async deferred.');
+					}
+					this.hasPassed = true;
+				},
+				// There was an error running the test; could be a skip, could be an assertion failure
+				error => {
+					if (error === SKIP) {
+						if (!this.skipped) {
+							this.skipped = error.message;
+						}
+					}
+					else {
+						this.error = error;
 					}
 				}
-				else {
-					this.error = error;
-				}
-			})
+			)
 			.finally(() => this.executor.emit('testEnd', this));
 	}
 
@@ -268,7 +278,7 @@ export default class Test implements TestProperties {
 	 *
 	 * @param message If provided, will be stored in this test's `skipped` property.
 	 */
-	skip(message: string = '') {
+	skip(message: string = 'skipped') {
 		this.skipped = message;
 		throw SKIP;
 	}

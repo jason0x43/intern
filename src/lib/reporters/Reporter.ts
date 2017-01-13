@@ -1,26 +1,50 @@
-export interface ReporterConfig {
-	console?: any; // Console
-	watermarks?: any; // Watermarks;
-	filename?: string;
-	output?: ReporterOutput;
-	projectRoot?: string;
-	directory?: string;
+import { Formatter } from '../util/format';
+import { mixin } from 'dojo-core/lang';
+import Executor from '../executors/Executor';
+import { Config } from '../../common';
+
+export interface ReporterProperties {
+	console: Console;
+	output: ReporterOutput;
+	formatter: Formatter;
 }
+
+export type ReporterOptions = Partial<ReporterProperties>;
 
 export interface ReporterOutput {
 	write(chunk: string | Buffer, encoding?: string, callback?: Function): void;
 	end(chunk: string | Buffer, encoding?: string, callback?: Function): void;
 }
 
-export default class Reporter {
-	config: ReporterConfig;
+export default class Reporter implements ReporterProperties {
+	console: Console;
 
-	constructor(config: ReporterConfig = {}) {
-		this.config = config;
+	output: ReporterOutput;
 
-		if (!config.console) {
-			this.config.console = getConsole();
+	executor: Executor;
+
+	protected _defaultFormatter: Formatter;
+
+	constructor(config: ReporterOptions = {}) {
+		mixin(this, config);
+
+		if (!this.console) {
+			this.console = getConsole();
 		}
+	}
+
+	get formatter() {
+		if (this.executor) {
+			return this.executor.formatter;
+		}
+		if (!this._defaultFormatter) {
+			this._defaultFormatter = new Formatter();
+		}
+		return this._defaultFormatter;
+	}
+
+	get internConfig(): Config {
+		return this.executor.config;
 	}
 }
 

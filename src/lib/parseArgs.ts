@@ -1,5 +1,6 @@
-import { BenchmarkMode, CommandLineArguments, Config } from '../common';
-import * as lang from 'dojo/lang';
+import { CommandLineArguments, Config } from '../common';
+// import { BenchmarkMode, CommandLineArguments, Config } from '../common';
+import { deepMixin } from 'dojo-core/lang';
 
 export function parseCommandLine(rawArgs: string[]) {
 	return parseArguments(rawArgs || process.argv.slice(2));
@@ -17,11 +18,10 @@ export function parseQueryString(query: string) {
 	});
 };
 
-export function newConfig(config: Config, args?: CommandLineArguments) {
+export function mixIntoConfig(config: Config, args?: CommandLineArguments) {
 	args = args || {};
 
-	/* jshint maxcomplexity:20 */
-	config = lang.deepMixin(config, args);
+	config = deepMixin(config, args);
 
 	if (args['grep']) {
 		let grep = /^\/(.*)\/([gim]*)$/.exec(args['grep']);
@@ -34,20 +34,16 @@ export function newConfig(config: Config, args?: CommandLineArguments) {
 		}
 	}
 
-	if (config.grep == null) {
-		config.grep = new RegExp('');
-	}
+	// if (config.grep == null) {
+	// 	config.grep = new RegExp('');
+	// }
 
-	config.instrumenterOptions = config.instrumenterOptions || {};
-
-	if (config.coverageVariable) {
-		config.instrumenterOptions.coverageVariable = config.coverageVariable;
-	}
-
-	if (config.proxyPort == null) {
-		config.proxyPort = 9000;
-	}
-	else if (typeof config.proxyPort === 'string') {
+	// TODO: don't set defaults here
+	// if (config.proxyPort == null) {
+	// 	config.proxyPort = 9000;
+	// }
+	// else if (typeof config.proxyPort === 'string') {
+	if (typeof config.proxyPort === 'string') {
 		if (isNaN(config.proxyPort)) {
 			throw new Error('proxyPort must be a number');
 		}
@@ -59,26 +55,26 @@ export function newConfig(config: Config, args?: CommandLineArguments) {
 		config.proxyUrl = 'http://localhost:' + config.proxyPort + '/';
 	}
 
-	let benchmarkConfig = config.benchmarkConfig = lang.deepMixin({
-		id: 'Benchmark',
-		filename: 'baseline.json',
-		mode: <BenchmarkMode>'test',
-		thresholds: {
-			warn: { rme: 3, mean: 5 },
-			fail: { rme: 6, mean: 10 }
-		},
-		verbosity: 0
-	}, config.benchmarkConfig);
+	// let benchmarkConfig = config.benchmarkConfig = lang.deepMixin({
+	// 	id: 'Benchmark',
+	// 	filename: 'baseline.json',
+	// 	mode: <BenchmarkMode>'test',
+	// 	thresholds: {
+	// 		warn: { rme: 3, mean: 5 },
+	// 		fail: { rme: 6, mean: 10 }
+	// 	},
+	// 	verbosity: 0
+	// }, config.benchmarkConfig);
 
-	if (config.benchmark) {
-		if (config.baseline) {
-			benchmarkConfig.mode = 'baseline';
-		}
+	// if (config.benchmark) {
+	// 	if (config.baseline) {
+	// 		benchmarkConfig.mode = 'baseline';
+	// 	}
 
-		config.suites = config.benchmarkSuites || [];
-		config.functionalSuites = [];
-		config.excludeInstrumentation = true;
-	}
+	// 	config.suites = config.benchmarkSuites || [];
+	// 	config.functionalSuites = [];
+	// 	config.excludeInstrumentation = true;
+	// }
 
 	return config;
 }

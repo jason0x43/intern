@@ -1,36 +1,23 @@
-import { getErrorMessage } from '../node/util';
 import Suite from '../Suite';
 import Test from '../Test';
-import Collector = require('istanbul/lib/collector');
-import TextReporter = require('istanbul/lib/report/text');
-import Reporter, { ReporterConfig } from './Reporter';
+import Coverage from './Coverage';
+import { CoverageMessage } from '../executors/Executor';
 
 /**
  * The console reporter outputs to the current environment's console.
  */
-export default class Simple extends Reporter {
+export default class Simple extends Coverage {
 	console: Console;
-	testId: string;
-	protected _coverageReporter: TextReporter;
-
-	constructor(config: ReporterConfig = {}) {
-		super(config);
-		this.console = config.console;
-		this.testId = 'id';
-		this._coverageReporter = new TextReporter({
-			watermarks: config.watermarks
-		});
-	}
 
 	error(error: Error): void {
 		this.console.error('FATAL ERROR');
-		this.console.error(getErrorMessage(error));
+		this.console.error(this.formatter.format(error));
 	}
 
 	suiteEnd(suite: Suite): void {
 		if (suite.error) {
 			this.console.warn('SUITE ERROR');
-			this.console.error(getErrorMessage(suite.error));
+			this.console.error(this.formatter.format(suite.error));
 		}
 		else {
 			const numTests = suite.numTests;
@@ -48,23 +35,22 @@ export default class Simple extends Reporter {
 
 	testEnd(test: Test): void {
 		if (test.error) {
-			this.console.error('FAIL: ' + (<{ [key: string]: any }> test)[this.testId] + ' (' + test.timeElapsed + 'ms)');
-			this.console.error(getErrorMessage(test.error));
+			this.console.error(`FAIL: ${test.id} (${test.timeElapsed}ms)`);
+			this.console.error(this.formatter.format(test.error));
 		}
 		else if (test.skipped) {
-			this.console.log('SKIP: ' + (<{ [key: string]: any }> test)[this.testId] + (test.skipped ? ' (' + test.skipped + ')' : ''));
+			this.console.log(`SKIP: ${test.id} (${test.skipped})`);
 		}
 		else {
-			this.console.log('PASS: ' + (<{ [key: string]: any }> test)[this.testId] + ' (' + test.timeElapsed + 'ms)');
+			this.console.log(`PASS: ${test.id} (${test.timeElapsed}ms)`);
 		}
 	}
 
-	coverage(coverage: Object): void {
-		const collector = new Collector();
-		collector.add(coverage);
+	coverage(data: CoverageMessage): void {
+		this.collector.add(data.coverage);
 
 		// add a newline between test results and coverage results for prettier output
 		this.console.log('');
-		this._coverageReporter.writeReport(collector, true);
+		this.report.writeReport(this.collector, true);
 	}
 }

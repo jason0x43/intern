@@ -2,17 +2,11 @@
   "compilerOptions": {
     "baseUrl": "..",
     "declaration": false,
-    "module": "umd",
-    "paths": {
-      "src/*": [
-        "./_build/src/*",
-        "./src/*"
-      ]
-    },
     "rootDir": ".."
   },
   "extends": "../tsconfig.json",
   "include": [
-    "./tester.ts"
+    "./tester.ts",
+    "./unit/lib/EnvironmentType.ts"
   ]
 }

@@ -58,21 +58,17 @@ declare module 'istanbul' {
 		path: string;
 	}
 
-	export class Collector {
-		constructor(options?: any);
-		add(coverage: any, testName?: string): void;
-	}
-
 	export class Configuration {
 		file?: string;
 		watermarks?: Watermarks;
 		dir?: string;
 	}
 
-	export class Instrumenter {
-		constructor(options?: any);
-		instrumentSync(code: string, filename: string): string;
-	}
+	import Collector = require('istanbul/lib/collector');
+	export { Collector };
+
+	import Instrumenter = require('istanbul/lib/instrumenter');
+	export { Instrumenter };
 
 	export class Reporter {
 		constructor(cfg?: Configuration, dir?: string);
@@ -112,6 +108,17 @@ declare module 'istanbul/lib/instrumenter' {
 		constructor(options?: any);
 		instrumentSync(code: string, path: string): string;
 		lastFileCoverage(): any;
+		opts: {
+			debug: boolean;
+			walkDebug: boolean;
+			coverageVariable: string;
+			codeGenerationOptions: any;
+			noAutoWrap: boolean;
+			noCompact: boolean;
+			embedSource: boolean;
+			preserveComments: boolean;
+			esModules: boolean;
+		};
 	}
 
 	export = Instrumenter;
@@ -129,6 +136,7 @@ declare module 'istanbul/lib/report' {
 		synopsis(): void;
 		getDefaultConfig(): Configuration;
 		writeReport(collector: Collector, sync?: boolean): void;
+		constructor(config?: any);
 	}
 
 	export = Report;

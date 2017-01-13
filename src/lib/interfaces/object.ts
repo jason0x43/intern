@@ -1,18 +1,19 @@
 import * as aspect from 'dojo/aspect';
-import * as main from '../../main';
-import Suite, { SuiteConfig, SuiteLifecycleFunction } from '../Suite';
+import Suite, { SuiteProperties, SuiteLifecycleFunction } from '../Suite';
 import Test from '../Test';
 
-export interface ObjectSuiteConfig extends SuiteConfig {
-	after?: SuiteLifecycleFunction;
-	before?: SuiteLifecycleFunction;
+export interface ObjectSuiteProperties extends SuiteProperties {
+	after: SuiteLifecycleFunction;
+	before: SuiteLifecycleFunction;
 }
+
+export type ObjectSuiteOptions = Partial<ObjectSuiteProperties>;
 
 export interface PropertyHandler {
 	(property: string, value: any, suite: Suite): boolean;
 }
 
-function createSuite(descriptor: ObjectSuiteConfig, parentSuite: Suite, TestClass?: typeof Test, propertyHandler?: PropertyHandler): void {
+function createSuite(descriptor: ObjectSuiteOptions, parentSuite: Suite, TestClass?: typeof Test, propertyHandler?: PropertyHandler): void {
 	/* jshint maxcomplexity: 13 */
 	let suite = new Suite({ parent: parentSuite });
 	let tests = suite.tests;
@@ -75,19 +76,19 @@ function defaultPropertyHandler(property: string, value: any, suite: Suite) {
  * @param TestClass Class to use to construct individual tests
  * @param propertyHandler Function to handle any properties that shouldn't be used as tests
  */
-export default function registerSuite(mainDescriptor: ObjectSuiteConfig, TestClass?: typeof Test, propertyHandler?: PropertyHandler): void {
-	TestClass = TestClass || Test;
+// export default function registerSuite(mainDescriptor: ObjectSuiteOptions, TestClass?: typeof Test, propertyHandler?: PropertyHandler): void {
+// 	TestClass = TestClass || Test;
 
-	main.executor.register(function (suite: Suite) {
-		let descriptor = mainDescriptor;
+// 	main.executor.register(function (suite: Suite) {
+// 		let descriptor = mainDescriptor;
 
-		// enable per-suite closure, to match feature parity with other interfaces like tdd/bdd more closely;
-		// without this, it becomes impossible to use the object interface for functional tests since there is no
-		// other way to create a closure for each main suite
-		if (typeof descriptor === 'function') {
-			descriptor = descriptor();
-		}
+// 		// enable per-suite closure, to match feature parity with other interfaces like tdd/bdd more closely;
+// 		// without this, it becomes impossible to use the object interface for functional tests since there is no
+// 		// other way to create a closure for each main suite
+// 		if (typeof descriptor === 'function') {
+// 			descriptor = descriptor();
+// 		}
 
-		createSuite(descriptor, suite, TestClass, propertyHandler);
-	});
-}
+// 		createSuite(descriptor, suite, TestClass, propertyHandler);
+// 	});
+// }

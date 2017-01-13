@@ -1,20 +1,18 @@
-import { Reporter, ReporterConfig, Config } from '../../common';
-import Suite from '../Suite';
-import Test from '../Test';
-import Tunnel from 'digdug/Tunnel';
-import charm = require('charm');
-import encode = require('charm/lib/encode');
-import { format } from 'util';
-import * as lang from 'dojo/lang';
-import { getErrorMessage } from '../node/util';
-import Collector = require('istanbul/lib/collector');
-import TextReport = require('istanbul/lib/report/text');
-
-export type Charm = charm.Charm;
-
 /**
  * Handles presentation of runner results to the user
  */
+
+import Suite from '../Suite';
+import Test from '../Test';
+import Reporter, { ReporterProperties } from './Reporter';
+import Tunnel from 'digdug/Tunnel';
+import { CoverageMessage } from '../executors/Executor';
+import { mixin } from 'dojo-core/lang';
+import { format } from 'util';
+import charm = require('charm');
+import TextReport = require('istanbul/lib/report/text');
+import Collector = require('istanbul/lib/collector');
+import encode = require('charm/lib/encode');
 
 const PAD = new Array(100).join(' ');
 const SPINNER_STATES = [ '/', '-', '\\', '|' ];
@@ -30,18 +28,17 @@ const BROWSERS = {
 	phantomjs: 'Phan'
 };
 
-const ASCII_COLOR = {
-	red: encode('[31m'),
-	green: encode('[32m'),
-	yellow: encode('[33m'),
-	reset: encode('[0m')
+const ANSI_COLOR = {
+	red: encode('[31m').toString('utf8'),
+	green: encode('[32m').toString('utf8'),
+	yellow: encode('[33m').toString('utf8'),
+	reset: encode('[0m').toString('utf8')
 };
 
 /**
  * Model tracking test results
- * @param {string} environment the environment associated with the report
- * @param {string?} sessionId the sessionId associated with the report
- * @constructor
+ * @param environment the environment associated with the report
+ * @param sessionId the sessionId associated with the report
  */
 export class Report {
 	environment: string;
@@ -106,59 +103,60 @@ function fit(text: string|number, width: number, padLeft: boolean = false): stri
 	return text.slice(0, width);
 }
 
-export interface PrettyReporterConfig extends ReporterConfig {
-	internConfig?: Config;
-	dimensions?: any;
-	titleWidth?: number;
-	maxProgressBarWidth?: number;
-	colorReplacement?: any;
+export interface PrettyProperties extends ReporterProperties {
+	dimensions: any;
+	titleWidth: number;
+	maxProgressBarWidth: number;
+	colorReplacement: { [key: string]: string };
 }
 
-export default class Pretty implements Reporter {
-	internConfig: Config;
+export type PrettyOptions = Partial<PrettyProperties>;
+
+export default class Pretty extends Reporter implements PrettyProperties {
 	spinnerOffset: number;
 	dimensions: any;
 	titleWidth: number;
 	maxProgressBarWidth: number;
-	colorReplacement: any;
-	header: string;
+	colorReplacement: { [key: string]: string };
 	reporters: any;
 	log: string[];
 	total: Report;
 	watermarks: any;
 	tunnelState: string;
-	charm: Charm;
+	header: string;
+
+	private _charm: charm.Charm;
 
 	private _renderTimeout: NodeJS.Timer;
 
-	constructor(config: PrettyReporterConfig = {}) {
-		this.internConfig = config.internConfig;
+	constructor(config: PrettyOptions = {}) {
+		super(config);
+
 		this.spinnerOffset = 0;
 		this.dimensions = config.dimensions || {};
 		this.titleWidth = config.titleWidth || 12;
 		this.maxProgressBarWidth = config.maxProgressBarWidth || 40;
-		this.colorReplacement = lang.mixin({
-			0: ASCII_COLOR.green + '✓',
-			1: ASCII_COLOR.reset + '~',
-			2: ASCII_COLOR.red + '×',
-			'✓': ASCII_COLOR.green,
-			'!': ASCII_COLOR.red,
-			'×': ASCII_COLOR.red,
-			'~': ASCII_COLOR.reset,
-			'⚠': ASCII_COLOR.yellow
+		this.colorReplacement = mixin({
+			0: ANSI_COLOR.green + '✓',
+			1: ANSI_COLOR.reset + '~',
+			2: ANSI_COLOR.red + '×',
+			'✓': ANSI_COLOR.green,
+			'!': ANSI_COLOR.red,
+			'×': ANSI_COLOR.red,
+			'~': ANSI_COLOR.reset,
+			'⚠': ANSI_COLOR.yellow
 		}, config.colorReplacement);
 		this.header = '';
 		this.reporters = {};
 		this.log = [];
 		this.total = new Report();
-		this.watermarks = config.watermarks;
 		this.tunnelState = '';
 		this._renderTimeout = undefined;
 	}
 
 	runStart() {
-		this.header = this.internConfig.config;
-		this.charm = this.charm || this._newCharm();
+		this.header = this.internConfig.name;
+		this._charm = this._charm || this._newCharm();
 
 		const resize = () => {
 			this.dimensions.width = (<any> process.stdout).columns || 80;
@@ -169,7 +167,7 @@ export default class Pretty implements Reporter {
 		process.stdout.on('resize', resize);
 
 		const rerender = () => {
-			this.charm.erase('screen').position(0, 0);
+			this._charm.erase('screen').position(0, 0);
 			this._render();
 			this._renderTimeout = setTimeout(rerender, 200);
 		};
@@ -177,21 +175,18 @@ export default class Pretty implements Reporter {
 	}
 
 	runEnd() {
-		const charm = this.charm;
+		const charm = this._charm;
 		clearTimeout(this._renderTimeout);
 		charm.erase('screen').position(0, 0);
 
 		// write a full log of errors
 		// Sort logs: pass < deprecated < skip < errors < fail
 		const ERROR_LOG_WEIGHT = { '!': 4, '×': 3, '~': 2, '⚠': 1, '✓': 0 };
-		const logs = this.log.sort(function (a: any, b: any) {
+		const logs = this.log.sort((a: any, b: any) => {
 			a = (<{ [key: string]: any }> ERROR_LOG_WEIGHT)[a.charAt(0)] || 0;
 			b = (<{ [key: string]: any }> ERROR_LOG_WEIGHT)[b.charAt(0)] || 0;
 			return a - b;
-		}).map(line => {
-			const color = this.colorReplacement[line.charAt(0)];
-			return color + line;
-		}).join('\n');
+		}).map(line => this._getColor(line) + line).join('\n');
 		charm.write(logs);
 		charm.write('\n\n');
 
@@ -207,10 +202,10 @@ export default class Pretty implements Reporter {
 		}
 	}
 
-	coverage(sessionId: string, coverage: Object): void {
-		const reporter = this.reporters[sessionId];
-		reporter && reporter.coverage.add(coverage);
-		this.total.coverage.add(coverage);
+	coverage(data: CoverageMessage): void {
+		const reporter = this.reporters[data.sessionId];
+		reporter && reporter.coverage.add(data.coverage);
+		this.total.coverage.add(data.coverage);
 	}
 
 	suiteStart(suite: Suite): void {
@@ -224,27 +219,29 @@ export default class Pretty implements Reporter {
 		}
 	}
 
-	suiteError(suite: Suite, error: Error) {
-		this._record(suite.sessionId, FAIL);
+	suiteEnd(suite: Suite) {
+		if (suite.error) {
+			this._record(suite.sessionId, FAIL);
 
-		const message = '! ' + suite.id;
-		this.log.push(message + '\n' + getErrorMessage(error));
+			const message = '! ' + suite.id;
+			this.log.push(message + '\n' + this.formatter.format(suite.error));
+		}
 	}
 
-	testSkip(test: Test): void {
-		this._record(test.sessionId, SKIP);
-		this.log.push('~ ' + test.id + ': ' + (test.skipped || 'skipped'));
-	}
-
-	testPass(test: Test): void {
-		this._record(test.sessionId, PASS);
-		this.log.push('✓ ' + test.id);
-	}
-
-	testFail(test: Test): void {
-		const message = '× ' + test.id;
-		this._record(test.sessionId, FAIL);
-		this.log.push(message + '\n' + getErrorMessage(test.error));
+	testEnd(test: Test) {
+		if (test.skipped) {
+			this._record(test.sessionId, SKIP);
+			this.log.push('~ ' + test.id + ': ' + (test.skipped || 'skipped'));
+		}
+		else if (test.error) {
+			const message = '× ' + test.id;
+			this._record(test.sessionId, FAIL);
+			this.log.push(message + '\n' + this.formatter.format(test.error));
+		}
+		else {
+			this._record(test.sessionId, PASS);
+			this.log.push('✓ ' + test.id);
+		}
 	}
 
 	tunnelStart(): void {
@@ -265,7 +262,7 @@ export default class Pretty implements Reporter {
 
 	fatalError(error: Error): void {
 		const message = '! ' + error.message;
-		this.log.push(message + '\n' + getErrorMessage(error));
+		this.log.push(message + '\n' + this.formatter.format(error));
 		// stop the render timeout on a fatal error so Intern can exit
 		clearTimeout(this._renderTimeout);
 	}
@@ -297,7 +294,7 @@ export default class Pretty implements Reporter {
 	/**
 	 * Create the charm instance used by this reporter.
 	 */
-	private _newCharm(): Charm {
+	private _newCharm(): charm.Charm {
 		const c = charm();
 		c.pipe(process.stdout);
 		return c;
@@ -317,7 +314,7 @@ export default class Pretty implements Reporter {
 	 */
 	private _drawProgressBar(report: Report, width: number): void {
 		const spinnerCharacter = SPINNER_STATES[this.spinnerOffset];
-		const charm = this.charm;
+		const charm = this._charm;
 		if (!report.numTotal) {
 			charm.write('Pending');
 			return;
@@ -328,7 +325,7 @@ export default class Pretty implements Reporter {
 		const barSize = Math.min(remainingWidth, report.numTotal, this.maxProgressBarWidth);
 		const results = report.getCompressedResults(barSize);
 
-		charm.write('[' + results.map(value => this.colorReplacement[value]).join(''));
+		charm.write('[' + results.map(value => this._getColor(value)).join(''));
 		charm.display('reset').write(fit(spinnerCharacter, barSize - results.length) + '] ' +
 			fit(report.finished, totalTextSize, true) + '/' + report.numTotal);
 	}
@@ -340,7 +337,7 @@ export default class Pretty implements Reporter {
 	 * title, OS and code coverage and the progress bar on the second
 	 */
 	private _drawSessionReporter(report: Report): void {
-		const charm = this.charm;
+		const charm = this._charm;
 		const titleWidth = this.titleWidth;
 		const leftOfBar = fit(this._abbreviateEnvironment(report.environment).slice(0, titleWidth - 2) + ': ',
 			titleWidth);
@@ -379,14 +376,18 @@ export default class Pretty implements Reporter {
 	}
 
 	private _render(omitLogs: boolean = false) {
-		const charm = this.charm;
+		const charm = this._charm;
 		const numReporters = Object.keys(this.reporters).length;
 		const logLength = this.dimensions.height - numReporters - 4 /* last line & total */ -
 			(this.tunnelState ? 2 : 0) - (numReporters ? 1 : 0) - (this.header ? 1 : 0);
 		this.spinnerOffset = (++this.spinnerOffset) % SPINNER_STATES.length;
 
 		charm.display('reset');
-		this.header && charm.write(this.header + '\n');
+		if (this.header) {
+			charm.display('bright');
+			charm.write(this.header + '\n');
+			charm.display('reset');
+		}
 		this.tunnelState && charm.write('Tunnel: ' + this.tunnelState + '\n\n');
 		this._drawTotalReporter(this.total);
 
@@ -405,9 +406,9 @@ export default class Pretty implements Reporter {
 				return (<{ [key: string]: any }> allowed)[line.charAt(0)];
 			}).slice(-logLength).map(line => {
 				// truncate long lines
-				const color = (<{ [key: string]: any }> this.colorReplacement)[line.charAt(0)] || ASCII_COLOR.reset;
+				const color = this._getColor(line);
 				line = line.split('\n', 1)[0];
-				return color + line.slice(0, this.dimensions.width) + ASCII_COLOR.reset;
+				return color + line.slice(0, this.dimensions.width) + ANSI_COLOR.reset;
 			}).join('\n');
 			charm.write('\n');
 			charm.write(logs);
@@ -415,7 +416,7 @@ export default class Pretty implements Reporter {
 	}
 
 	private _drawTotalReporter(report: Report): void {
-		const charm = this.charm;
+		const charm = this._charm;
 		const title = 'Total: ';
 		const totalTextSize = String(report.numTotal).length;
 
@@ -423,5 +424,12 @@ export default class Pretty implements Reporter {
 		this._drawProgressBar(report, this.dimensions.width - title.length);
 		charm.write(format('\nPassed: %s  Failed: %s  Skipped: %d\n',
 			fit(report.numPassed, totalTextSize), fit(report.numFailed, totalTextSize), report.numSkipped));
+	}
+
+	private _getColor(value: string | number): string {
+		if (typeof value === 'string') {
+			value = value[0];
+		}
+		return this.colorReplacement[value] || ANSI_COLOR.reset;
 	}
 }

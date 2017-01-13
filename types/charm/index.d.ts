@@ -38,8 +38,8 @@ declare module 'charm' {
 
 declare module 'charm/lib/encode' {
 	interface EncodeStatic {
-		(xs: string): Buffer|string;
-		ord(c: string): Buffer|string;
+		(xs: string): Buffer;
+		ord(c: string): Buffer;
 	}
 
 	const encode: EncodeStatic;

@@ -1,16 +1,12 @@
 import { Config } from '../../common';
-import Suite from '../Suite';
-import Test from '../Test';
-import * as util from '../util';
-import * as lang from 'dojo/lang';
-import Promise = require('dojo/Promise');
+import Suite, { SuiteOptions } from '../Suite';
+import Test, { isTestOptions, TestOptions } from '../Test';
+import { mixin } from 'dojo-core/lang';
+import Task from 'dojo-core/async/Task';
 import Reporter from '../reporters/Reporter';
-import { getErrorMessage } from '../node/util';
-
-// Legacy imports
-import * as intern from '../../main';
-
-const globalOrWindow = Function('return this')();
+import { Formatter } from '../util/format';
+import { pullFromArray } from '../util';
+import global from 'dojo-core/global';
 
 export interface Listener {
 	(...args: any[]): void | Promise<void>;
@@ -20,12 +16,19 @@ export interface Handle {
 	remove(): (void | Promise<void>);
 }
 
-abstract class Executor {
+export interface CoverageMessage {
+	sessionId?: string;
+	coverage: any;
+}
+
+export default class Executor {
 	/** The resolved configuration for this executor. */
-	config: Config;
+	readonly config: Config;
 
 	/** The type of the executor. */
-	mode: string;
+	readonly mode: string;
+
+	protected _formatter: Formatter;
 
 	/** The root suites managed by this executor. */
 	protected _rootSuites: Suite[];
@@ -37,34 +40,51 @@ abstract class Executor {
 	protected _reporters: Reporter[];
 
 	constructor(config: Config) {
-		this.config = lang.deepMixin({
+		this.config = mixin({
 			instrumenterOptions: {
 				coverageVariable: '__internCoverage'
 			},
 			defaultTimeout: 30000,
-			reporters: []
+			reporters: [],
+			grep: new RegExp('')
 		}, config);
 
 		this._listeners = {};
 		this._reporters = [];
+
+		this.config.reporters.forEach(reporter => {
+			this.addReporter(reporter);
+		});
+	}
+
+	get formatter() {
+		if (!this._formatter) {
+			if (this.config.formatter) {
+				this._formatter = this.config.formatter;
+			}
+			else {
+				this._formatter = new Formatter(this.config);
+			}
+		}
+		return this._formatter;
 	}
 
 	/**
 	 * Emit an event to all registered listeners.
 	 */
-	emit(eventName: 'newSuite', data: Suite): Promise<any>;
-	emit(eventName: 'newTest', data: Test): Promise<any>;
-	emit(eventName: 'runStart'): Promise<any>;
-	emit(eventName: 'suiteStart', data: Suite): Promise<any>;
-	emit(eventName: 'suiteError', data: Suite): Promise<any>;
-	emit(eventName: 'testStart', data: Test): Promise<any>;
-	emit(eventName: 'testEnd', data: Test): Promise<any>;
-	emit(eventName: 'suiteEnd', data: Suite): Promise<any>;
-	emit(eventName: 'coverage', data: any): Promise<any>;
-	emit(eventName: 'runEnd'): Promise<any>;
-	emit(eventName: 'error', data: Error): Promise<any>;
-	emit(eventName: string, data?: any): Promise<any> {
-		if (eventName === 'suiteError') {
+	emit(eventName: 'newSuite', data: Suite): Task<any>;
+	emit(eventName: 'newTest', data: Test): Task<any>;
+	emit(eventName: 'runStart'): Task<any>;
+	emit(eventName: 'suiteStart', data: Suite): Task<any>;
+	emit(eventName: 'suiteError', data: Suite): Task<any>;
+	emit(eventName: 'testStart', data: Test): Task<any>;
+	emit(eventName: 'testEnd', data: Test): Task<any>;
+	emit(eventName: 'suiteEnd', data: Suite): Task<any>;
+	emit(eventName: 'coverage', data: CoverageMessage): Task<any>;
+	emit(eventName: 'runEnd'): Task<any>;
+	emit(eventName: 'error', data: Error): Task<any>;
+	emit(eventName: string, data?: any): Task<any> {
+		if (eventName === 'suiteEnd' && data.error) {
 			this._hasSuiteErrors = true;
 		}
 
@@ -76,17 +96,24 @@ abstract class Executor {
 		if (listeners.length === 0 && reporters.length === 0) {
 			// Report an error when no error listeners are registered
 			if (eventName === 'error') {
-				console.error('ERROR:', getErrorMessage(data));
+				console.log('ERROR:', this.formatter.format(data));
 			}
 
-			return Promise.resolve();
+			return Task.resolve();
 		}
 
-		return Promise.all(listeners.map(listener => {
-			return listener(data);
+		// TODO: Remove Promise.all call once Task.all works
+		return Task.resolve(Promise.all(listeners.map(listener => {
+			return new Promise<void>(resolve => {
+				resolve(listener(data));
+			});
 		}).concat(reporters.map(reporter => {
-			return (<any>reporter)[eventName](data);
-		})));
+			return new Promise<void>(resolve => {
+				resolve((<any>reporter)[eventName](data));
+			});
+		})))).catch(error => {
+			console.log(`Error emitting ${eventName}: ${this.formatter.format(error)}`);
+		});
 	}
 
 	/**
@@ -123,15 +150,25 @@ abstract class Executor {
 		if (this._reporters.indexOf(reporter) !== -1) {
 			return;
 		}
+		reporter.executor = this;
 		this._reporters.push(reporter);
 	}
 
 	/**
 	 * Add a test or suite of tests.
 	 */
-	addTest(suiteOrTest: Suite | Test) {
+	addTest(suiteOrTest: Suite | Test | SuiteOptions | TestOptions) {
+		// Check if suiteOrTest is an instance or a simple Object
+		if (!(suiteOrTest instanceof Test) && !(suiteOrTest instanceof Suite)) {
+			if (isTestOptions(suiteOrTest)) {
+				suiteOrTest = new Test(suiteOrTest);
+			}
+			else {
+				suiteOrTest = new Suite(suiteOrTest);
+			}
+		}
 		this._rootSuites.forEach(suite => {
-			suite.add(suiteOrTest);
+			suite.add(<Suite | Test>suiteOrTest);
 		});
 	}
 
@@ -140,20 +177,14 @@ abstract class Executor {
 	 * should typically override `_runTests` to execute tests.
 	 */
 	run() {
-		const emitRunEnd = () => this.emit('runEnd');
-		const emitRunStart = () => this.emit('runStart');
-		const runConfigSetup = () => Promise.resolve(this.config.setup && this.config.setup(this));
-		const runConfigTeardown = () => Promise.resolve(this.config.teardown && this.config.teardown(this));
-		const runTests = () => this._runTests(this.config.maxConcurrency);
-
 		const promise = this._beforeRun()
 			.then(() => {
-				return runConfigSetup().then(function () {
-					return emitRunStart()
-						.then(runTests)
-						.finally(emitRunEnd);
+				return Task.resolve(this.config.setup && this.config.setup(this)).then(() => {
+					return this.emit('runStart')
+						.then(() => this._runTests(this.config.maxConcurrency))
+						.finally(() => this.emit('runEnd'));
 				})
-				.finally(runConfigTeardown);
+				.finally(() => Promise.resolve(this.config.teardown && this.config.teardown(this)));
 			})
 			.finally(() => this._afterRun())
 			.then(() => {
@@ -161,12 +192,14 @@ abstract class Executor {
 					throw new Error('One or more suite errors occurred during testing');
 				}
 
+				// Return total number of failed tests
 				return this._rootSuites.reduce(function (numFailedTests, suite) {
 					return numFailedTests + suite.numFailedTests;
 				}, 0);
 			})
 			.catch(error => this.emit('error', error));
 
+		// Only allow the executor to be started once
 		this.run = function () {
 			return promise;
 		};
@@ -185,8 +218,7 @@ abstract class Executor {
 	 * Code to execute before the main test run has started to set up the test system.
 	 */
 	protected _beforeRun() {
-		intern.setExecutor(this);
-		return Promise.resolve();
+		return Task.resolve();
 	}
 
 	/**
@@ -195,71 +227,117 @@ abstract class Executor {
 	protected _runTests(maxConcurrency: number) {
 		maxConcurrency = maxConcurrency || Infinity;
 
-		const self = this;
 		const suites = this._rootSuites;
 		let numSuitesCompleted = 0;
 		const numSuitesToRun = suites.length;
-		const queue = util.createQueue(maxConcurrency);
+		const queue = createQueue(maxConcurrency);
 		let hasError = false;
+		const runningSuites: Task<any>[] = [];
 
-		return new Promise(function (resolve, _reject, _progress, setCanceler) {
-			const runningSuites: Promise<any>[] = [];
+		return new Task<any>(
+			(resolve, reject) => {
+				const emitLocalCoverage = () => {
+					let error = new Error('Run failed due to one or more suite errors');
 
-			setCanceler(function (reason) {
+					let coverageData: Object = global[this.config.instrumenterOptions.coverageVariable];
+					if (coverageData) {
+						return this.emit('coverage', { coverage: coverageData }).then(() => {
+							if (hasError) {
+								throw error;
+							}
+						});
+					}
+					else if (hasError) {
+						return Promise.reject(error);
+					}
+				};
+
+				function finishSuite() {
+					if (++numSuitesCompleted === numSuitesToRun) {
+						emitLocalCoverage().then(resolve, error => {
+							console.error('errored');
+							reject(error);
+						});
+					}
+				}
+
+				if (suites && suites.length) {
+					suites.forEach(queue(function (suite: Suite) {
+						const runTask = suite.run().then(finishSuite, error => {
+							console.error('error:', error);
+							hasError = true;
+							finishSuite();
+						});
+						runningSuites.push(runTask);
+						runTask.finally(() => {
+							pullFromArray(runningSuites, runTask);
+						});
+						return runTask;
+					}));
+				}
+				else {
+					emitLocalCoverage().then(resolve, error => {
+						console.error('errored');
+						reject(error);
+					});
+				}
+			},
+			() => {
 				queue.empty();
 
-				let cancellations: any[] = [];
-				let task: Promise<any>;
+				let task: Task<any>;
 				while ((task = runningSuites.pop())) {
-					cancellations.push(task.cancel && task.cancel(reason));
-				}
-
-				return Promise.all(cancellations).then(function () {
-					throw reason;
-				});
-			});
-
-			function emitLocalCoverage() {
-				let error = new Error('Run failed due to one or more suite errors');
-
-				let coverageData = globalOrWindow[self.config.instrumenterOptions.coverageVariable];
-				if (coverageData) {
-					return self.emit('coverage', coverageData).then(function () {
-						if (hasError) {
-							throw error;
-						}
-					});
-				}
-				else if (hasError) {
-					return Promise.reject(error);
+					task.cancel();
 				}
 			}
-
-			function finishSuite() {
-				if (++numSuitesCompleted === numSuitesToRun) {
-					resolve(emitLocalCoverage());
-				}
-			}
-
-			if (suites && suites.length) {
-				suites.forEach(queue(function (suite: Suite) {
-					let runTask = suite.run().then(finishSuite, function (error) {
-						console.error('error:', error);
-						hasError = true;
-						finishSuite();
-					});
-					runningSuites.push(runTask);
-					runTask.finally(function () {
-						lang.pullFromArray(runningSuites, runTask);
-					});
-					return runTask;
-				}));
-			}
-			else {
-				resolve(emitLocalCoverage());
-			}
-		});
+		);
 	}
 }
 
-export default Executor;
+interface Queuer {
+	(callee: Function): () => void;
+	empty?: () => void;
+}
+
+/**
+ * Creates a basic FIFO function queue to limit the number of currently executing asynchronous functions.
+ *
+ * @param maxConcurrency Number of functions to execute at once.
+ * @returns A function that can be used to push new functions onto the queue.
+ */
+function createQueue(maxConcurrency: number) {
+	let numCalls = 0;
+	let queue: any[] = [];
+
+	function shiftQueue() {
+		if (queue.length) {
+			const callee = queue.shift();
+			Task.resolve(callee[0].apply(callee[1], callee[2])).finally(shiftQueue);
+		}
+		else {
+			--numCalls;
+		}
+	}
+
+	// Returns a function to wrap callback function in this queue
+	let queuer: Queuer = function (callee: Function) {
+		// Calling the wrapped function either executes immediately if possible,
+		// or pushes onto the queue if not
+		return function (this: any) {
+			if (numCalls < maxConcurrency) {
+				++numCalls;
+				Task.resolve(callee.apply(this, arguments)).finally(shiftQueue);
+			}
+			else {
+				queue.push([ callee, this, arguments ]);
+			}
+		};
+	};
+
+	(<any> queuer).empty = function () {
+		queue = [];
+		numCalls = 0;
+	};
+
+	return queuer;
+}

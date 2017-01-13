@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "module": "amd",
+    "outFile": "./_build/src/intern.js"
+  },
+  "extends": "./tsconfig.json",
+  "include": [
+    "./src/**/*.ts"
+  ]
+}
+
