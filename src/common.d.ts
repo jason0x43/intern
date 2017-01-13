@@ -3,7 +3,7 @@ import Tunnel from 'digdug/Tunnel';
 import Executor from './lib/executors/Executor';
 import EnvironmentType from './lib/EnvironmentType';
 import Test from './lib/Test';
-import { Formatter } from './lib/util/format';
+import Formatter from './lib/Formatter';
 import Reporter from './lib/reporters/Reporter';
 import Suite from './lib/Suite';
 import Command = require('leadfoot/Command');

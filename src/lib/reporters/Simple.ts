@@ -36,7 +36,7 @@ export default class Simple extends Coverage {
 	testEnd(test: Test): void {
 		if (test.error) {
 			this.console.error(`FAIL: ${test.id} (${test.timeElapsed}ms)`);
-			this.console.error(this.formatter.format(test.error));
+			this.console.error(this.formatter.format(test.error, { space: '  ' }));
 		}
 		else if (test.skipped) {
 			this.console.log(`SKIP: ${test.id} (${test.skipped})`);

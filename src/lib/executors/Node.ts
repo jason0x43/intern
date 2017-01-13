@@ -3,7 +3,9 @@ import Simple from '../reporters/Simple';
 import Executor from './Executor';
 import Suite from '../Suite';
 import Task from 'dojo-core/async/Task';
-import { Formatter, instrument, normalizePath } from '../util/node';
+import { instrument } from '../instrument';
+import { normalizePath } from '../node/util';
+import Formatter from '../node/Formatter';
 import { resolve, sep } from 'path';
 import { hook } from 'istanbul';
 

@@ -4,7 +4,7 @@ import Test, { isTestOptions, TestOptions } from '../Test';
 import { mixin } from 'dojo-core/lang';
 import Task from 'dojo-core/async/Task';
 import Reporter from '../reporters/Reporter';
-import { Formatter } from '../util/format';
+import Formatter from '../Formatter';
 import { pullFromArray } from '../util';
 import global from 'dojo-core/global';
 

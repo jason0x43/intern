@@ -1,5 +1,5 @@
-import { InternError } from '../../common';
-import { createDiff } from './object';
+import { InternError } from '../common';
+import { createDiff } from './util';
 import { mixin } from 'dojo-core/lang';
 
 export interface FormatterProperties {
@@ -8,7 +8,11 @@ export interface FormatterProperties {
 
 export type FormatterOptions = Partial<FormatterProperties>;
 
-export class Formatter implements FormatterProperties {
+export interface FormatOptions {
+	space?: string;
+}
+
+export default class Formatter implements FormatterProperties {
 	filterErrorStack = false;
 
 	constructor(options: FormatterOptions = {}) {
@@ -22,9 +26,12 @@ export class Formatter implements FormatterProperties {
 	 * @param error An object describing the error.
 	 * @returns A string message describing the error.
 	 */
-	format(error: string | Error | InternError): string {
+	format(error: string | Error | InternError, options?: FormatOptions): string {
+		options = options || {};
+		let message: string;
+
 		if (typeof error !== 'string' && (error.message || error.stack)) {
-			let message = (error.name || 'Error') + ': ' + (error.message || 'Unknown error');
+			message = (error.name || 'Error') + ': ' + (error.message || 'Unknown error');
 			let stack = error.stack;
 
 			if (stack) {
@@ -67,12 +74,19 @@ export class Formatter implements FormatterProperties {
 			else {
 				message += '\nNo stack or location';
 			}
-
-			return message;
 		}
 		else {
-			return String(error);
+			message = String(error);
 		}
+
+		const space = options.space;
+		if (space != null) {
+			message = message.split('\n').map(line => {
+				return space + line;
+			}).join('\n');
+		}
+
+		return message;
 	}
 
 	protected _getSource(tracepath: string): string {

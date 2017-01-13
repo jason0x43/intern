@@ -1,16 +1,9 @@
-import { Formatter as BaseFormatter } from './format';
+import BaseFormatter from '../Formatter';
 import * as fs from 'fs';
 import pathUtil = require('path');
-import { Instrumenter } from 'istanbul';
 import { MappingItem, RawSourceMap, SourceMapConsumer } from 'source-map';
-import { mixin } from 'dojo-core/lang';
 
-let instrumentationSourceMap: { [path: string]: SourceMapConsumer } = {};
-let fileSourceMaps: { [path: string]: SourceMapConsumer } = {};
-let fileSources: { [path: string]: string } = {};
-let instrumenters: { [name: string]: Instrumenter } = {};
-
-export class Formatter extends BaseFormatter {
+export default class Formatter extends BaseFormatter {
 	/**
 	 * Dereference the source from a traceline.
 	 */
@@ -75,101 +68,9 @@ export class Formatter extends BaseFormatter {
 	}
 }
 
-/**
- * Instrument a given file, saving its coverage source map.
- *
- * @param filedata Text of file being instrumented
- * @param filepath Full path of file being instrumented
- * @param instrumenterOptions Extra options for the instrumenter
- *
- * @returns {string} A string of instrumented code
- */
-export function instrument(filedata: string, filepath: string, instrumenterOptions?: any) {
-	const instrumenter = getInstrumenter(instrumenterOptions);
-	let options = instrumenter.opts;
-	if (!options.codeGenerationOptions) {
-		options.codeGenerationOptions = {};
-	}
-
-	// Assign to options.codeGenerationOptions to handle the case where codeGenerationOptions is null
-	options.codeGenerationOptions = mixin(options.codeGenerationOptions, {
-		sourceMap: pathUtil.normalize(filepath),
-		sourceMapWithCode: true
-	});
-
-	const code = instrumenter.instrumentSync(filedata, pathUtil.normalize(filepath));
-	const map = (<any>instrumenter).lastSourceMap();
-
-	if (map) {
-		instrumentationSourceMap[filepath] = new SourceMapConsumer(map.toString());
-		fileSources[filepath] = filedata;
-	}
-
-	return code;
-}
-
-/**
- * Normalize a path (e.g., resolve '..')
- */
-export function normalizePath(path: string) {
-	if (pathUtil) {
-		return pathUtil.normalize(path).replace(/\\/g, '/');
-	}
-
-	const parts = path.replace(/\\/g, '/').split('/');
-	let result: string[] = [];
-	for (let i = 0; i < parts.length; ++i) {
-		let part = parts[i];
-
-		if (!part || part === '.') {
-			if (i === 0 || i === parts.length - 1) {
-				result.push('');
-			}
-
-			continue;
-		}
-
-		if (part === '..') {
-			if (result.length && result[result.length - 1] !== '..') {
-				result.pop();
-			}
-			else {
-				result.push(part);
-			}
-		}
-		else {
-			result.push(part);
-		}
-	}
-
-	return result.join('/');
-}
-
-/**
- * Return the instrumenter, creating it if necessary.
- */
-function getInstrumenter(instrumenterOptions: any) {
-	instrumenterOptions = instrumenterOptions || {};
-
-	const coverageVariable = instrumenterOptions.coverageVariable;
-
-	if (!instrumenters[coverageVariable]) {
-		const options = mixin({
-			// coverage variable is changed primarily to avoid any jshint complaints, but also to make
-			// it clearer where the global is coming from
-			coverageVariable: coverageVariable,
-
-			// compacting code makes it harder to look at but it does not really matter
-			noCompact: true,
-
-			// auto-wrap breaks code
-			noAutoWrap: true
-		}, instrumenterOptions);
-
-		instrumenters[coverageVariable] = new Instrumenter(options);
-	}
-	return instrumenters[coverageVariable];
-}
+let instrumentationSourceMap: { [path: string]: SourceMapConsumer } = {};
+let fileSourceMaps: { [path: string]: SourceMapConsumer } = {};
+let fileSources: { [path: string]: string } = {};
 
 /**
  * Get the original position of line:column based on map.
