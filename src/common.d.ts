@@ -16,25 +16,23 @@ type BenchmarkMode = 'test' | 'baseline';
 // }
 
 export interface Config {
+	args?: { [name: string]: any };
 	bail?: boolean;
 	basePath?: string;
 	baseline?: boolean;
 	benchmark?: boolean;
 	// benchmarkConfig?: BenchmarkReporterDescriptor;
-	benchmarkSuites?: Suite[];
 	capabilities?: {
 		name?: string,
 		build?: string,
 		[key: string]: any
 	};
-	coverageVariable?: string;
 	defaultTimeout?: number;
 	environments?: { [key: string]: any }[];
 	environmentRetries?: number;
 	excludeInstrumentation?: true | RegExp;
 	filterErrorStack?: boolean;
 	formatter?: Formatter;
-	functionalSuites?: Suite[];
 	grep?: RegExp;
 	instrumenterOptions?: any;
 	leaveRemoteOpen?: 'fail' | boolean;
@@ -50,7 +48,6 @@ export interface Config {
 	rootSuiteName?: string;
 	sessionId?: string;
 	setup?: (executor: Executor) => Task<any>;
-	suites?: Suite[];
 	teardown?: (executor: Executor) => Task<any>;
 	tunnel?: typeof Tunnel;
 	tunnelOptions?: {

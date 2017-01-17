@@ -1,6 +1,5 @@
-import { Config } from '../../common';
 import Simple from '../reporters/Simple';
-import Executor from './Executor';
+import Executor, { Config as BaseConfig } from './Executor';
 import Suite from '../Suite';
 import Task from 'dojo-core/async/Task';
 import { instrument } from '../instrument';
@@ -9,10 +8,19 @@ import Formatter from '../node/Formatter';
 import { resolve, sep } from 'path';
 import { hook } from 'istanbul';
 
+export interface Config extends BaseConfig {
+	basePath?: string;
+	rootSuiteName?: string;
+	sessionId?: string;
+}
+
 /**
  * The Node executor is used to run unit tests in a Node environment.
  */
 export default class Node extends Executor {
+	/** The resolved configuration for this executor. */
+	readonly config: Config;
+
 	mode: 'client';
 
 	constructor(config: Config) {

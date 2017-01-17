@@ -1,6 +1,5 @@
 import { CommandLineArguments, Config } from '../common';
 // import { BenchmarkMode, CommandLineArguments, Config } from '../common';
-import { deepMixin } from 'dojo-core/lang';
 
 export function parseCommandLine(rawArgs: string[]) {
 	return parseArguments(rawArgs || process.argv.slice(2));
@@ -21,8 +20,6 @@ export function parseQueryString(query: string) {
 export function mixIntoConfig(config: Config, args?: CommandLineArguments) {
 	args = args || {};
 
-	config = deepMixin(config, args);
-
 	if (args['grep']) {
 		let grep = /^\/(.*)\/([gim]*)$/.exec(args['grep']);
 
@@ -33,10 +30,6 @@ export function mixIntoConfig(config: Config, args?: CommandLineArguments) {
 			config.grep = new RegExp(args['grep'], 'i');
 		}
 	}
-
-	// if (config.grep == null) {
-	// 	config.grep = new RegExp('');
-	// }
 
 	// TODO: don't set defaults here
 	// if (config.proxyPort == null) {

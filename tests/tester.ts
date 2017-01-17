@@ -1,19 +1,18 @@
 // Import the proper executor for the current environment
-import Node from '../src/lib/executors/Node';
-
-import { mixIntoConfig, parseCommandLine } from '../src/lib/parseArgs';
+import Node, { Config } from '../src/lib/executors/Node';
+import { parseCommandLine } from '../src/lib/parseArgs';
 import Suite from '../src/lib/Suite';
 import Test from '../src/lib/Test';
 
 // import { assert } from 'chai';
 // import Pretty from '../src/lib/reporters/Pretty';
 
-// TODO: this is kludgey
-const config = mixIntoConfig({
+const config: Config = {
 	name: 'Test config',
 	// reporters: [ new Pretty() ],
-	filterErrorStack: true
-}, parseCommandLine(process.argv.slice(2)));
+	filterErrorStack: true,
+	args: parseCommandLine(process.argv.slice(2))
+};
 
 const executor = new Node(config);
 

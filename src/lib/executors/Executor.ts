@@ -1,4 +1,3 @@
-import { Config } from '../../common';
 import Suite, { isSuiteOptions, SuiteOptions } from '../Suite';
 import Test, { isTestOptions, TestOptions } from '../Test';
 import { mixin } from 'dojo-core/lang';
@@ -7,6 +6,25 @@ import Reporter from '../reporters/Reporter';
 import Formatter from '../Formatter';
 import { pullFromArray } from '../util';
 import global from 'dojo-core/global';
+
+export interface Config {
+	args?: { [name: string]: any };
+	bail?: boolean;
+	baseline?: boolean;
+	benchmark?: boolean;
+	// benchmarkConfig?: BenchmarkReporterDescriptor;
+	defaultTimeout?: number;
+	excludeInstrumentation?: true | RegExp;
+	filterErrorStack?: boolean;
+	formatter?: Formatter;
+	grep?: RegExp;
+	instrumenterOptions?: any;
+	maxConcurrency?: number;
+	name?: string;
+	reporters?: Reporter[];
+	setup?: (executor: Executor) => Task<any>;
+	teardown?: (executor: Executor) => Task<any>;
+}
 
 export interface Listener {
 	(...args: any[]): void | Promise<void>;
@@ -40,14 +58,48 @@ export default class Executor {
 	protected _reporters: Reporter[];
 
 	constructor(config: Config) {
+		config = config || {};
+
+		// config.benchmarkConfig = deepMixin({
+		// 	id: 'Benchmark',
+		// 	filename: 'baseline.json',
+		// 	mode: <BenchmarkMode>'test',
+		// 	thresholds: {
+		// 		warn: { rme: 3, mean: 5 },
+		// 		fail: { rme: 6, mean: 10 }
+		// 	},
+		// 	verbosity: 0
+		// }, config.benchmarkConfig);
+
 		this.config = mixin({
 			instrumenterOptions: {
 				coverageVariable: '__internCoverage'
 			},
-			defaultTimeout: 30000,
-			reporters: [],
-			grep: new RegExp('')
+			defaultTimeout: 30000
 		}, config);
+
+		if (config.args) {
+			const args = config.args;
+			if (args['grep']) {
+				let grep = /^\/(.*)\/([gim]*)$/.exec(args['grep']);
+
+				if (grep) {
+					this.config.grep = new RegExp(grep[1], grep[2]);
+				}
+				else {
+					this.config.grep = new RegExp(args['grep'], 'i');
+				}
+			}
+
+		}
+
+		if (this.config.grep == null) {
+			this.config.grep = new RegExp('');
+		}
+
+		if (this.config.reporters == null) {
+			this.config.reporters = [];
+		}
 
 		this._listeners = {};
 		this._reporters = [];
