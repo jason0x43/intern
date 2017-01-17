@@ -1,9 +1,12 @@
+// Import the proper executor for the current environment
 import Node from '../src/lib/executors/Node';
+
 import { mixIntoConfig, parseCommandLine } from '../src/lib/parseArgs';
-// import { assert } from 'chai';
-// import Pretty from '../src/lib/reporters/Pretty';
 import Suite from '../src/lib/Suite';
 import Test from '../src/lib/Test';
+
+// import { assert } from 'chai';
+// import Pretty from '../src/lib/reporters/Pretty';
 
 // TODO: this is kludgey
 const config = mixIntoConfig({
@@ -15,9 +18,8 @@ const config = mixIntoConfig({
 const executor = new Node(config);
 
 // For instrumentation to work in Node, any modules that should be instrumented
-// must be loaded *after* the Node executor.
-const tests = require('./unit/lib/EnvironmentType');
-executor.addTest(tests.default);
+// must be loaded *after* the Node executor is instantiated.
+executor.addFile('_build/tests/unit/lib/EnvironmentType');
 
 executor.addTest({
 	name: 'foo',

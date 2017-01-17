@@ -1,8 +1,7 @@
 import { assert } from 'chai';
-import { SuiteOptions } from 'src/lib/Suite';
 import EnvironmentType from '../../../src/lib/EnvironmentType';
 
-const config: SuiteOptions = {
+export default {
 	name: 'intern/lib/EnvironmentType',
 
 	tests: {
@@ -23,5 +22,3 @@ const config: SuiteOptions = {
 		}
 	}
 };
-
-export default config;

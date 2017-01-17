@@ -37,6 +37,16 @@ export default class Node extends Executor {
 		}
 	}
 
+	addFile(file: string) {
+		const suite = require(resolve(file));
+		if (suite.__esModule) {
+			this.addTest(suite.default);
+		}
+		else {
+			this.addTest(suite);
+		}
+	}
+
 	protected _beforeRun(): Task<void> {
 		return super._beforeRun().then(() => {
 			const suite = this._rootSuites[0];
