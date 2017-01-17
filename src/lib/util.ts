@@ -1,4 +1,6 @@
 import * as diffUtil from 'diff';
+import Executor from './executors/Executor';
+import global from 'dojo-core/global';
 
 export const hasFunctionName = function () {
 	function foo() {}
@@ -41,6 +43,20 @@ export function createDiff(actual: Object, expected: Object): string {
 	}
 
 	return diff;
+}
+
+export function getIntern(): Executor {
+	let internName = 'intern';
+
+	const internConfig = global['internConfig'];
+	if (internConfig && internConfig.internName) {
+		internName = internConfig.internName;
+	}
+
+	if (!global[internName]) {
+		throw new Error('Missing Intern global');
+	}
+	return global[internName];
 }
 
 /**

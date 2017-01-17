@@ -10,6 +10,7 @@ import { hook } from 'istanbul';
 
 export interface Config extends BaseConfig {
 	basePath?: string;
+	globalName?: string;
 	rootSuiteName?: string;
 	sessionId?: string;
 }

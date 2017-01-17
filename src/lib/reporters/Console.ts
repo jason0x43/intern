@@ -1,14 +1,13 @@
-import Executor from '../executors/Executor';
 import Suite from '../Suite';
 import Test from '../Test';
-import Reporter, { ReporterOptions } from './Reporter';
+import Reporter, { ReporterOptions, ReporterOutput } from './Reporter';
 
 /**
  * The console reporter outputs to the browser console.
  */
 export default class ConsoleReporter extends Reporter {
 	hasGrouping: boolean;
-	testId: string;
+	testId: keyof Test;
 
 	constructor(options: ReporterOptions = {}) {
 		super(options);
@@ -16,7 +15,7 @@ export default class ConsoleReporter extends Reporter {
 		this.testId = this.hasGrouping ? 'name' : 'id';
 	}
 
-	get output() {
+	get output(): ReporterOutput {
 		if (!this._output) {
 			const element = document.createElement('pre');
 			this._output = {

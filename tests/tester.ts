@@ -1,5 +1,5 @@
 // Import the proper executor for the current environment
-import Node, { Config } from '../src/lib/executors/Node';
+import initialize, { Config } from '../src/node';
 import { parseCommandLine } from '../src/lib/parseArgs';
 import Suite from '../src/lib/Suite';
 import Test from '../src/lib/Test';
@@ -14,13 +14,13 @@ const config: Config = {
 	args: parseCommandLine(process.argv.slice(2))
 };
 
-const executor = new Node(config);
+const intern = initialize(config);
 
 // For instrumentation to work in Node, any modules that should be instrumented
 // must be loaded *after* the Node executor is instantiated.
-executor.addFile('_build/tests/unit/lib/EnvironmentType');
+require('./unit/lib/EnvironmentType');
 
-executor.addTest({
+intern.addTest({
 	name: 'foo',
 	test: () => {
 		return new Promise((_resolve, reject) => {
@@ -31,13 +31,13 @@ executor.addTest({
 	}
 });
 
-executor.addTest({
+intern.addTest({
 	name: 'bar',
 	test: () => {
 	}
 });
 
-executor.addTest(new Suite({
+intern.addTest(new Suite({
 	name: 'sub',
 	tests: [
 		new Test({
@@ -53,7 +53,7 @@ executor.addTest(new Suite({
 	]
 }));
 
-executor.addTest({
+intern.addTest({
 	name: 'baz',
 	test: () => {
 		return new Promise(resolve => {
@@ -64,4 +64,4 @@ executor.addTest({
 	}
 });
 
-executor.run();
+intern.run();

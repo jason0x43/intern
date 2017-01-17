@@ -33,7 +33,10 @@
     "insertSpaceAfterSemicolonInForStatements": true
   },
   "files": [
+    "src/browser.ts",
+    "src/node.ts",
     "src/lib/EnvironmentType.ts",
+    "src/lib/executors/Browser.ts",
     "src/lib/executors/Executor.ts",
     "src/lib/executors/Node.ts",
     "src/lib/reporters/Pretty.ts",

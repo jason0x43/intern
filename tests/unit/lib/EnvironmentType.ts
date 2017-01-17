@@ -1,7 +1,8 @@
 import { assert } from 'chai';
+import registerSuite from '../../../src/lib/interfaces/object';
 import EnvironmentType from '../../../src/lib/EnvironmentType';
 
-export default {
+registerSuite({
 	name: 'intern/lib/EnvironmentType',
 
 	tests: {
@@ -21,4 +22,4 @@ export default {
 			assert.strictEqual(type.toString(), 'Any browser on any platform');
 		}
 	}
-};
+});

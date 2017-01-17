@@ -1,10 +1,12 @@
 import * as aspect from 'dojo/aspect';
 import Suite, { SuiteProperties, SuiteLifecycleFunction } from '../Suite';
-import Test from '../Test';
+import Test, { TestFunction } from '../Test';
+import { getIntern } from '../util';
 
 export interface ObjectSuiteProperties extends SuiteProperties {
 	after: SuiteLifecycleFunction;
 	before: SuiteLifecycleFunction;
+	tests: { [name: string]: Suite | Test | TestFunction };
 }
 
 export type ObjectSuiteOptions = Partial<ObjectSuiteProperties>;
@@ -13,16 +15,14 @@ export interface PropertyHandler {
 	(property: string, value: any, suite: Suite): boolean;
 }
 
-function createSuite(descriptor: ObjectSuiteOptions, parentSuite: Suite, TestClass?: typeof Test, propertyHandler?: PropertyHandler): void {
+function createSuite(descriptor: ObjectSuiteOptions, TestClass?: typeof Test, propertyHandler?: PropertyHandler) {
 	/* jshint maxcomplexity: 13 */
-	let suite = new Suite({ parent: parentSuite });
-	let tests = suite.tests;
+	let suite = new Suite({});
 	let test: any;
 	let handled: boolean;
+	let k: keyof ObjectSuiteOptions;
 
-	parentSuite.tests.push(suite);
-
-	for (let k in descriptor) {
+	for (k in descriptor) {
 		test = descriptor[k];
 		handled = propertyHandler && propertyHandler(k, test, suite);
 
@@ -33,15 +33,18 @@ function createSuite(descriptor: ObjectSuiteOptions, parentSuite: Suite, TestCla
 		if (!handled) {
 			// Test isn't a function; assume it's a nested suite
 			if (typeof test !== 'function') {
-				test.name = test.name || k;
-				createSuite(test, suite, TestClass, propertyHandler);
+				const suiteOptions = <ObjectSuiteOptions>test;
+				suiteOptions.name = suiteOptions.name || k;
+				suite.add(createSuite(suiteOptions, TestClass, propertyHandler));
 			}
 			// Test is a function; create a Test instance for it
 			else {
-				tests.push(new TestClass({ name: k, test: test, parent: suite }));
+				suite.add(new TestClass({ name: k, test: test, parent: suite }));
 			}
 		}
 	}
+
+	return suite;
 }
 
 function defaultPropertyHandler(property: string, value: any, suite: Suite) {
@@ -76,19 +79,17 @@ function defaultPropertyHandler(property: string, value: any, suite: Suite) {
  * @param TestClass Class to use to construct individual tests
  * @param propertyHandler Function to handle any properties that shouldn't be used as tests
  */
-// export default function registerSuite(mainDescriptor: ObjectSuiteOptions, TestClass?: typeof Test, propertyHandler?: PropertyHandler): void {
-// 	TestClass = TestClass || Test;
+export default function registerSuite(mainDescriptor: ObjectSuiteOptions, TestClass?: typeof Test, propertyHandler?: PropertyHandler): void {
+	TestClass = TestClass || Test;
 
-// 	main.executor.register(function (suite: Suite) {
-// 		let descriptor = mainDescriptor;
+	let descriptor = mainDescriptor;
 
-// 		// enable per-suite closure, to match feature parity with other interfaces like tdd/bdd more closely;
-// 		// without this, it becomes impossible to use the object interface for functional tests since there is no
-// 		// other way to create a closure for each main suite
-// 		if (typeof descriptor === 'function') {
-// 			descriptor = descriptor();
-// 		}
+	// enable per-suite closure, to match feature parity with other interfaces like tdd/bdd more closely;
+	// without this, it becomes impossible to use the object interface for functional tests since there is no
+	// other way to create a closure for each main suite
+	if (typeof descriptor === 'function') {
+		descriptor = descriptor();
+	}
 
-// 		createSuite(descriptor, suite, TestClass, propertyHandler);
-// 	});
-// }
+	getIntern().addTest(createSuite(descriptor, TestClass, propertyHandler));
+}

@@ -19,6 +19,7 @@ export interface Config {
 	formatter?: Formatter;
 	grep?: RegExp;
 	instrumenterOptions?: any;
+	internName?: string;
 	maxConcurrency?: number;
 	name?: string;
 	reporters?: Reporter[];
