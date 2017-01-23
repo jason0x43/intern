@@ -80,8 +80,6 @@ export default class Executor {
 
 	protected _reporters: Reporter[];
 
-	protected _nativeReporters: { [name: string]: typeof Reporter };
-
 	constructor(config: Config = {}) {
 		this._config = {
 			instrumenterOptions: {
@@ -96,6 +94,8 @@ export default class Executor {
 		if (config) {
 			this._configure(config);
 		}
+
+		global['intern'] = this;
 	}
 
 	get config() {
@@ -393,6 +393,10 @@ export default class Executor {
 			}
 		);
 	}
+}
+
+declare global {
+	export let intern: Executor;
 }
 
 interface Queuer {

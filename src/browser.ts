@@ -1,5 +1,4 @@
 import Browser from './lib/executors/Browser';
-import global from 'dojo-core/global';
 
 function getThisPath() {
 	const scripts = document.getElementsByTagName('script');
@@ -18,8 +17,4 @@ const basePath = thisPath.split('/').slice(0, -1).join('/');
 // TODO: don't do this in the final version
 const devBasePath = basePath.split('/').slice(0, -1).concat('src').join('/');
 
-global['intern'] = new Browser({ basePath: devBasePath });
-
-declare global {
-	export let intern: Browser;
-}
+new Browser({ basePath: devBasePath });

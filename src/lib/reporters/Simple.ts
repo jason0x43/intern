@@ -24,10 +24,13 @@ export default class Simple extends Coverage {
 			const numTests = suite.numTests;
 			const numFailedTests = suite.numFailedTests;
 			const numSkippedTests = suite.numSkippedTests;
-			let message = numFailedTests + '/' + numTests + ' tests failed';
+			let message = `${numFailedTests}/${numTests} tests failed`;
+			if (suite.name) {
+				message += ` in ${suite.name}`;
+			}
 
 			if (numSkippedTests > 0) {
-				message += ' (' + numSkippedTests + ' skipped)';
+				message += ` (${numSkippedTests} skipped)`;
 			}
 
 			this.console[numFailedTests ? 'warn' : 'info'](message);

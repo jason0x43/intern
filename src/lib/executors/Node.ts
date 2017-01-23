@@ -1,4 +1,3 @@
-import Simple from '../reporters/Simple';
 import Executor, { Config as BaseConfig } from './Executor';
 import Suite from '../Suite';
 import Task from 'dojo-core/async/Task';
@@ -7,6 +6,8 @@ import { normalizePath } from '../node/util';
 import Formatter from '../node/Formatter';
 import { resolve, sep } from 'path';
 import { hook } from 'istanbul';
+import Pretty from '../reporters/Pretty';
+import Simple from '../reporters/Simple';
 
 export interface Config extends BaseConfig {
 	basePath?: string;
@@ -46,7 +47,7 @@ export default class Node extends Executor {
 	}
 
 	protected _beforeRun(): Task<void> {
-		if (!this._listeners['testStart']) {
+		if (!this._listeners['testEnd']) {
 			this._defaultReporter = new Simple(this);
 		}
 
@@ -63,9 +64,9 @@ export default class Node extends Executor {
 	protected _getReporter(name: string) {
 		switch (name) {
 			case 'simple':
-				return require('Simple');
+				return Simple;
 			case 'pretty':
-				return require('Pretty');
+				return Pretty;
 		}
 	}
 
