@@ -2,19 +2,20 @@ import Suite from '../Suite';
 import Test from '../Test';
 import Coverage from './Coverage';
 import { CoverageMessage } from '../executors/Executor';
+import { eventHandler } from './Reporter';
 
 /**
  * The Simple reporter outputs to the terminal console.
  */
 export default class Simple extends Coverage {
-	console: Console;
-
-	error(error: Error): void {
+	@eventHandler()
+	error(error: Error) {
 		this.console.error('FATAL ERROR');
 		this.console.error(this.formatter.format(error));
 	}
 
-	suiteEnd(suite: Suite): void {
+	@eventHandler()
+	suiteEnd(suite: Suite) {
 		if (suite.error) {
 			this.console.warn('SUITE ERROR');
 			this.console.error(this.formatter.format(suite.error));
@@ -33,7 +34,8 @@ export default class Simple extends Coverage {
 		}
 	}
 
-	testEnd(test: Test): void {
+	@eventHandler()
+	testEnd(test: Test) {
 		if (test.error) {
 			this.console.error(`FAIL: ${test.id} (${test.timeElapsed}ms)`);
 			this.console.error(this.formatter.format(test.error, { space: '  ' }));
@@ -46,7 +48,8 @@ export default class Simple extends Coverage {
 		}
 	}
 
-	coverage(data: CoverageMessage): void {
+	@eventHandler()
+	coverage(data: CoverageMessage) {
 		this.collector.add(data.coverage);
 
 		// add a newline between test results and coverage results for prettier output

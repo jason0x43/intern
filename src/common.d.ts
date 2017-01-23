@@ -1,6 +1,6 @@
 import 'chai';
 import Tunnel from 'digdug/Tunnel';
-import Executor from './lib/executors/Executor';
+import Executor, { Config } from './lib/executors/Executor';
 import EnvironmentType from './lib/EnvironmentType';
 import Test from './lib/Test';
 import Formatter from './lib/Formatter';
@@ -9,51 +9,18 @@ import Suite from './lib/Suite';
 import Command = require('leadfoot/Command');
 import Task from 'dojo-core/async/Task';
 
-type BenchmarkMode = 'test' | 'baseline';
+export interface GlobalConfig {
+	/** Configuration for the test executor */
+	config?: Config;
 
-// export interface BenchmarkReporterDescriptor extends ReporterDescriptor {
-// 	mode: BenchmarkMode;
-// }
+	/** The test executor */
+	intern?: Executor;
 
-export interface Config {
-	args?: { [name: string]: any };
-	bail?: boolean;
-	basePath?: string;
-	baseline?: boolean;
-	benchmark?: boolean;
-	// benchmarkConfig?: BenchmarkReporterDescriptor;
-	capabilities?: {
-		name?: string,
-		build?: string,
-		[key: string]: any
-	};
-	defaultTimeout?: number;
-	environments?: { [key: string]: any }[];
-	environmentRetries?: number;
-	excludeInstrumentation?: true | RegExp;
-	filterErrorStack?: boolean;
-	formatter?: Formatter;
-	grep?: RegExp;
-	instrumenterOptions?: any;
-	leaveRemoteOpen?: 'fail' | boolean;
-	maxConcurrency?: number;
-	name?: string;
-	proxyOnly?: boolean;
-	proxyPort?: number;
-	proxyUrl?: string;
-	reporters?: Reporter[];
-	runnerClientReporter?: {
-		waitForRunner?: boolean
-	};
-	rootSuiteName?: string;
-	sessionId?: string;
-	setup?: (executor: Executor) => Task<any>;
-	teardown?: (executor: Executor) => Task<any>;
-	tunnel?: typeof Tunnel;
-	tunnelOptions?: {
-		servers?: string[],
-		[key: string]: any
-	};
+	/** The global name used for the test executor; defaults to 'intern' */
+	internName?: string;
+
+	/** Registered reporter classes. Loading a reporter module will cause it to register here. */
+	reporters?: { [name: string]: typeof Reporter };
 }
 
 export interface CommandLineArguments {

@@ -6,7 +6,7 @@ import Suite from './Suite';
 import { mixin } from 'dojo-core/lang';
 
 export function isTest(value: any): value is Test {
-	return value instanceof Test;
+	return typeof value.hasPassed === 'boolean' && typeof value.timeElapsed === 'number';
 }
 
 export function isTestOptions(value: any): value is TestOptions {

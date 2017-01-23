@@ -1,12 +1,11 @@
 {
   "compilerOptions": {
-    "baseUrl": "..",
-    "declaration": false,
-    "rootDir": ".."
+    "declaration": false
   },
   "extends": "../tsconfig.json",
-  "include": [
+  "files": [
+	"../_build/src/browser.d.ts",
     "./tester.ts",
-    "./unit/lib/EnvironmentType.ts"
+    "./unit/all.ts"
   ]
 }

@@ -1,18 +1,25 @@
-import Browser, { Config } from './lib/executors/Browser';
-import Html from './lib/reporters/Html';
-import Console from './lib/reporters/Console';
+import Browser from './lib/executors/Browser';
 import global from 'dojo-core/global';
 
-export const reporters = {
-	Html,
-	Console
-};
+function getThisPath() {
+	const scripts = document.getElementsByTagName('script');
+	let script: HTMLScriptElement;
+	for (let i = 0; i < scripts.length; i++) {
+		script = scripts[i];
+		if (/\/browser\.js\b/.test(script.src)) {
+			return script.src;
+		}
+	}
+}
 
-export * from './lib/executors/Browser';
-export default Browser;
+const thisPath = getThisPath();
+const basePath = thisPath.split('/').slice(0, -1).join('/');
 
-const config: Config = global['internConfig'] || {};
-const executor = new Browser(config);
+// TODO: don't do this in the final version
+const devBasePath = basePath.split('/').slice(0, -1).concat('src').join('/');
 
-const globalName = config.internName || 'intern';
-global[globalName] = executor;
+global['intern'] = new Browser({ basePath: devBasePath });
+
+declare global {
+	export let intern: Browser;
+}

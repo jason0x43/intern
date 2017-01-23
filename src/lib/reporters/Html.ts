@@ -1,4 +1,5 @@
-import Reporter, { ReporterProperties } from './Reporter';
+import Browser from '../executors/Browser';
+import Reporter, { eventHandler, ReporterProperties } from './Reporter';
 import Test from '../Test';
 import Suite from '../Suite';
 
@@ -65,6 +66,8 @@ export interface HtmlProperties extends ReporterProperties {
 export type HtmlOptions = Partial<HtmlProperties>;
 
 export default class Html extends Reporter implements HtmlProperties {
+	readonly executor: Browser;
+
 	document: Document;
 
 	protected _reportContainer: Element = null;
@@ -110,15 +113,17 @@ export default class Html extends Reporter implements HtmlProperties {
 
 	protected _runningSuites: any = {};
 
-	constructor(options: HtmlOptions = {}) {
-		super(options);
+	constructor(executor: Browser, options: HtmlOptions = {}) {
+		super(executor, options);
 
 		if (!this.document) {
 			this.document = window.document;
 		}
 	}
 
-	private _generateSummary(suite: Suite): void {
+	protected _generateSummary(suite: Suite): void {
+		const document = this.document;
+
 		if (this._summaryNodes.length === 0) {
 			return;
 		}
@@ -164,21 +169,21 @@ export default class Html extends Reporter implements HtmlProperties {
 		}
 	}
 
-	_injectCSS(): void {
+	protected _injectCSS() {
+		const document = this.document;
 		// Prevent FOUC
 		const style = document.createElement('style');
 		style.innerHTML = 'body { visibility: hidden; }';
 
 		const link = document.createElement('link');
 		link.rel = 'stylesheet';
-		// TODO
-		// link.href = require.toUrl('./html/html.css');
+		link.href = this.executor.resolvePath('lib/reporters/html/html.css');
 
 		document.head.appendChild(style);
 		document.head.appendChild(link);
 	}
 
-	private _getIndentLevel(node: Element): number {
+	protected _getIndentLevel(node: Element) {
 		// second child always has a class of indentN
 		const child: Element = node.children[1];
 
@@ -196,7 +201,7 @@ export default class Html extends Reporter implements HtmlProperties {
 	 * @param {DOMNode} node A suite node
 	 * @param {boolean} collapsed Set the collapsed state, or toggle if undefined
 	 */
-	private _setCollapsed(node: Element, collapsed: boolean = false): void {
+	protected _setCollapsed(node: Element, collapsed: boolean = false) {
 		let indentDelta: number;
 		let initialIndent = this._getIndentLevel(node);
 
@@ -228,7 +233,9 @@ export default class Html extends Reporter implements HtmlProperties {
 		}
 	}
 
-	fatalError(error: Error): void {
+	@eventHandler()
+	error(error: Error) {
+		const document = this.document;
 		let htmlError = this.formatter.format(error).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 		let errorNode = document.createElement('div');
 		errorNode.style.cssText = 'color: red; font-family: sans-serif;';
@@ -237,9 +244,9 @@ export default class Html extends Reporter implements HtmlProperties {
 		document.body.appendChild(errorNode);
 	};
 
-	run(): void {
-		/* jshint maxlen:false */
-
+	@eventHandler()
+	runStart() {
+		const document = this.document;
 		this._reportContainer = document.createElement('div');
 		const headerNode = document.createElement('h1');
 		let tableNode: Element;
@@ -327,7 +334,8 @@ export default class Html extends Reporter implements HtmlProperties {
 		this._reportContainer.appendChild(tableNode);
 	}
 
-	suiteStart(suite: Suite): void {
+	@eventHandler()
+	suiteStart(suite: Suite) {
 		// There's a top-level Suite that contains all user-created suites
 		// We want to skip it
 		if (!suite.parent) {
@@ -338,6 +346,7 @@ export default class Html extends Reporter implements HtmlProperties {
 		this._testIndex = 0;
 		this._processedTests = {};
 
+		const document = this.document;
 		const rowNode = document.createElement('tr');
 
 		// Status cell
@@ -364,9 +373,11 @@ export default class Html extends Reporter implements HtmlProperties {
 		++this._indentLevel;
 	}
 
-	suiteEnd(suite: Suite): void {
+	@eventHandler()
+	suiteEnd(suite: Suite) {
 		const document = this.document;
-		if (!suite.parent) {
+
+		if (!suite.hasParent) {
 			this._generateSummary(suite);
 
 			this._injectCSS();
@@ -406,7 +417,7 @@ export default class Html extends Reporter implements HtmlProperties {
 		const numSkippedTests = suite.numSkippedTests;
 		const numPassedTests = numTests - numFailedTests - numSkippedTests;
 
-		// Mark a suite as failed if any of its child tests failed, and 
+		// Mark a suite as failed if any of its child tests failed, and
 		addClass(rowNode, numFailedTests > 0 ? 'failed' : 'passed');
 
 		// Only suites with failed tests will be initially expanded
@@ -462,7 +473,8 @@ export default class Html extends Reporter implements HtmlProperties {
 		this._runningSuites[suite.id] = null;
 	}
 
-	testEnd(test: Test): void {
+	@eventHandler()
+	testEnd(test: Test) {
 		if (test.id in this._processedTests) {
 			return;
 		}
@@ -471,6 +483,7 @@ export default class Html extends Reporter implements HtmlProperties {
 
 		this._testIndex++;
 
+		const document = this.document;
 		const rowNode = document.createElement('tr');
 
 		// Status cell
@@ -514,9 +527,5 @@ export default class Html extends Reporter implements HtmlProperties {
 		rowNode.appendChild(cellNode);
 
 		this._reportNode.appendChild(rowNode);
-	}
-
-	testSkip(test: Test): void {
-		return this.testEnd(test);
 	}
 }

@@ -1,4 +1,4 @@
-import objectRegisterSuite, { ObjectSuiteConfig } from './object';
+import objectRegisterSuite, { ObjectSuiteOptions } from './object';
 import Suite from '../Suite';
 import BenchmarkTest from '../BenchmarkTest';
 import aspect = require('dojo/aspect');
@@ -10,8 +10,9 @@ function propertyHandler(property: string, value: any, suite: Suite) {
 	}
 }
 
-export default function registerSuite(mainDescriptor: ObjectSuiteConfig) {
-	objectRegisterSuite(mainDescriptor, BenchmarkTest, propertyHandler);
+export default function registerSuite(mainDescriptor: ObjectSuiteOptions) {
+	mainDescriptor.TestClass = BenchmarkTest;
+	objectRegisterSuite(mainDescriptor);
 };
 
 const async = BenchmarkTest.async;

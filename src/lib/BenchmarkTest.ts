@@ -5,87 +5,7 @@ import Promise = require('dojo/Promise');
 import * as lang from 'dojo/lang';
 import * as string from 'dojo/string';
 
-const createLifecycle = (function () {
-	const template = [
-		'(function (benchmark) {',
-			'\tvar queue = benchmark.intern${queueName}EachLoopQueue;',
-			'\tvar suite;',
-			'\tif (!queue) {',
-				'\t\tsuite = benchmark.internTest;',
-				'\t\tbenchmark.intern${queueName}EachLoopQueue = queue = [];',
-				'\t\twhile ((suite = suite.parent)) {',
-					'\t\t\tif (suite.${methodName}EachLoop) {',
-					'\t\t\tqueue.${queueMethod}(suite);',
-					'\t\t\t}',
-				'\t\t}',
-			'\t}',
-			'\tvar i = queue.length;',
-			'\twhile((suite = queue[--i])) {',
-				'\t\tsuite.${methodName}EachLoop();',
-			'\t}',
-		'})(this.benchmark || this);\n'
-	].join('\n');
-
-	function createLifecycle(before: boolean) {
-		return string.substitute(template, {
-			queueName: before ? 'Before' : 'After',
-			queueMethod: before ? 'push' : 'unshift',
-			methodName: before ? 'before' : 'after'
-		});
-	}
-
-	return createLifecycle;
-})();
-
-/* istanbul ignore next */
-function noop() {}
-
-function createDeferred(benchmark: Benchmark, deferred: Deferred<any>, numCallsUntilResolution?: number) {
-	if (!numCallsUntilResolution) {
-		numCallsUntilResolution = 1;
-	}
-
-	return {
-		resolve() {
-			--numCallsUntilResolution;
-			if (numCallsUntilResolution === 0) {
-				deferred.resolve();
-			}
-			else if (numCallsUntilResolution < 0) {
-				throw new Error('resolve called too many times');
-			}
-		},
-
-		reject(error: InternError) {
-			benchmark.error = error;
-			benchmark.abort();
-			deferred.resolve();
-		},
-
-		progress: noop,
-
-		rejectOnError(this: any, callback: Function) {
-			const self = this;
-			return function (this: any) {
-				try {
-					return callback.apply(this, arguments);
-				}
-				catch (error) {
-					self.reject(error);
-				}
-			};
-		},
-
-		callback: function (this: any, callback: Function) {
-			const self = this;
-			return self.rejectOnError(function (this: any) {
-				const returnValue = callback.apply(this, arguments);
-				self.resolve();
-				return returnValue;
-			});
-		}
-	};
-}
+type BenchmarkMode = 'test' | 'baseline';
 
 export interface BenchmarkTestFunction {
 	(): void | Promise<any>;
@@ -284,3 +204,86 @@ export default class BenchmarkTest extends Test {
 		return testFunction;
 	}
 }
+
+const createLifecycle = (function () {
+	const template = [
+		'(function (benchmark) {',
+			'\tvar queue = benchmark.intern${queueName}EachLoopQueue;',
+			'\tvar suite;',
+			'\tif (!queue) {',
+				'\t\tsuite = benchmark.internTest;',
+				'\t\tbenchmark.intern${queueName}EachLoopQueue = queue = [];',
+				'\t\twhile ((suite = suite.parent)) {',
+					'\t\t\tif (suite.${methodName}EachLoop) {',
+					'\t\t\tqueue.${queueMethod}(suite);',
+					'\t\t\t}',
+				'\t\t}',
+			'\t}',
+			'\tvar i = queue.length;',
+			'\twhile((suite = queue[--i])) {',
+				'\t\tsuite.${methodName}EachLoop();',
+			'\t}',
+		'})(this.benchmark || this);\n'
+	].join('\n');
+
+	function createLifecycle(before: boolean) {
+		return string.substitute(template, {
+			queueName: before ? 'Before' : 'After',
+			queueMethod: before ? 'push' : 'unshift',
+			methodName: before ? 'before' : 'after'
+		});
+	}
+
+	return createLifecycle;
+})();
+
+/* istanbul ignore next */
+function noop() {}
+
+function createDeferred(benchmark: Benchmark, deferred: Deferred<any>, numCallsUntilResolution?: number) {
+	if (!numCallsUntilResolution) {
+		numCallsUntilResolution = 1;
+	}
+
+	return {
+		resolve() {
+			--numCallsUntilResolution;
+			if (numCallsUntilResolution === 0) {
+				deferred.resolve();
+			}
+			else if (numCallsUntilResolution < 0) {
+				throw new Error('resolve called too many times');
+			}
+		},
+
+		reject(error: InternError) {
+			benchmark.error = error;
+			benchmark.abort();
+			deferred.resolve();
+		},
+
+		progress: noop,
+
+		rejectOnError(this: any, callback: Function) {
+			const self = this;
+			return function (this: any) {
+				try {
+					return callback.apply(this, arguments);
+				}
+				catch (error) {
+					self.reject(error);
+				}
+			};
+		},
+
+		callback: function (this: any, callback: Function) {
+			const self = this;
+			return self.rejectOnError(function (this: any) {
+				const returnValue = callback.apply(this, arguments);
+				self.resolve();
+				return returnValue;
+			});
+		}
+	};
+}
+

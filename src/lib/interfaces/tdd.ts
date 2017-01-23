@@ -1,50 +1,49 @@
 import { on } from 'dojo/aspect';
-import * as main from '../../main';
 import Suite, { SuiteLifecycleFunction } from '../Suite';
 import Test, { TestFunction } from '../Test';
+import Executor from '../executors/Executor';
 
-let currentSuite: Suite;
-const suites: Suite[] = [];
-
-function registerSuite(name: string, factory: TestFunction): void {
-	const parentSuite = currentSuite;
-
-	currentSuite = new Suite({ name: name, parent: parentSuite });
-	parentSuite.tests.push(currentSuite);
-
-	suites.push(parentSuite);
-	factory.call(currentSuite);
-	currentSuite = suites.pop();
+export interface TddInterface {
+	suite(name: string, factory: TestFunction): void;
+	test(name: string, test: TestFunction): void;
+	before(fn: SuiteLifecycleFunction): void;
+	after(fn: SuiteLifecycleFunction): void;
+	beforeEach(fn: SuiteLifecycleFunction): void;
+	afterEach(fn: SuiteLifecycleFunction): void;
 }
 
-export function suite(name: string, factory: TestFunction): void {
-	if (!currentSuite) {
-		main.executor.register(suite => {
-			currentSuite = suite;
-			registerSuite(name, factory);
-			currentSuite = null;
-		});
-	} else {
-		registerSuite(name, factory);
-	}
-}
+export default function getInterface(executor: Executor): TddInterface {
+	let currentSuite: Suite;
 
-export function test (name: string, test: TestFunction): void {
-	currentSuite.tests.push(new Test({ name, test, parent: currentSuite }));
-}
+	return {
+		suite(name: string, factory: TestFunction) {
+			if (!currentSuite) {
+				currentSuite = new Suite({ name, tests: [ factory ] });
+				executor.addTest(currentSuite);
+			} else {
+				// TODO: this seems wrong
+				currentSuite.add(factory);
+			}
+		},
 
-export function before(fn: SuiteLifecycleFunction): void {
-	on(currentSuite, 'setup', fn);
-}
+		test(name: string, test: TestFunction) {
+			currentSuite.tests.push(new Test({ name, test, parent: currentSuite }));
+		},
 
-export function after(fn: SuiteLifecycleFunction): void {
-	on(currentSuite, 'teardown', fn);
-}
+		before(fn: SuiteLifecycleFunction) {
+			on(currentSuite, 'setup', fn);
+		},
 
-export function beforeEach(fn: SuiteLifecycleFunction): void {
-	on(currentSuite, 'beforeEach', fn);
-}
+		after(fn: SuiteLifecycleFunction) {
+			on(currentSuite, 'teardown', fn);
+		},
 
-export function afterEach(fn: SuiteLifecycleFunction): void {
-	on(currentSuite, 'afterEach', fn);
+		beforeEach(fn: SuiteLifecycleFunction) {
+			on(currentSuite, 'beforeEach', fn);
+		},
+
+		afterEach(fn: SuiteLifecycleFunction) {
+			on(currentSuite, 'afterEach', fn);
+		}
+	};
 }

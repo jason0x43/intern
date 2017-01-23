@@ -1,11 +1,11 @@
 import Task from 'dojo-core/async/Task';
 import Deferred from './Deferred';
 import Executor from './executors/Executor';
-import Test, { isTestOptions, TestFunction, TestOptions, SKIP } from './Test';
+import Test, { isTest, isTestOptions, TestFunction, TestOptions, SKIP } from './Test';
 import { InternError, Remote } from '../common';
 
 export function isSuite(value: any): value is Suite {
-	return value instanceof Suite;
+	return value.TestClass != null && typeof value.numTests === 'number';
 }
 
 export function isSuiteOptions(value: any): value is SuiteOptions {
@@ -38,9 +38,8 @@ export interface SuiteProperties {
 	executor: Executor;
 	name: string;
 	parent: Suite;
-	setup: SuiteLifecycleFunction;
-	teardown: SuiteLifecycleFunction;
 	timeout: number;
+	TestClass: typeof Test;
 }
 
 export type SuiteOptions = Partial<SuiteProperties> &
@@ -49,9 +48,9 @@ export type SuiteOptions = Partial<SuiteProperties> &
 export default class Suite {
 	async: (timeout?: number) => Deferred<void>;
 
-	afterEach: TestLifecycleFunction = null;
+	afterEach: TestLifecycleFunction;
 
-	beforeEach: TestLifecycleFunction = null;
+	beforeEach: TestLifecycleFunction;
 
 	error: InternError;
 
@@ -68,6 +67,8 @@ export default class Suite {
 	tests: (Suite | Test)[];
 
 	timeElapsed: number;
+
+	TestClass: typeof Test;
 
 	/**
 	 * If true, the suite will publish its start topic after the setup callback has finished,
@@ -96,6 +97,10 @@ export default class Suite {
 			(<any>this)[key] = options[key];
 		});
 
+		if (!this.TestClass) {
+			this.TestClass = Test;
+		}
+
 		const tests = options.tests;
 		if (tests) {
 			if (Array.isArray(tests)) {
@@ -104,7 +109,7 @@ export default class Suite {
 			else {
 				const simpleSuite = <SimpleSuite>tests;
 				Object.keys(simpleSuite).forEach(name => {
-					this.add(new Test({ name, test: simpleSuite[name] }));
+					this.add(new this.TestClass({ name, test: simpleSuite[name] }));
 				});
 			}
 		}
@@ -283,14 +288,17 @@ export default class Suite {
 
 		let test: Suite | Test;
 
-		if (isTestOptions(suiteOrTest)) {
-			test = new Test(suiteOrTest);
+		if (isTest(suiteOrTest) || isSuite(suiteOrTest)) {
+			test = suiteOrTest;
+		}
+		else if (isTestOptions(suiteOrTest)) {
+			test = new this.TestClass(suiteOrTest);
 		}
 		else if (isSuiteOptions(suiteOrTest)) {
 			test = new Suite(suiteOrTest);
 		}
 		else {
-			test = suiteOrTest;
+			throw new Error('Tried to add invalid suite or test');
 		}
 
 		test.parent = this;
@@ -458,7 +466,8 @@ export default class Suite {
 							if (!error.relatedTest) {
 								error.relatedTest = <Test>test;
 							}
-							this.executor.emit('suiteError', this);
+							// TODO: Emit a non-fatal suite error
+							this.executor.emit('error', error);
 							return Promise.resolve();
 						};
 

@@ -1,44 +1,29 @@
+import Executor from '../executors/Executor';
 import Suite from '../Suite';
 import Test from '../Test';
-import Reporter, { ReporterOptions, ReporterOutput } from './Reporter';
+import Reporter, { eventHandler, ReporterOptions } from './Reporter';
 
 /**
  * The console reporter outputs to the browser console.
  */
 export default class ConsoleReporter extends Reporter {
-	hasGrouping: boolean;
-	testId: keyof Test;
+	private _hasGrouping: boolean;
+	private _testId: keyof Test;
 
-	constructor(options: ReporterOptions = {}) {
-		super(options);
-		this.hasGrouping = 'group' in this.console && 'groupEnd' in this.console;
-		this.testId = this.hasGrouping ? 'name' : 'id';
+	constructor(executor: Executor, options: ReporterOptions = {}) {
+		super(executor, options);
+		this._hasGrouping = 'group' in this.console && 'groupEnd' in this.console;
+		this._testId = this._hasGrouping ? 'name' : 'id';
 	}
 
-	get output(): ReporterOutput {
-		if (!this._output) {
-			const element = document.createElement('pre');
-			this._output = {
-				write(chunk: string, _encoding: string, callback: Function) {
-					element.appendChild(document.createTextNode(chunk));
-					callback();
-				},
-				end(chunk: string, _encoding: string, callback: Function) {
-					element.appendChild(document.createTextNode(chunk));
-					document.body.appendChild(element);
-					callback();
-				}
-			};
-		}
-		return this._output;
-	}
-
-	error(error: Error): void {
+	@eventHandler()
+	error(error: Error) {
 		this.console.warn('FATAL ERROR');
 		this.console.error(this.formatter.format(error));
 	}
 
-	suiteEnd(suite: Suite): void {
+	@eventHandler()
+	suiteEnd(suite: Suite) {
 		// IE<10 does not provide a global console object when Developer Tools is turned off
 		if (!this.console) {
 			return;
@@ -61,24 +46,26 @@ export default class ConsoleReporter extends Reporter {
 			this.console[numFailedTests ? 'warn' : 'info'](message);
 		}
 
-		this.hasGrouping && this.console.groupEnd();
+		this._hasGrouping && this.console.groupEnd();
 	}
 
-	suiteStart(suite: Suite): void {
+	@eventHandler()
+	suiteStart(suite: Suite) {
 		// only start group for non-root suite
-		this.hasGrouping && suite.hasParent && this.console.group(suite.name);
+		this._hasGrouping && suite.hasParent && this.console.group(suite.name);
 	}
 
-	testEnd(test: Test): void {
+	@eventHandler()
+	testEnd(test: Test) {
 		if (test.error) {
-			this.console.error(`FAIL: ${test[this.testId]} (${test.timeElapsed}ms)`);
+			this.console.error(`FAIL: ${test[this._testId]} (${test.timeElapsed}ms)`);
 			this.console.error(this.formatter.format(test.error));
 		}
 		else if (test.skipped) {
-			this.console.log(`SKIP: ${test[this.testId]} (${test.skipped})`);
+			this.console.log(`SKIP: ${test[this._testId]} (${test.skipped})`);
 		}
 		else {
-			this.console.log(`PASS: ${test[this.testId]} (${test.timeElapsed})ms)`);
+			this.console.log(`PASS: ${test[this._testId]} (${test.timeElapsed})ms)`);
 		}
 	}
 }

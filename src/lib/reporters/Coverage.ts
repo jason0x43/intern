@@ -1,3 +1,4 @@
+import Executor from '../executors/Executor';
 import Collector = require('istanbul/lib/collector');
 import TextReport = require('istanbul/lib/report/text');
 import Report = require('istanbul/lib/report');
@@ -16,7 +17,7 @@ export interface ReportConstructor {
 
 export type CoverageOptions = Partial<CoverageProperties>;
 
-export default class Coverage extends Reporter implements CoverageProperties {
+abstract class Coverage extends Reporter implements CoverageProperties {
 	watermarks: Watermarks;
 
 	filename: string;
@@ -27,8 +28,8 @@ export default class Coverage extends Reporter implements CoverageProperties {
 
 	protected _collector: Collector;
 
-	constructor(options: CoverageOptions = {}) {
-		super(options);
+	constructor(executor: Executor, options: CoverageOptions = {}) {
+		super(executor, options);
 	}
 
 	get report() {
@@ -48,3 +49,5 @@ export default class Coverage extends Reporter implements CoverageProperties {
 		return this._collector;
 	}
 }
+
+export default Coverage;

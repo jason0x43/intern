@@ -1,11 +1,17 @@
 import Suite, { isSuiteOptions, SuiteOptions } from '../Suite';
 import Test, { isTestOptions, TestOptions } from '../Test';
 import { mixin } from 'dojo-core/lang';
+import { Handle } from 'dojo-interfaces/core';
 import Task from 'dojo-core/async/Task';
-import Reporter from '../reporters/Reporter';
 import Formatter from '../Formatter';
 import { pullFromArray } from '../util';
+import Reporter, { ReporterOptions } from '../reporters/Reporter';
+import getObjectInterface, { ObjectInterface } from '../interfaces/object';
+import getTddInterface, { TddInterface } from '../interfaces/tdd';
+import getBddInterface, { BddInterface } from '../interfaces/bdd';
 import global from 'dojo-core/global';
+
+export { Handle };
 
 export interface Config {
 	args?: { [name: string]: any };
@@ -19,20 +25,16 @@ export interface Config {
 	formatter?: Formatter;
 	grep?: RegExp;
 	instrumenterOptions?: any;
-	internName?: string;
+	interfaces?: string[];
 	maxConcurrency?: number;
 	name?: string;
-	reporters?: Reporter[];
+	reporters?: [ string | typeof Reporter | { reporter: string | typeof Reporter, options?: ReporterOptions } ];
 	setup?: (executor: Executor) => Task<any>;
 	teardown?: (executor: Executor) => Task<any>;
 }
 
-export interface Listener {
-	(...args: any[]): void | Promise<void>;
-}
-
-export interface Handle {
-	remove(): (void | Promise<void>);
+export interface Listener<T> {
+	(arg: T): void | Promise<void>;
 }
 
 export interface CoverageMessage {
@@ -40,12 +42,32 @@ export interface CoverageMessage {
 	coverage: any;
 }
 
-export default class Executor {
-	/** The resolved configuration for this executor. */
-	readonly config: Config;
+export interface DeprecationMessage {
+	original: string;
+	replacement: string;
+	message?: string;
+}
 
+export interface Events {
+	newSuite: Suite;
+	newTest: Test;
+	error: Error;
+	testStart: Test;
+	testEnd: Test;
+	suiteStart: Suite;
+	suiteEnd: Suite;
+	runStart: never;
+	runEnd: never;
+	coverage: CoverageMessage;
+	deprecated: DeprecationMessage;
+};
+
+export default class Executor {
 	/** The type of the executor. */
 	readonly mode: string;
+
+	/** The resolved configuration for this executor. */
+	protected _config: Config;
 
 	protected _formatter: Formatter;
 
@@ -54,13 +76,45 @@ export default class Executor {
 
 	protected _hasSuiteErrors = false;
 
-	protected _listeners: { [event: string]: Listener[] };
+	protected _listeners: { [event: string]: Listener<any>[] };
 
 	protected _reporters: Reporter[];
 
-	constructor(config: Config) {
-		config = config || {};
+	protected _nativeReporters: { [name: string]: typeof Reporter };
 
+	constructor(config: Config = {}) {
+		this._config = {
+			instrumenterOptions: {
+				coverageVariable: '__internCoverage'
+			},
+			defaultTimeout: 30000
+		};
+
+		this._listeners = {};
+		this._reporters = [];
+
+		if (config) {
+			this._configure(config);
+		}
+	}
+
+	get config() {
+		return this._config;
+	}
+
+	get formatter() {
+		if (!this._formatter) {
+			if (this.config.formatter) {
+				this._formatter = this.config.formatter;
+			}
+			else {
+				this._formatter = new Formatter(this.config);
+			}
+		}
+		return this._formatter;
+	}
+
+	protected _configure(config: Config) {
 		// config.benchmarkConfig = deepMixin({
 		// 	id: 'Benchmark',
 		// 	filename: 'baseline.json',
@@ -72,12 +126,7 @@ export default class Executor {
 		// 	verbosity: 0
 		// }, config.benchmarkConfig);
 
-		this.config = mixin({
-			instrumenterOptions: {
-				coverageVariable: '__internCoverage'
-			},
-			defaultTimeout: 30000
-		}, config);
+		mixin(this._config, config);
 
 		if (config.args) {
 			const args = config.args;
@@ -98,58 +147,46 @@ export default class Executor {
 			this.config.grep = new RegExp('');
 		}
 
-		if (this.config.reporters == null) {
-			this.config.reporters = [];
+		if (this.config.reporters) {
+			this.config.reporters.forEach(reporter => {
+				if (typeof reporter === 'string') {
+					const ReporterClass = this._getReporter(reporter);
+					this._reporters.push(new ReporterClass(this));
+				}
+				else if (typeof reporter === 'function') {
+					this._reporters.push(new reporter(this));
+				}
+				else {
+					let ReporterClass: typeof Reporter;
+					if (typeof reporter.reporter === 'string') {
+						ReporterClass = this._getReporter(reporter.reporter);
+					}
+					else {
+						ReporterClass = reporter.reporter;
+					}
+
+					this._reporters.push(new ReporterClass(this, reporter.options));
+				}
+			});
 		}
-
-		this._listeners = {};
-		this._reporters = [];
-
-		this.config.reporters.forEach(reporter => {
-			this.addReporter(reporter);
-		});
-	}
-
-	get formatter() {
-		if (!this._formatter) {
-			if (this.config.formatter) {
-				this._formatter = this.config.formatter;
-			}
-			else {
-				this._formatter = new Formatter(this.config);
-			}
-		}
-		return this._formatter;
 	}
 
 	/**
 	 * Emit an event to all registered listeners.
 	 */
-	emit(eventName: 'newSuite', data: Suite): Task<any>;
-	emit(eventName: 'newTest', data: Test): Task<any>;
 	emit(eventName: 'runStart'): Task<any>;
-	emit(eventName: 'suiteStart', data: Suite): Task<any>;
-	emit(eventName: 'suiteError', data: Suite): Task<any>;
-	emit(eventName: 'testStart', data: Test): Task<any>;
-	emit(eventName: 'testEnd', data: Test): Task<any>;
-	emit(eventName: 'suiteEnd', data: Suite): Task<any>;
-	emit(eventName: 'coverage', data: CoverageMessage): Task<any>;
 	emit(eventName: 'runEnd'): Task<any>;
-	emit(eventName: 'error', data: Error): Task<any>;
-	emit(eventName: string, data?: any): Task<any> {
-		if (eventName === 'suiteEnd' && data.error) {
+	emit<T extends keyof Events>(eventName: T, data: Events[T]): Task<any>;
+	emit<T extends keyof Events>(eventName: T, data?: Events[T]): Task<any> {
+		if (eventName === 'suiteEnd' && (<any>data).error) {
 			this._hasSuiteErrors = true;
 		}
 
 		const listeners = this._listeners[eventName] || [];
-		const reporters = this._reporters.filter(reporter => {
-			return typeof (<any>reporter)[eventName] === 'function';
-		});
-
-		if (listeners.length === 0 && reporters.length === 0) {
+		if (listeners.length === 0) {
 			// Report an error when no error listeners are registered
 			if (eventName === 'error') {
-				console.log('ERROR:', this.formatter.format(data));
+				console.error('ERROR:', this.formatter.format(<any>data));
 			}
 
 			return Task.resolve();
@@ -160,21 +197,30 @@ export default class Executor {
 			return new Promise<void>(resolve => {
 				resolve(listener(data));
 			});
-		}).concat(reporters.map(reporter => {
-			return new Promise<void>(resolve => {
-				resolve((<any>reporter)[eventName](data));
-			});
-		})))).catch(error => {
-			console.log(`Error emitting ${eventName}: ${this.formatter.format(error)}`);
+		}))).catch(error => {
+			console.error(`Error emitting ${eventName}: ${this.formatter.format(error)}`);
 		});
 	}
 
+	getInterface(name: 'object'): ObjectInterface;
+	getInterface(name: 'tdd'): TddInterface;
+	getInterface(name: 'bdd'): BddInterface;
+	getInterface(name: string): any {
+		switch (name) {
+			case 'object':
+				return getObjectInterface(this);
+			case 'tdd':
+				return getTddInterface(this);
+			case 'bdd':
+				return getBddInterface(this);
+		}
+	}
+
 	/**
-	 * Add a listener for a test event. When an event is emitted, the executor
-	 * will wait for all Promises returned by listener callbacks to resolve
-	 * before continuing.
+	 * Add a listener for a test event. When an event is emitted, the executor will wait for all Promises returned by
+	 * listener callbacks to resolve before continuing.
 	 */
-	on(eventName: string, listener: Listener) {
+	on<T extends keyof Events>(eventName: T, listener: Listener<Events[T]>): Handle {
 		let listeners = this._listeners[eventName];
 		if (!listeners) {
 			listeners = this._listeners[eventName] = [];
@@ -185,8 +231,8 @@ export default class Executor {
 		}
 
 		const handle: Handle = {
-			remove(this: any) {
-				this.remove = function () { };
+			destroy(this: any) {
+				this.destroy = function () { };
 				const index = listeners.indexOf(listener);
 				if (index !== -1) {
 					listeners = listeners.splice(index, 1);
@@ -194,17 +240,6 @@ export default class Executor {
 			}
 		};
 		return handle;
-	}
-
-	/**
-	 * Add a reporter.
-	 */
-	addReporter(reporter: Reporter) {
-		if (this._reporters.indexOf(reporter) !== -1) {
-			return;
-		}
-		reporter.executor = this;
-		this._reporters.push(reporter);
 	}
 
 	/**
@@ -278,6 +313,13 @@ export default class Executor {
 	}
 
 	/**
+	 * Return a reporter constructor corresponding to the given name
+	 */
+	protected _getReporter(_name: string): typeof Reporter {
+		return null;
+	}
+
+	/**
 	 * Runs each of the root suites, limited to a certain number of suites at the same time by `maxConcurrency`.
 	 */
 	protected _runTests(maxConcurrency: number) {
@@ -293,19 +335,22 @@ export default class Executor {
 		return new Task<any>(
 			(resolve, reject) => {
 				const emitLocalCoverage = () => {
-					let error = new Error('Run failed due to one or more suite errors');
+					const message = 'Run failed due to one or more suite errors';
 
-					let coverageData: Object = global[this.config.instrumenterOptions.coverageVariable];
+					const coverageData: Object = global[this.config.instrumenterOptions.coverageVariable];
 					if (coverageData) {
 						return this.emit('coverage', { coverage: coverageData }).then(() => {
 							if (hasError) {
-								throw error;
+								throw new Error(message);
 							}
 						});
 					}
-					else if (hasError) {
-						return Promise.reject(error);
+
+					if (hasError) {
+						return Promise.reject(new Error(message));
 					}
+
+					return Promise.resolve();
 				};
 
 				function finishSuite() {
@@ -390,7 +435,7 @@ function createQueue(maxConcurrency: number) {
 		};
 	};
 
-	(<any> queuer).empty = function () {
+	queuer.empty = function () {
 		queue = [];
 		numCalls = 0;
 	};

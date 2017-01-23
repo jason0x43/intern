@@ -2,6 +2,7 @@
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
     "declaration": true,
+    "experimentalDecorators": true,
 	"lib": [
       "ES5",
       "ES2015.Promise",
@@ -39,6 +40,8 @@
     "src/lib/executors/Browser.ts",
     "src/lib/executors/Executor.ts",
     "src/lib/executors/Node.ts",
+    "src/lib/executors/WebDriver.ts",
+    "src/lib/interfaces/object.ts",
     "src/lib/reporters/Pretty.ts",
     "src/lib/reporters/Reporter.ts",
     "src/lib/reporters/Simple.ts"

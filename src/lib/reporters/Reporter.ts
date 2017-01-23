@@ -1,50 +1,80 @@
 import Formatter from '../Formatter';
 import { mixin } from 'dojo-core/lang';
-import Executor from '../executors/Executor';
-import { Config } from '../../common';
+import Executor, { Events, Handle } from '../executors/Executor';
+
+/**
+ * Create a decorator that will add a decorated method to a class's list of event handlers.
+ */
+export function createEventHandler<E extends Events>() {
+	return function (name?: keyof E) {
+		return function<T extends keyof E> (
+			target: any,
+			propertyKey: T,
+			_descriptor: TypedPropertyDescriptor<(data: E[T]) => void>
+		) {
+			if (!target.hasOwnProperty('_eventHandlers')) {
+				target._eventHandlers = {};
+			}
+			target._eventHandlers[name || propertyKey] = propertyKey;
+		};
+	};
+}
+
+/**
+ * The default event handler decorator.
+ */
+export const eventHandler = createEventHandler<Events>();
 
 export interface ReporterProperties {
-	console: Console;
 	output: ReporterOutput;
-	formatter: Formatter;
 }
 
 export type ReporterOptions = Partial<ReporterProperties>;
 
+/**
+ * A stream that reporters can write to
+ */
 export interface ReporterOutput {
 	write(chunk: string | Buffer, encoding?: string, callback?: Function): void;
 	end(chunk: string | Buffer, encoding?: string, callback?: Function): void;
 }
 
 export default class Reporter implements ReporterProperties {
-	console: Console;
+	readonly executor: Executor;
 
-	executor: Executor;
+	protected _console: Console;
 
-	protected _defaultFormatter: Formatter;
+	protected _executor: Executor;
+
+	/**
+	 * A mapping from event names to the names of methods on this object. This property should be defined on the class
+	 * prototype. It is automatically created by the @eventHandler decorator.
+	 */
+	protected _eventHandlers: { [eventName in keyof Events]: string };
+
+	protected _handles: Handle[];
 
 	protected _output: ReporterOutput;
 
-	constructor(config: ReporterOptions = {}) {
+	constructor(executor: Executor, config: ReporterOptions = {}) {
 		mixin(this, config);
-
-		if (!this.console) {
-			this.console = getConsole();
-		}
+		this.executor = executor;
+		this._registerEventHandlers();
 	}
 
-	get formatter() {
-		if (this.executor) {
-			return this.executor.formatter;
+	get console() {
+		if (!this._console) {
+			this._console = getConsole();
 		}
-		if (!this._defaultFormatter) {
-			this._defaultFormatter = new Formatter();
-		}
-		return this._defaultFormatter;
+		return this._console;
 	}
 
-	get internConfig(): Config {
-		return this.executor.config;
+	set console(value: Console) {
+		this._console = value;
+	}
+
+	get formatter(): Formatter {
+		return this.executor.formatter;
 	}
 
 	get output() {
@@ -66,6 +96,22 @@ export default class Reporter implements ReporterProperties {
 
 	set output(value: ReporterOutput) {
 		this._output = value;
+	}
+
+	/**
+	 * Register any handlers added to the class event handlers map
+	 */
+	protected _registerEventHandlers() {
+		if (!this._eventHandlers) {
+			return;
+		}
+
+		Object.keys(this._eventHandlers).forEach((name: keyof Events) => {
+			this.executor.on(name, (...args: any[]) => {
+				const handler = this._eventHandlers[name];
+				return (<any>this)[handler](...args);
+			});
+		});
 	}
 }
 

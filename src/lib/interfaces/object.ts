@@ -1,95 +1,75 @@
-import * as aspect from 'dojo/aspect';
-import Suite, { SuiteProperties, SuiteLifecycleFunction } from '../Suite';
-import Test, { TestFunction } from '../Test';
-import { getIntern } from '../util';
+/**
+ * Object interface for registering suites
+ */
+
+import Suite, { isSuiteOptions, SuiteOptions, SuiteProperties, SuiteLifecycleFunction } from '../Suite';
+import Test, { isTestOptions, TestFunction, TestOptions } from '../Test';
+import Executor from '../executors/Executor';
+
+export interface ObjectInterface {
+	registerSuite(mainDescriptor: ObjectSuiteOptions): void;
+}
 
 export interface ObjectSuiteProperties extends SuiteProperties {
-	after: SuiteLifecycleFunction;
-	before: SuiteLifecycleFunction;
-	tests: { [name: string]: Suite | Test | TestFunction };
+	setup: SuiteLifecycleFunction;
+	teardown: SuiteLifecycleFunction;
+	tests: { [name: string]: SuiteOptions | TestOptions | TestFunction };
 }
 
 export type ObjectSuiteOptions = Partial<ObjectSuiteProperties>;
 
-export interface PropertyHandler {
-	(property: string, value: any, suite: Suite): boolean;
+export default function getInterface(executor: Executor) {
+	return {
+		registerSuite(mainDescriptor: ObjectSuiteOptions) {
+			_registerSuite(executor, mainDescriptor);
+		}
+	};
 }
 
-function createSuite(descriptor: ObjectSuiteOptions, TestClass?: typeof Test, propertyHandler?: PropertyHandler) {
-	/* jshint maxcomplexity: 13 */
-	let suite = new Suite({});
-	let test: any;
-	let handled: boolean;
-	let k: keyof ObjectSuiteOptions;
+const propertyMap: { [key: string]: keyof SuiteProperties } = {
+	teardown: 'after',
+	setup: 'before'
+};
 
-	for (k in descriptor) {
-		test = descriptor[k];
-		handled = propertyHandler && propertyHandler(k, test, suite);
+function createSuite(descriptor: ObjectSuiteOptions) {
+	let options: SuiteOptions = {};
 
-		if (!handled) {
-			handled = defaultPropertyHandler(k, test, suite);
+	Object.keys(descriptor).filter(k => {
+		return k !== 'tests';
+	}).map((k: keyof ObjectSuiteOptions) => {
+		return <keyof SuiteProperties>(propertyMap[k] || k);
+	}).forEach(k => {
+		options[k] = descriptor[k];
+	});
+
+	const TestClass = descriptor.TestClass || Test;
+	const tests = descriptor.tests;
+	options.tests = Object.keys(tests).map(name => {
+		const thing = tests[name];
+		if (isSuiteOptions(thing) || isTestOptions(thing)) {
+			thing.name = name;
+			return thing;
 		}
+		return new TestClass({ name, test: thing });
+	});
 
-		if (!handled) {
-			// Test isn't a function; assume it's a nested suite
-			if (typeof test !== 'function') {
-				const suiteOptions = <ObjectSuiteOptions>test;
-				suiteOptions.name = suiteOptions.name || k;
-				suite.add(createSuite(suiteOptions, TestClass, propertyHandler));
-			}
-			// Test is a function; create a Test instance for it
-			else {
-				suite.add(new TestClass({ name: k, test: test, parent: suite }));
-			}
-		}
-	}
-
-	return suite;
-}
-
-function defaultPropertyHandler(property: string, value: any, suite: Suite) {
-	if (property === 'before') {
-		property = 'setup';
-	}
-	if (property === 'after') {
-		property = 'teardown';
-	}
-
-	switch (property) {
-		case 'name':
-		case 'timeout':
-			(<{ [key: string]: any }> suite)[property] = value;
-			return true;
-
-		case 'setup':
-		case 'beforeEach':
-		case 'afterEach':
-		case 'teardown':
-			aspect.on(suite, property, value);
-			return true;
-	}
-
-	return false;
+	return new Suite(options);
 }
 
 /**
  * Register a new test suite. If provided, tests will be constructed using TestClass.
  *
  * @param mainDescriptor Object or IIFE describing the suite
- * @param TestClass Class to use to construct individual tests
- * @param propertyHandler Function to handle any properties that shouldn't be used as tests
  */
-export default function registerSuite(mainDescriptor: ObjectSuiteOptions, TestClass?: typeof Test, propertyHandler?: PropertyHandler): void {
-	TestClass = TestClass || Test;
-
+function _registerSuite(executor: Executor, mainDescriptor: ObjectSuiteOptions) {
 	let descriptor = mainDescriptor;
 
-	// enable per-suite closure, to match feature parity with other interfaces like tdd/bdd more closely;
-	// without this, it becomes impossible to use the object interface for functional tests since there is no
-	// other way to create a closure for each main suite
+	// Enable per-suite closure, to match feature parity with other interfaces like tdd/bdd more closely; without this,
+	// it becomes impossible to use the object interface for functional tests since there is no other way to create a
+	// closure for each main suite
 	if (typeof descriptor === 'function') {
 		descriptor = descriptor();
 	}
 
-	getIntern().addTest(createSuite(descriptor, TestClass, propertyHandler));
+	executor.addTest(createSuite(descriptor));
 }

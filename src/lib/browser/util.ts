@@ -30,4 +30,3 @@ export function normalizePath(path: string) {
 
 	return result.join('/');
 }
-

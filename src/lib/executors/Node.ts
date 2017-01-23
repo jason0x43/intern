@@ -24,6 +24,8 @@ export default class Node extends Executor {
 
 	mode: 'client';
 
+	protected _defaultReporter: Simple;
+
 	constructor(config: Config) {
 		super(config);
 
@@ -31,32 +33,23 @@ export default class Node extends Executor {
 			this.config.excludeInstrumentation = /(?:node_modules|tests)\//;
 		}
 
-		this._rootSuites = [new Suite({
-			executor: this
-		})];
+		this._rootSuites = [ new Suite({
+			executor: this,
+			name: this.config.rootSuiteName
+		}) ];
 
 		this._formatter = new Formatter(config);
-
-		if (this._reporters.length === 0) {
-			this.addReporter(new Simple());
-		}
 
 		if (this.config.excludeInstrumentation !== true) {
 			this._setInstrumentationHooks(this.config.excludeInstrumentation);
 		}
 	}
 
-	addFile(file: string) {
-		const suite = require(resolve(file));
-		if (suite.__esModule) {
-			this.addTest(suite.default);
-		}
-		else {
-			this.addTest(suite);
-		}
-	}
-
 	protected _beforeRun(): Task<void> {
+		if (!this._listeners['testStart']) {
+			this._defaultReporter = new Simple(this);
+		}
+
 		return super._beforeRun().then(() => {
 			const suite = this._rootSuites[0];
 			suite.name = this.config.rootSuiteName || null;
@@ -65,6 +58,15 @@ export default class Node extends Executor {
 			suite.timeout = this.config.defaultTimeout;
 			suite.bail = this.config.bail;
 		});
+	}
+
+	protected _getReporter(name: string) {
+		switch (name) {
+			case 'simple':
+				return require('Simple');
+			case 'pretty':
+				return require('Pretty');
+		}
 	}
 
 	/**

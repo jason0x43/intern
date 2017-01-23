@@ -9,7 +9,7 @@
  *     'baseline': Benchmark data will be written to a baseline file when testing is finished
  *     'test': Benchmark is compared to a baseline read from a file when testing starts
  *
- * Baseline data is stored hierarchically by environment and then by test. 
+ * Baseline data is stored hierarchically by environment and then by test.
  *
  * Notation
  * --------
@@ -23,6 +23,10 @@ import { Reporter, ReporterConfig } from '../../common';
 import Test from '../Test';
 import Suite from '../Suite';
 import _Benchmark = require('benchmark');
+
+export interface BenchmarkReporterDescriptor extends ReporterDescriptor {
+	mode: BenchmarkMode;
+}
 
 export interface BenchmarkData {
 	times: _Benchmark.Times;

@@ -1,21 +1,46 @@
-import Executor, { Config } from './Executor';
+import Executor, { Config as BaseConfig } from './Executor';
 import Formatter from '../browser/Formatter';
+import Reporter from '../reporters/Reporter';
 import Html from '../reporters/Html';
-import global from 'dojo-core/global';
+import Console from '../reporters/Console';
+import Suite from '../Suite';
 
-export { Config };
+export interface Config extends BaseConfig {
+	basePath?: string;
+}
 
 export default class Browser extends Executor {
-	constructor(config: Config) {
+	protected _defaultReporters: Reporter[];
+
+	constructor(config?: Config) {
 		super(config);
 
-		const globalName = this.config.name || 'intern';
-		if (global[globalName]) {
-			throw new Error(`An executor has already been installed at "${globalName}"`);
-		}
-		global[globalName] = this;
-
 		this._formatter = new Formatter(config);
-		this.addReporter(new Html());
+		this._defaultReporters = [ new Html(this) ];
+		this._rootSuites = [ new Suite({ executor: this }) ];
+	}
+
+	get config(): Config {
+		return this._config;
+	}
+
+	configure(config: Config) {
+		this._configure(config);
+	}
+
+	/**
+	 * Resolve a path that's relative to the project root to one that's relative to the Intern root.
+	 */
+	resolvePath(_path: string) {
+		return `${this.config.basePath}/${_path}`;
+	}
+
+	protected _getReporter(name: string): typeof Reporter {
+		switch (name) {
+			case 'html':
+				return Html;
+			case 'console':
+				return Console;
+		}
 	}
 }

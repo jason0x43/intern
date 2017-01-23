@@ -1,6 +1,6 @@
 import { assert } from 'chai';
-import registerSuite from '../../../src/lib/interfaces/object';
 import EnvironmentType from '../../../src/lib/EnvironmentType';
+const { registerSuite } = intern.getInterface('object');
 
 registerSuite({
 	name: 'intern/lib/EnvironmentType',

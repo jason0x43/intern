@@ -2,13 +2,19 @@
 
 <html>
 	<head>
-		<script src="../../_build/src/bundle.js"></script>
-		<script src="../../_build/tests/unit/lib/EnvironmentType.js"></script>
-		<script>
-			intern.run();
-		</script>
 	</head>
 
 	<body>
+		<script src="../../_build/browser/browser.js"></script>
+		<script>
+			intern.configure({
+				reporters: [ 'console' ],
+				interfaces: [ 'object' ]
+			});
+		</script>
+		<script src="../../_build/browser/tests/unit/all.js"></script>
+		<script>
+			intern.run();
+		</script>
 	</body>
 </html>
