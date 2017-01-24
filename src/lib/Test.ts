@@ -14,7 +14,7 @@ export function isTestOptions(value: any): value is TestOptions {
 }
 
 export interface TestFunction {
-	(): void | Promise<any>;
+	(this: Test): void | Promise<any>;
 }
 
 export interface TestProperties {

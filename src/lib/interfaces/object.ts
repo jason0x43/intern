@@ -7,16 +7,18 @@ import Test, { isTestOptions, TestFunction, TestOptions } from '../Test';
 import Executor from '../executors/Executor';
 
 export interface ObjectInterface {
-	registerSuite(mainDescriptor: ObjectSuiteOptions): void;
+	registerSuite(mainDescriptor: ObjectSuiteOptions | ObjectSuiteFactory): void;
 }
 
-export interface ObjectSuiteProperties extends SuiteProperties {
-	setup: SuiteLifecycleFunction;
-	teardown: SuiteLifecycleFunction;
+export interface ObjectSuiteFactory {
+	(): ObjectSuiteOptions;
+}
+
+export type ObjectSuiteOptions = SuiteOptions & {
+	setup?: SuiteLifecycleFunction;
+	teardown?: SuiteLifecycleFunction;
 	tests: { [name: string]: SuiteOptions | TestOptions | TestFunction };
-}
-
-export type ObjectSuiteOptions = Partial<ObjectSuiteProperties>;
+};
 
 export default function getInterface(executor: Executor) {
 	return {
@@ -32,7 +34,7 @@ const propertyMap: { [key: string]: keyof SuiteProperties } = {
 };
 
 function createSuite(descriptor: ObjectSuiteOptions) {
-	let options: SuiteOptions = {};
+	let options: SuiteOptions = { name: null };
 
 	Object.keys(descriptor).filter(k => {
 		return k !== 'tests';

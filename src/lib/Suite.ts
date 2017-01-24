@@ -9,7 +9,7 @@ export function isSuite(value: any): value is Suite {
 }
 
 export function isSuiteOptions(value: any): value is SuiteOptions {
-	return !(value instanceof Suite) && (
+	return !(value instanceof Suite) && ('name' in value) && (
 		value.tests != null ||
 		value.before != null ||
 		value.beforeEach != null ||
@@ -19,11 +19,11 @@ export function isSuiteOptions(value: any): value is SuiteOptions {
 }
 
 export interface SuiteLifecycleFunction {
-	(): void | Promise<any>;
+	(this: Suite): void | Promise<any>;
 }
 
 export interface TestLifecycleFunction {
-	(test: Test): void | Promise<any>;
+	(this: Test): void | Promise<any>;
 }
 
 export interface SimpleSuite {
@@ -42,10 +42,13 @@ export interface SuiteProperties {
 	TestClass: typeof Test;
 }
 
-export type SuiteOptions = Partial<SuiteProperties> &
-	{ tests?: (Suite | Test | SuiteOptions | TestOptions)[] | SimpleSuite };
+export type SuiteOptions = Partial<SuiteProperties> & {
+	// name is required
+	name: string;
+	tests?: (Suite | Test | SuiteOptions | TestOptions)[] | SimpleSuite
+};
 
-export default class Suite {
+export default class Suite implements SuiteProperties {
 	async: (timeout?: number) => Deferred<void>;
 
 	afterEach: TestLifecycleFunction;
@@ -58,11 +61,11 @@ export default class Suite {
 
 	parent: Suite;
 
-	setup: SuiteLifecycleFunction;
+	before: SuiteLifecycleFunction;
 
 	skipped: string;
 
-	teardown: SuiteLifecycleFunction;
+	after: SuiteLifecycleFunction;
 
 	tests: (Suite | Test)[];
 
@@ -89,7 +92,7 @@ export default class Suite {
 	private _timeout: number;
 
 	constructor(options: SuiteOptions) {
-		options = options || {};
+		options = options || { name: null };
 
 		Object.keys(options).filter(key => {
 			return key !== 'tests';
@@ -107,7 +110,7 @@ export default class Suite {
 				tests.forEach(suiteOrTest => this.add(suiteOrTest));
 			}
 			else {
-				const simpleSuite = <SimpleSuite>tests;
+				const simpleSuite: SimpleSuite = tests;
 				Object.keys(simpleSuite).forEach(name => {
 					this.add(new this.TestClass({ name, test: simpleSuite[name] }));
 				});
