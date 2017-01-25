@@ -5,7 +5,9 @@
   "extends": "../tsconfig.json",
   "files": [
 	"../_build/src/browser.d.ts",
-    "./tester.ts",
-    "./unit/all.ts"
+    "./example.node.ts",
+    "./example.webdriver.ts",
+    "./unit/all.ts",
+    "./functional/lib/ProxiedSession.ts"
   ]
 }

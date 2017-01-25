@@ -34,7 +34,10 @@ export default class Pretty extends Reporter implements PrettyProperties {
 	colorReplacement: { [key: string]: string };
 	reporters: any;
 	log: string[];
+
+	// TODO: Where should watermarks come from?
 	watermarks: any;
+
 	tunnelState: string;
 	header: string;
 
@@ -44,7 +47,7 @@ export default class Pretty extends Reporter implements PrettyProperties {
 
 	private _renderTimeout: NodeJS.Timer;
 
-	constructor(executor: Executor, config: PrettyOptions = {}) {
+	constructor(executor: Executor<Events>, config: PrettyOptions = {}) {
 		super(executor, config);
 
 		this.spinnerOffset = 0;

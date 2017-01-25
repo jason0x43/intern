@@ -1,7 +1,4 @@
 import * as diffUtil from 'diff';
-import Executor from './executors/Executor';
-import { GlobalConfig } from '../common';
-import global from 'dojo-core/global';
 
 export const hasFunctionName = function () {
 	function foo() {}
@@ -44,22 +41,6 @@ export function createDiff(actual: Object, expected: Object): string {
 	}
 
 	return diff;
-}
-
-export function getConfig(): GlobalConfig {
-	return global['internConfig'];
-}
-
-export function getExecutor(): Executor {
-	const internConfig = getConfig() || {};
-	const internName = internConfig.internName || 'intern';
-	const executor = global[internName];
-
-	if (!executor) {
-		throw new Error('No executor has been created');
-	}
-
-	return executor;
 }
 
 /**

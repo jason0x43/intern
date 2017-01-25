@@ -1,6 +1,5 @@
 import 'chai';
 import Tunnel from 'digdug/Tunnel';
-import Executor, { Config } from './lib/executors/Executor';
 import EnvironmentType from './lib/EnvironmentType';
 import Test from './lib/Test';
 import Formatter from './lib/Formatter';
@@ -8,20 +7,6 @@ import Reporter from './lib/reporters/Reporter';
 import Suite from './lib/Suite';
 import Command = require('leadfoot/Command');
 import Task from 'dojo-core/async/Task';
-
-export interface GlobalConfig {
-	/** Configuration for the test executor */
-	config?: Config;
-
-	/** The test executor */
-	intern?: Executor;
-
-	/** The global name used for the test executor; defaults to 'intern' */
-	internName?: string;
-
-	/** Registered reporter classes. Loading a reporter module will cause it to register here. */
-	reporters?: { [name: string]: typeof Reporter };
-}
 
 export interface CommandLineArguments {
 	config?: string;

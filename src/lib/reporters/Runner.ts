@@ -3,13 +3,13 @@ import * as nodeUtil from 'util';
 import Collector = require('istanbul/lib/collector');
 import TextSummaryReport = require('istanbul/lib/report/text-summary');
 import TextReport = require('istanbul/lib/report/text');
-import * as intern from '../../main';
-import * as util from '../node/util';
 import Test from '../Test';
 import Suite from '../Suite';
-import { Reporter, ReporterConfig, Config, Proxy } from '../../common';
+import Reporter, { createEventHandler, ReporterProperties } from './Reporter';
 import { Writable } from 'stream';
-import Tunnel from 'digdug/Tunnel';
+import Proxy from '../Proxy';
+import Executor from '../executors/Executor';
+import WebDriver, { Events, TunnelMessage } from '../executors/WebDriver';
 
 const LIGHT_RED = '\x1b[91m';
 const LIGHT_GREEN = '\x1b[92m';
@@ -17,11 +17,9 @@ const LIGHT_YELLOW = '\x1b[93m';
 const LIGHT_MAGENTA = '\x1b[95m';
 export type Charm = charm.Charm;
 
-export interface RunnerConfig extends ReporterConfig {
-	internConfig?: Config;
-}
+const eventHandler = createEventHandler<Events>();
 
-export default class Runner implements Reporter {
+export default class Runner extends Reporter {
 	sessions: { [sessionId: string]: any };
 	hasErrors: boolean;
 	proxyOnly: boolean;
@@ -31,23 +29,26 @@ export default class Runner implements Reporter {
 
 	protected charm: Charm;
 
-	constructor(config: RunnerConfig = {}) {
+	constructor(executor: WebDriver, config: Partial<ReporterProperties> = {}) {
+		super(executor, config);
+
 		this.sessions = {};
 		this.hasErrors = false;
-		this.proxyOnly = Boolean(config.internConfig.proxyOnly);
+		this.proxyOnly = executor.config.proxyOnly;
 		this._summaryReporter = new TextSummaryReport({
-			watermarks: config.watermarks
+			watermarks: executor.config.watermarks
 		});
 		this._detailedReporter = new TextReport({
 			watermarks: config.watermarks
 		});
 
 		this.charm = charm();
-		this.charm.pipe(<Writable> config.output);
+		this.charm.pipe(<Writable>config.output);
 		this.charm.display('reset');
 	}
 
-	coverage(sessionId: string, coverage: Object): void {
+	@eventHandler()
+	coverage(sessionId: string, coverage: Object) {
 		// coverage will be called for the runner host, which has no session ID -- ignore that
 		if (intern.mode === 'client' || sessionId) {
 			const session = this.sessions[sessionId || ''];
@@ -56,7 +57,8 @@ export default class Runner implements Reporter {
 		}
 	}
 
-	deprecated(name: string, replacement: string, extra: string): void {
+	@eventHandler()
+	deprecated(name: string, replacement: string, extra: string) {
 		this.charm
 			.write(LIGHT_YELLOW)
 			.write('⚠︎ ' + name + ' is deprecated. ');
@@ -76,7 +78,8 @@ export default class Runner implements Reporter {
 		this.charm.write('\n').display('reset');
 	}
 
-	fatalError(error: Error): void {
+	@eventHandler()
+	error(error: Error) {
 		this.charm
 			.foreground('red')
 			.write('(ノಠ益ಠ)ノ彡┻━┻\n')
@@ -87,20 +90,13 @@ export default class Runner implements Reporter {
 		this.hasErrors = true;
 	}
 
-	proxyStart(proxy: Proxy): void {
+	@eventHandler()
+	proxyStart(proxy: Proxy) {
 		this.charm.write('Listening on 0.0.0.0:' + proxy.config.port + '\n');
 	}
 
-	reporterError(_reporter: Reporter, error: Error): void {
-		this.charm
-			.foreground('red')
-			.write('Reporter error!\n')
-			.write(util.getErrorMessage(error))
-			.display('reset')
-			.write('\n');
-	}
-
-	runEnd(): void {
+	@eventHandler()
+	runEnd() {
 		let collector = new Collector();
 		let numEnvironments = 0;
 		let numTests = 0;
@@ -141,8 +137,21 @@ export default class Runner implements Reporter {
 			.write('\n\n');
 	}
 
-	suiteEnd(suite: Suite): void {
-		if (!suite.hasParent) {
+	@eventHandler()
+	suiteEnd(suite: Suite) {
+		if (suite.error) {
+			const error = suite.error;
+
+			this.charm
+				.foreground('red')
+				.write('Suite ' + suite.id + ' FAILED\n')
+				.write(this.formatter.format(error))
+				.display('reset')
+				.write('\n');
+
+			this.hasErrors = true;
+		}
+		else if (!suite.hasParent) {
 			// runEnd will report all of this information, so do not repeat it
 			if (intern.mode === 'client') {
 				return;
@@ -202,20 +211,8 @@ export default class Runner implements Reporter {
 		}
 	}
 
-	suiteError(suite: Suite): void {
-		const error = suite.error;
-
-		this.charm
-			.foreground('red')
-			.write('Suite ' + suite.id + ' FAILED\n')
-			.write(util.getErrorMessage(error))
-			.display('reset')
-			.write('\n');
-
-		this.hasErrors = true;
-	}
-
-	suiteStart(suite: Suite): void {
+	@eventHandler()
+	suiteStart(suite: Suite) {
 		if (!suite.hasParent) {
 			this.sessions[suite.sessionId || ''] = { suite: suite };
 			if (suite.sessionId) {
@@ -224,47 +221,51 @@ export default class Runner implements Reporter {
 		}
 	}
 
-	testFail(test: Test): void {
-		this.charm
-			.write(LIGHT_RED)
-			.write('× ' + test.id)
-			.write(' (' + (test.timeElapsed / 1000) + 's)')
-			.write('\n')
-			.foreground('red')
-			.write(util.getErrorMessage(test.error))
-			.display('reset')
-			.write('\n');
+	@eventHandler()
+	testEnd(test: Test) {
+		if (test.error) {
+			this.charm
+				.write(LIGHT_RED)
+				.write('× ' + test.id)
+				.write(' (' + (test.timeElapsed / 1000) + 's)')
+				.write('\n')
+				.foreground('red')
+				.write(this.formatter.format(test.error))
+				.display('reset')
+				.write('\n');
+		}
+		else if (test.skipped) {
+			this.charm
+				.write(LIGHT_MAGENTA)
+				.write('~ ' + test.id)
+				.foreground('white')
+				.write(' (' + (test.skipped || 'skipped') + ')')
+				.display('reset')
+				.write('\n');
+		}
+		else {
+			this.charm
+				.write(LIGHT_GREEN)
+				.write('✓ ' + test.id)
+				.foreground('white')
+				.write(' (' + (test.timeElapsed / 1000) + 's)')
+				.display('reset')
+				.write('\n');
+		}
 	}
 
-	testPass(test: Test): void {
-		this.charm
-			.write(LIGHT_GREEN)
-			.write('✓ ' + test.id)
-			.foreground('white')
-			.write(' (' + (test.timeElapsed / 1000) + 's)')
-			.display('reset')
-			.write('\n');
+	@eventHandler()
+	tunnelDownloadProgress(message: TunnelMessage) {
+		this.charm.write('Tunnel download: ' + (message.progress.loaded / message.progress.total * 100).toFixed(3) + '%\r');
 	}
 
-	testSkip(test: Test): void {
-		this.charm
-			.write(LIGHT_MAGENTA)
-			.write('~ ' + test.id)
-			.foreground('white')
-			.write(' (' + (test.skipped || 'skipped') + ')')
-			.display('reset')
-			.write('\n');
-	}
-
-	tunnelDownloadProgress(_tunnel: Tunnel, progress: { loaded: number, total: number }) {
-		this.charm.write('Tunnel download: ' + (progress.loaded / progress.total * 100).toFixed(3) + '%\r');
-	}
-
-	tunnelStart(): void {
+	@eventHandler()
+	tunnelStart() {
 		this.charm.write('Tunnel started\n');
 	}
 
-	tunnelStatus(_tunnel: Tunnel, status: string): void {
-		this.charm.write(status + '\x1b[K\r');
+	@eventHandler()
+	tunnelStatus(message: TunnelMessage) {
+		this.charm.write(message.status + '\x1b[K\r');
 	}
 }

@@ -1,4 +1,4 @@
-import Executor, { Config as BaseConfig } from './Executor';
+import Executor, { Config as BaseConfig, Events } from './Executor';
 import Suite from '../Suite';
 import Task from 'dojo-core/async/Task';
 import { instrument } from '../instrument';
@@ -6,6 +6,7 @@ import { normalizePath } from '../node/util';
 import Formatter from '../node/Formatter';
 import { resolve, sep } from 'path';
 import { hook } from 'istanbul';
+import Reporter from '../reporters/Reporter';
 import Pretty from '../reporters/Pretty';
 import Simple from '../reporters/Simple';
 
@@ -16,16 +17,15 @@ export interface Config extends BaseConfig {
 	sessionId?: string;
 }
 
+export { Events };
+
 /**
  * The Node executor is used to run unit tests in a Node environment.
  */
-export default class Node extends Executor {
-	/** The resolved configuration for this executor. */
+export default class Node extends Executor<Events> {
 	readonly config: Config;
 
-	mode: 'client';
-
-	protected _defaultReporter: Simple;
+	protected _defaultReporter: Reporter;
 
 	constructor(config: Config) {
 		super(config);
@@ -55,13 +55,14 @@ export default class Node extends Executor {
 			const suite = this._rootSuites[0];
 			suite.name = this.config.rootSuiteName || null;
 			suite.grep = this.config.grep;
+			// TODO: Does node need a session ID?
 			suite.sessionId = this.config.sessionId;
 			suite.timeout = this.config.defaultTimeout;
 			suite.bail = this.config.bail;
 		});
 	}
 
-	protected _getReporter(name: string) {
+	protected _getReporter(name: string): typeof Reporter {
 		switch (name) {
 			case 'simple':
 				return Simple;

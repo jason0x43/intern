@@ -1,33 +1,46 @@
-import * as util from './node/util';
-import * as lang from 'dojo/lang';
-import * as Promise from 'dojo/Promise';
-import * as aspect from 'dojo/aspect';
+import { getShouldWait, pullFromArray } from './util';
+import { normalizePath } from './node/util';
+import { instrument } from './instrument';
+import * as aspect from 'dojo-core/aspect';
 import * as http from 'http';
 import * as path from 'path';
 import * as fs from 'fs';
 import { lookup } from 'mime-types';
 import * as net from 'net';
+import { mixin } from 'dojo-core/lang';
 
-export type ProxyConfig = {
-	basePath?: string;
-	excludeInstrumentation?: boolean|RegExp;
-	instrument?: boolean;
-	instrumenterOptions?: any;
-	port?: number;
-	waitForRunner?: boolean;
+export interface ProxyProperties {
+	basePath: string;
+	excludeInstrumentation: boolean | RegExp;
+	instrument: boolean;
+	instrumenterOptions: any;
+	port: number;
+	waitForRunner: boolean;
 };
 
-export default class Proxy {
-	config: ProxyConfig;
+export type ProxyOptions = Partial<ProxyProperties>;
+
+export default class Proxy implements ProxyProperties {
+	basePath: string;
+
+	excludeInstrumentation: boolean | RegExp;
+
+	instrument: boolean;
+
+	instrumenterOptions: any;
+
+	port: number;
 
 	server: http.Server;
+
+	waitForRunner: boolean;
 
 	private _codeCache: { [filename: string]: { mtime: number, data: string } };
 
 	private _sessions: { [id: string]: { lastSequence: number, queue: any, listeners: any[] } };
 
-	constructor(config: ProxyConfig = {}) {
-		this.config = config;
+	constructor(options: ProxyOptions = {}) {
+		mixin(this, options);
 	}
 
 	start() {
@@ -61,7 +74,7 @@ export default class Proxy {
 				});
 			});
 
-			server.listen(this.config.port, resolve);
+			server.listen(this.port, resolve);
 		});
 	}
 
@@ -83,8 +96,8 @@ export default class Proxy {
 		listeners.push(listener);
 		return {
 			remove: function (this: any) {
-				this.remove = function () {};
-				lang.pullFromArray(listeners, listener);
+				this.remove = function () { };
+				pullFromArray(listeners, listener);
 			}
 		};
 	}
@@ -100,7 +113,7 @@ export default class Proxy {
 	private _handler(request: http.IncomingMessage, response: http.ServerResponse) {
 		if (request.method === 'GET') {
 			if (/\.js(?:$|\?)/.test(request.url)) {
-				this._handleFile(request, response, this.config.instrument);
+				this._handleFile(request, response, this.instrument);
 			}
 			else {
 				this._handleFile(request, response);
@@ -128,7 +141,7 @@ export default class Proxy {
 					}));
 
 					let shouldWait = messages.some((message) => {
-						return util.getShouldWait(this.config.waitForRunner, message.payload);
+						return getShouldWait(this.waitForRunner, message.payload);
 					});
 
 					if (shouldWait) {
@@ -160,7 +173,7 @@ export default class Proxy {
 		}
 	}
 
-	private _handleFile(request: http.IncomingMessage, response: http.ServerResponse, instrument?: boolean, omitContent?: boolean) {
+	private _handleFile(request: http.IncomingMessage, response: http.ServerResponse, shouldInstrument?: boolean, omitContent?: boolean) {
 		function send(contentType: string, data: string) {
 			response.writeHead(200, {
 				'Content-Type': contentType,
@@ -175,27 +188,25 @@ export default class Proxy {
 		if (/^__intern\//.test(file)) {
 			const basePath = path.resolve(path.join(__dirname, '..'));
 			wholePath = path.join(basePath, file.replace(/^__intern\//, ''));
-			instrument = false;
+			shouldInstrument = false;
 		}
 		else {
-			wholePath = path.join(this.config.basePath, file);
+			wholePath = path.join(this.basePath, file);
 		}
 
-		wholePath = util.normalizePath(wholePath);
+		wholePath = normalizePath(wholePath);
 
 		if (wholePath.charAt(wholePath.length - 1) === '/') {
 			wholePath += 'index.html';
 		}
 
-		const config = this.config;
-
 		// if the string passed to `excludeInstrumentation` changes here, it must also change in
 		// `lib/executors/Executor.js`
 		if (
-			config.excludeInstrumentation === true ||
-			(config.excludeInstrumentation && config.excludeInstrumentation.test(file))
+			this.excludeInstrumentation === true ||
+			(this.excludeInstrumentation && this.excludeInstrumentation.test(file))
 		) {
-			instrument = false;
+			shouldInstrument = false;
 		}
 
 		const contentType = lookup(path.basename(wholePath)) || 'application/octet-stream';
@@ -210,7 +221,7 @@ export default class Proxy {
 				return;
 			}
 
-			if (instrument) {
+			if (shouldInstrument) {
 				const mtime = stats.mtime.getTime();
 				if (this._codeCache[wholePath] && this._codeCache[wholePath].mtime === mtime) {
 					send(contentType, this._codeCache[wholePath].data);
@@ -229,10 +240,10 @@ export default class Proxy {
 
 						// providing `wholePath` to the instrumenter instead of a partial filename is necessary because
 						// lcov.info requires full path names as per the lcov spec
-						data = util.instrument(
+						data = instrument(
 							data,
 							wholePath,
-							this.config.instrumenterOptions
+							this.instrumenterOptions
 						);
 						this._codeCache[wholePath] = {
 							// strictly speaking mtime could reflect a previous version, assume those race conditions are rare
@@ -267,14 +278,13 @@ export default class Proxy {
 				' last ' + message.sequence + ' cur');
 		}
 
-		message.resolver = new Promise.Deferred(function (reason) {
-			message.cancelled = true;
-			throw reason;
+		message.promise = new Promise(resolve => {
+			message.resolve = resolve;
 		});
 
 		if (message.sequence > session.lastSequence + 1) {
 			session.queue[message.sequence] = message;
-			return message.resolver.promise;
+			return message.promise;
 		}
 
 		let triggerMessage = message;
@@ -284,14 +294,14 @@ export default class Proxy {
 			delete session.queue[session.lastSequence];
 
 			if (!message.cancelled) {
-				message.resolver.resolve(Promise.all(session.listeners.map(function (listener) {
+				message.resolve(Promise.all(session.listeners.map(function (listener) {
 					return listener.apply(null, message.payload);
 				})));
 			}
 		}
 		while ((message = session.queue[message.sequence + 1]));
 
-		return triggerMessage.resolver.promise;
+		return triggerMessage.promise;
 	}
 
 	private _send404(response: http.ServerResponse) {
@@ -306,7 +316,8 @@ export default class Proxy {
 interface Message {
 	sessionId: string;
 	sequence: number;
-	resolver: Promise.Deferred<any>;
 	cancelled: boolean;
 	payload: string;
+	promise: Promise<any>;
+	resolve: (value?: any) => void;
 }

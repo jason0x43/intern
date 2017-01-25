@@ -11,6 +11,11 @@ import getTddInterface, { TddInterface } from '../interfaces/tdd';
 import getBddInterface, { BddInterface } from '../interfaces/bdd';
 import global from 'dojo-core/global';
 
+declare global {
+	// There will be one active executor
+	export let intern: Executor<Events>;
+}
+
 export { Handle };
 
 export interface Config {
@@ -29,8 +34,8 @@ export interface Config {
 	maxConcurrency?: number;
 	name?: string;
 	reporters?: [ string | typeof Reporter | { reporter: string | typeof Reporter, options?: ReporterOptions } ];
-	setup?: (executor: Executor) => Task<any>;
-	teardown?: (executor: Executor) => Task<any>;
+	setup?: (executor: Executor<Events>) => Task<any>;
+	teardown?: (executor: Executor<Events>) => Task<any>;
 }
 
 export interface Listener<T> {
@@ -62,7 +67,12 @@ export interface Events {
 	deprecated: DeprecationMessage;
 };
 
-export default class Executor {
+export interface ExecutorClass<E extends Events, T extends Executor<E>> {
+	new (config: Config): T;
+	create(this: ExecutorClass<E, T>, config: Config): T;
+}
+
+export abstract class Executor<E extends Events> {
 	/** The type of the executor. */
 	readonly mode: string;
 
@@ -94,8 +104,16 @@ export default class Executor {
 		if (config) {
 			this._configure(config);
 		}
+	}
 
-		global['intern'] = this;
+	/**
+	 * Create a new instance of an Executor and assign it to the global intern reference. This is the method that user
+	 * code should generally use to instantiate an executor since it ensures the global reference is created.
+	 */
+	static create<E extends Events, T extends Executor<E>>(this: ExecutorClass<E, T>, config: Config = {}): T {
+		const executor = new this(config);
+		global['intern'] = executor;
+		return executor;
 	}
 
 	get config() {
@@ -128,6 +146,7 @@ export default class Executor {
 
 		mixin(this._config, config);
 
+		// Process any command line or query args
 		if (config.args) {
 			const args = config.args;
 			if (args['grep']) {
@@ -176,8 +195,8 @@ export default class Executor {
 	 */
 	emit(eventName: 'runStart'): Task<any>;
 	emit(eventName: 'runEnd'): Task<any>;
-	emit<T extends keyof Events>(eventName: T, data: Events[T]): Task<any>;
-	emit<T extends keyof Events>(eventName: T, data?: Events[T]): Task<any> {
+	emit<T extends keyof E>(eventName: T, data: E[T]): Task<any>;
+	emit<T extends keyof E>(eventName: T, data?: E[T]): Task<any> {
 		if (eventName === 'suiteEnd' && (<any>data).error) {
 			this._hasSuiteErrors = true;
 		}
@@ -220,7 +239,7 @@ export default class Executor {
 	 * Add a listener for a test event. When an event is emitted, the executor will wait for all Promises returned by
 	 * listener callbacks to resolve before continuing.
 	 */
-	on<T extends keyof Events>(eventName: T, listener: Listener<Events[T]>): Handle {
+	on<T extends keyof E>(eventName: T, listener: Listener<E[T]>): Handle {
 		let listeners = this._listeners[eventName];
 		if (!listeners) {
 			listeners = this._listeners[eventName] = [];
@@ -267,7 +286,7 @@ export default class Executor {
 	 * Sets up the environment for test execution with instrumentation, reporting, and error handling. Subclasses
 	 * should typically override `_runTests` to execute tests.
 	 */
-	run() {
+	run(): Task<void> {
 		const promise = this._beforeRun()
 			.then(() => {
 				return Task.resolve(this.config.setup && this.config.setup(this)).then(() => {
@@ -291,9 +310,7 @@ export default class Executor {
 			.catch(error => this.emit('error', error));
 
 		// Only allow the executor to be started once
-		this.run = function () {
-			return promise;
-		};
+		this.run = () => promise;
 
 		return promise;
 	}
@@ -315,9 +332,7 @@ export default class Executor {
 	/**
 	 * Return a reporter constructor corresponding to the given name
 	 */
-	protected _getReporter(_name: string): typeof Reporter {
-		return null;
-	}
+	abstract protected _getReporter(_name: string): typeof Reporter;
 
 	/**
 	 * Runs each of the root suites, limited to a certain number of suites at the same time by `maxConcurrency`.
@@ -395,9 +410,7 @@ export default class Executor {
 	}
 }
 
-declare global {
-	export let intern: Executor;
-}
+export default Executor;
 
 interface Queuer {
 	(callee: Function): () => void;
