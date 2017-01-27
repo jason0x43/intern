@@ -2243,7 +2243,7 @@ declare module 'leadfoot/Server' {
 	 * The Server class represents a remote HTTP server implementing the WebDriver wire protocol that can be used to
 	 * generate new remote control sessions.
 	 */
-	class Server {
+	class Server<T extends Session> {
 		/**
 		 * @param url
 		 * The fully qualified URL to the JsonWireProtocol endpoint on the server. The default endpoint for a
@@ -2329,7 +2329,7 @@ declare module 'leadfoot/Server' {
 		 * A hash map of required capabilities of the remote environment. The server will not return an environment that
 		 * does not match all the required capabilities if one is not available.
 		 */
-		createSession(desiredCapabilities: leadfoot.Capabilities, requiredCapabilities?: leadfoot.Capabilities): Promise<Session>;
+		createSession(desiredCapabilities: leadfoot.Capabilities, requiredCapabilities?: leadfoot.Capabilities): Promise<T>;
 
 		/**
 		 * Adds additional capabilities data on the `capabilities` key of the passed session.
@@ -2377,7 +2377,7 @@ declare module 'leadfoot/Session' {
 		 * @param server The server that the session belongs to.
 		 * @param capabilities A map of bugs and features that the remote environment exposes.
 		 */
-		constructor(sessionId: string, server: Server, capabilities: leadfoot.Capabilities);
+		constructor(sessionId: string, server: Server<Session>, capabilities: leadfoot.Capabilities);
 
 		/**
 		 * Information about the available features and bugs in the remote environment.
@@ -2400,7 +2400,7 @@ declare module 'leadfoot/Session' {
 		 * @memberOf module:leadfoot/Session#
 		 * @readonly
 		 */
-		server: Server;
+		server: Server<Session>;
 
 		/**
 		 * A function that performs an HTTP request to a JsonWireProtocol endpoint and normalises response status and

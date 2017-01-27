@@ -5,15 +5,10 @@ import Html from '../reporters/Html';
 import Console from '../reporters/Console';
 import Suite from '../Suite';
 
-export { Events }
-
-export interface Config extends BaseConfig {
-	basePath?: string;
-}
-
-export default class Browser extends Executor {
-	protected _defaultReporters: Reporter[];
-
+/**
+ * The Browser executor is used to run unit tests in a browser.
+ */
+export default class Browser extends Executor<Events> {
 	constructor(config?: Config) {
 		config = config || {};
 
@@ -28,16 +23,12 @@ export default class Browser extends Executor {
 		super(config);
 
 		this._formatter = new Formatter(config);
-		this._defaultReporters = [ new Html(this) ];
 		this._rootSuites = [ new Suite({ name: null, executor: this }) ];
+		this._reporters.push(new Html(this));
 	}
 
 	get config(): Config {
 		return this._config;
-	}
-
-	configure(config: Config) {
-		this._configure(config);
 	}
 
 	/**
@@ -55,6 +46,12 @@ export default class Browser extends Executor {
 				return Console;
 		}
 	}
+}
+
+export { Events }
+
+export interface Config extends BaseConfig {
+	basePath?: string;
 }
 
 function getThisPath() {

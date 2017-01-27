@@ -1,5 +1,4 @@
 import { CommandLineArguments } from '../common';
-// import { BenchmarkMode, CommandLineArguments, Config } from '../common';
 
 export function parseCommandLine(rawArgs: string[]) {
 	return parseArguments(rawArgs || process.argv.slice(2));
@@ -16,61 +15,6 @@ export function parseQueryString(query: string) {
 		return decodeURIComponent(str);
 	});
 };
-
-// export function mixIntoConfig(config: Config, args?: CommandLineArguments) {
-// 	args = args || {};
-
-// 	if (args['grep']) {
-// 		let grep = /^\/(.*)\/([gim]*)$/.exec(args['grep']);
-
-// 		if (grep) {
-// 			config.grep = new RegExp(grep[1], grep[2]);
-// 		}
-// 		else {
-// 			config.grep = new RegExp(args['grep'], 'i');
-// 		}
-// 	}
-
-// 	// TODO: don't set defaults here
-// 	// if (config.proxyPort == null) {
-// 	// 	config.proxyPort = 9000;
-// 	// }
-// 	// else if (typeof config.proxyPort === 'string') {
-// 	if (typeof config.proxyPort === 'string') {
-// 		if (isNaN(config.proxyPort)) {
-// 			throw new Error('proxyPort must be a number');
-// 		}
-// 		config.proxyPort = Number(config.proxyPort);
-// 	}
-
-// 	// If the user doesn't specify a proxy URL, construct one using the proxy port.
-// 	if (config.proxyUrl == null) {
-// 		config.proxyUrl = 'http://localhost:' + config.proxyPort + '/';
-// 	}
-
-// 	// let benchmarkConfig = config.benchmarkConfig = lang.deepMixin({
-// 	// 	id: 'Benchmark',
-// 	// 	filename: 'baseline.json',
-// 	// 	mode: <BenchmarkMode>'test',
-// 	// 	thresholds: {
-// 	// 		warn: { rme: 3, mean: 5 },
-// 	// 		fail: { rme: 6, mean: 10 }
-// 	// 	},
-// 	// 	verbosity: 0
-// 	// }, config.benchmarkConfig);
-
-// 	// if (config.benchmark) {
-// 	// 	if (config.baseline) {
-// 	// 		benchmarkConfig.mode = 'baseline';
-// 	// 	}
-
-// 	// 	config.suites = config.benchmarkSuites || [];
-// 	// 	config.functionalSuites = [];
-// 	// 	config.excludeInstrumentation = true;
-// 	// }
-
-// 	return config;
-// }
 
 function parseArguments(rawArgs: string[], decoder?: (name: string) => any) {
 	let args: CommandLineArguments = {};

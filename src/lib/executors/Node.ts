@@ -10,22 +10,11 @@ import Reporter from '../reporters/Reporter';
 import Pretty from '../reporters/Pretty';
 import Simple from '../reporters/Simple';
 
-export interface Config extends BaseConfig {
-	basePath?: string;
-	globalName?: string;
-	rootSuiteName?: string;
-	sessionId?: string;
-}
-
-export { Events };
-
 /**
  * The Node executor is used to run unit tests in a Node environment.
  */
 export default class Node extends Executor<Events> {
 	readonly config: Config;
-
-	protected _defaultReporter: Reporter;
 
 	constructor(config: Config) {
 		super(config);
@@ -36,7 +25,7 @@ export default class Node extends Executor<Events> {
 
 		this._rootSuites = [ new Suite({
 			executor: this,
-			name: this.config.rootSuiteName
+			name: this.config.rootSuiteName || 'root'
 		}) ];
 
 		this._formatter = new Formatter(config);
@@ -47,11 +36,11 @@ export default class Node extends Executor<Events> {
 	}
 
 	protected _beforeRun(): Task<void> {
-		if (!this._listeners['testEnd']) {
-			this._defaultReporter = new Simple(this);
-		}
-
 		return super._beforeRun().then(() => {
+			if (this._reporters.length === 0) {
+				this._reporters.push(new Simple(this));
+			}
+
 			const suite = this._rootSuites[0];
 			suite.name = this.config.rootSuiteName || null;
 			suite.grep = this.config.grep;
@@ -100,3 +89,12 @@ export default class Node extends Executor<Events> {
 		hook.unhookRequire();
 	}
 }
+
+export interface Config extends BaseConfig {
+	basePath?: string;
+	globalName?: string;
+	rootSuiteName?: string;
+	sessionId?: string;
+}
+
+export { Events };

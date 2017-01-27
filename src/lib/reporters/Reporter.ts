@@ -40,11 +40,11 @@ export interface ReporterOutput {
 }
 
 export default class Reporter implements ReporterProperties {
-	readonly executor: Executor;
+	readonly executor: Executor<Events>;
 
 	protected _console: Console;
 
-	protected _executor: Executor;
+	protected _executor: Executor<Events>;
 
 	/**
 	 * A mapping from event names to the names of methods on this object. This property should be defined on the class
@@ -56,7 +56,7 @@ export default class Reporter implements ReporterProperties {
 
 	protected _output: ReporterOutput;
 
-	constructor(executor: Executor, config: ReporterOptions = {}) {
+	constructor(executor: Executor<Events>, config: ReporterOptions = {}) {
 		mixin(this, config);
 		this.executor = executor;
 		this._registerEventHandlers();

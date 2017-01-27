@@ -1,6 +1,5 @@
 // Import the proper executor for the current environment
 import Node from '../src/lib/executors/Node';
-import { parseCommandLine } from '../src/lib/parseArgs';
 import Suite from '../src/lib/Suite';
 import Test from '../src/lib/Test';
 
@@ -9,7 +8,6 @@ import { assert } from 'chai';
 const intern = Node.create({
 	name: 'Test config',
 	filterErrorStack: true,
-	args: parseCommandLine(process.argv.slice(2)),
 	reporters: [ 'simple' ]
 });
 
@@ -17,30 +15,27 @@ const intern = Node.create({
 // must be loaded *after* the Node executor is instantiated.
 require('./unit/lib/EnvironmentType');
 
-intern.addTest({
+intern.addTest(new Test({
 	name: 'foo',
 	test: () => {
 		assert(false, 'bad thing happened');
 	}
-});
+}));
 
 intern.addTest(new Suite({
 	name: 'sub',
 	tests: [
-		{
-			name: 'foo',
-			test: () => {}
-		},
-		{
+		new Test({ name: 'foo', test: () => {} }),
+		new Test({
 			name: 'skipper',
 			test: function (this: Test) {
 				this.skip();
 			}
-		}
+		})
 	]
 }));
 
-intern.addTest({
+intern.addTest(new Test({
 	name: 'baz',
 	test: () => {
 		return new Promise(resolve => {
@@ -49,6 +44,6 @@ intern.addTest({
 			}, 200);
 		});
 	}
-});
+}));
 
 intern.run();

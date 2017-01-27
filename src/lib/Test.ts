@@ -1,33 +1,10 @@
-import Executor from './executors/Executor';
+import Executor, { Events } from './executors/Executor';
 import Deferred from './Deferred';
 import Task, { isTask } from 'dojo-core/async/Task';
-import { InternError, Remote } from '../common';
+import { InternError } from '../common';
+import { Remote } from './executors/WebDriver';
 import Suite from './Suite';
 import { mixin } from 'dojo-core/lang';
-
-export function isTest(value: any): value is Test {
-	return typeof value.hasPassed === 'boolean' && typeof value.timeElapsed === 'number';
-}
-
-export function isTestOptions(value: any): value is TestOptions {
-	return !(value instanceof Test) && value.test != null;
-}
-
-export interface TestFunction {
-	(this: Test): void | Promise<any>;
-}
-
-export interface TestProperties {
-	hasPassed: boolean;
-	name: string;
-	parent: Suite;
-	skipped: string;
-	test: TestFunction;
-}
-
-export type TestOptions = Partial<TestProperties>;
-
-export const SKIP: any = {};
 
 export default class Test implements TestProperties {
 	hasPassed = false;
@@ -55,10 +32,14 @@ export default class Test implements TestProperties {
 	protected _usesRemote = false;
 
 	constructor(options: TestOptions) {
+		if (!options.name && !options.test) {
+			throw new Error('A Test requires a name and a test function');
+		}
+
 		mixin(this, options);
 	}
 
-	get executor(): Executor {
+	get executor(): Executor<Events> {
 		return this.parent && this.parent.executor;
 	}
 
@@ -312,3 +293,27 @@ export default class Test implements TestProperties {
 		};
 	}
 }
+
+export function isTest(value: any): value is Test {
+	return typeof value.hasPassed === 'boolean' && typeof value.timeElapsed === 'number';
+}
+
+export function isTestOptions(value: any): value is TestOptions {
+	return !(value instanceof Test) && value.name != null && value.test != null;
+}
+
+export interface TestFunction {
+	(this: Test): void | Promise<any>;
+}
+
+export interface TestProperties {
+	hasPassed: boolean;
+	name: string;
+	parent: Suite;
+	skipped: string;
+	test: TestFunction;
+}
+
+export type TestOptions = Partial<TestProperties> & { name: string, test: TestFunction };
+
+export const SKIP: any = {};

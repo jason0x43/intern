@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import { lookup } from 'mime-types';
 import * as net from 'net';
 import { mixin } from 'dojo-core/lang';
+import { Handle } from 'dojo-interfaces/core';
 
 export interface ProxyProperties {
 	basePath: string;
@@ -91,12 +92,15 @@ export default class Proxy implements ProxyProperties {
 		});
 	}
 
-	subscribeToSession(sessionId: string, listener: Function) {
+	/**
+	 * Listen for all events for a specific session
+	 */
+	subscribe(sessionId: string, listener: Function): Handle {
 		const listeners = this._getSession(sessionId).listeners;
 		listeners.push(listener);
 		return {
-			remove: function (this: any) {
-				this.remove = function () { };
+			destroy: function (this: any) {
+				this.destroy = function () {};
 				pullFromArray(listeners, listener);
 			}
 		};

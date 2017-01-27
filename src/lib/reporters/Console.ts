@@ -1,4 +1,4 @@
-import Executor from '../executors/Executor';
+import Executor, { Events } from '../executors/Executor';
 import Suite from '../Suite';
 import Test from '../Test';
 import Reporter, { eventHandler, ReporterOptions } from './Reporter';
@@ -10,7 +10,7 @@ export default class ConsoleReporter extends Reporter {
 	private _hasGrouping: boolean;
 	private _testId: keyof Test;
 
-	constructor(executor: Executor, options: ReporterOptions = {}) {
+	constructor(executor: Executor<Events>, options: ReporterOptions = {}) {
 		super(executor, options);
 		this._hasGrouping = 'group' in this.console && 'groupEnd' in this.console;
 		this._testId = this._hasGrouping ? 'name' : 'id';

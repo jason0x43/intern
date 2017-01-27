@@ -35,14 +35,8 @@
   },
   "files": [
     "src/browser.ts",
-    "src/lib/EnvironmentType.ts",
-    "src/lib/executors/Browser.ts",
-    "src/lib/executors/Executor.ts",
+    "src/client.ts",
     "src/lib/executors/Node.ts",
-    "src/lib/executors/WebDriver.ts",
-    "src/lib/interfaces/object.ts",
-    "src/lib/reporters/Pretty.ts",
-    "src/lib/reporters/Reporter.ts",
-    "src/lib/reporters/Simple.ts"
+    "src/lib/executors/WebDriver.ts"
   ]
 }

@@ -25,11 +25,6 @@ export interface InternError {
 	relatedTest?: Test;
 }
 
-export interface Remote extends Command<any> {
-	environmentType?: EnvironmentType;
-	setHeartbeatInterval(delay: number): Command<any>;
-}
-
 export interface Removable {
 	remove: () => void;
 }

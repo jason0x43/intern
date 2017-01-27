@@ -21,7 +21,7 @@ registerSuite(function () {
 		});
 	}
 
-	function createServerFromRemote(remote: any): Server {
+	function createServerFromRemote(remote: any): Server<ProxiedSession> {
 		// Intern 2
 		if (remote.session && remote.session.server) {
 			return new Server(remote.session.server.url, null);

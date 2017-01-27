@@ -1,57 +1,18 @@
 import Task from 'dojo-core/async/Task';
 import Deferred from './Deferred';
-import Executor from './executors/Executor';
-import Test, { isTest, isTestOptions, TestFunction, TestOptions, SKIP } from './Test';
-import { InternError, Remote } from '../common';
+import Executor, { Events } from './executors/Executor';
+import Test, { isTest, SKIP } from './Test';
+import { InternError } from '../common';
+import { Remote } from './executors/WebDriver';
 
-export function isSuite(value: any): value is Suite {
-	return value.TestClass != null && typeof value.numTests === 'number';
-}
-
-export function isSuiteOptions(value: any): value is SuiteOptions {
-	return !(value instanceof Suite) && ('name' in value) && (
-		value.tests != null ||
-		value.before != null ||
-		value.beforeEach != null ||
-		value.after != null ||
-		value.afterEach != null
-	);
-}
-
-export interface SuiteLifecycleFunction {
-	(this: Suite): void | Promise<any>;
-}
-
-export interface TestLifecycleFunction {
-	(this: Test): void | Promise<any>;
-}
-
-export interface SimpleSuite {
-	[name: string]: TestFunction;
-}
-
-export interface SuiteProperties {
+export default class Suite implements RequiredSuiteProperties {
 	after: SuiteLifecycleFunction;
+
 	afterEach: TestLifecycleFunction;
-	before: SuiteLifecycleFunction;
-	beforeEach: TestLifecycleFunction;
-	executor: Executor;
-	name: string;
-	parent: Suite;
-	timeout: number;
-	TestClass: typeof Test;
-}
 
-export type SuiteOptions = Partial<SuiteProperties> & {
-	// name is required
-	name: string;
-	tests?: (Suite | Test | SuiteOptions | TestOptions)[] | SimpleSuite
-};
-
-export default class Suite implements SuiteProperties {
 	async: (timeout?: number) => Deferred<void>;
 
-	afterEach: TestLifecycleFunction;
+	before: SuiteLifecycleFunction;
 
 	beforeEach: TestLifecycleFunction;
 
@@ -61,27 +22,21 @@ export default class Suite implements SuiteProperties {
 
 	parent: Suite;
 
-	before: SuiteLifecycleFunction;
-
-	skipped: string;
-
-	after: SuiteLifecycleFunction;
-
-	tests: (Suite | Test)[];
-
-	timeElapsed: number;
-
-	TestClass: typeof Test;
-
 	/**
 	 * If true, the suite will publish its start topic after the setup callback has finished,
 	 * and will publish its end topic before the teardown callback has finished.
 	 */
 	publishAfterSetup: boolean = false;
 
+	skipped: string;
+
+	tests: (Suite | Test)[];
+
+	timeElapsed: number;
+
 	private _bail: boolean;
 
-	private _executor: Executor;
+	private _executor: Executor<Events>;
 
 	private _grep: RegExp;
 
@@ -92,7 +47,9 @@ export default class Suite implements SuiteProperties {
 	private _timeout: number;
 
 	constructor(options: SuiteOptions) {
-		options = options || { name: null };
+		if (!options.name) {
+			throw new Error('A Suite requires a name');
+		}
 
 		Object.keys(options).filter(key => {
 			return key !== 'tests';
@@ -100,21 +57,8 @@ export default class Suite implements SuiteProperties {
 			(<any>this)[key] = options[key];
 		});
 
-		if (!this.TestClass) {
-			this.TestClass = Test;
-		}
-
-		const tests = options.tests;
-		if (tests) {
-			if (Array.isArray(tests)) {
-				tests.forEach(suiteOrTest => this.add(suiteOrTest));
-			}
-			else {
-				const simpleSuite: SimpleSuite = tests;
-				Object.keys(simpleSuite).forEach(name => {
-					this.add(new this.TestClass({ name, test: simpleSuite[name] }));
-				});
-			}
+		if (options.tests) {
+			options.tests.forEach(suiteOrTest => this.add(suiteOrTest));
 		}
 	}
 
@@ -132,11 +76,11 @@ export default class Suite implements SuiteProperties {
 	/**
 	 * The executor used to run this Suite.
 	 */
-	get executor(): Executor {
+	get executor(): Executor<Events> {
 		return this._executor || (this.parent && this.parent._executor);
 	}
 
-	set executor(value: Executor) {
+	set executor(value: Executor<Events>) {
 		if (this._executor) {
 			throw new Error('AlreadyAssigned: an executor may only be set once per suite');
 		}
@@ -284,28 +228,17 @@ export default class Suite implements SuiteProperties {
 	/**
 	 * Add a test or suite to this suite.
 	 */
-	add(suiteOrTest: Suite | Test | SuiteOptions | TestOptions) {
+	add(suiteOrTest: Suite | Test) {
 		if (!this.tests) {
 			this.tests = [];
 		}
 
-		let test: Suite | Test;
-
-		if (isTest(suiteOrTest) || isSuite(suiteOrTest)) {
-			test = suiteOrTest;
-		}
-		else if (isTestOptions(suiteOrTest)) {
-			test = new this.TestClass(suiteOrTest);
-		}
-		else if (isSuiteOptions(suiteOrTest)) {
-			test = new Suite(suiteOrTest);
-		}
-		else {
+		if (!isTest(suiteOrTest) && !isSuite(suiteOrTest)) {
 			throw new Error('Tried to add invalid suite or test');
 		}
 
-		test.parent = this;
-		this.tests.push(test);
+		suiteOrTest.parent = this;
+		this.tests.push(suiteOrTest);
 	}
 
 	/**
@@ -610,6 +543,51 @@ export default class Suite implements SuiteProperties {
 		};
 	}
 }
+
+export function isSuite(value: any): value is Suite {
+	return value.name && value.tests && typeof value.numTests === 'number' && typeof value.hasParent === 'boolean';
+}
+
+export function isSuiteOptions(value: any): value is SuiteOptions {
+	return !(value instanceof Suite) && value.name && value.tests && (
+		value.before != null ||
+		value.beforeEach != null ||
+		value.after != null ||
+		value.afterEach != null
+	);
+}
+
+export interface SuiteLifecycleFunction {
+	(this: Suite): void | Promise<any>;
+}
+
+export interface TestLifecycleFunction {
+	(this: Test): void | Promise<any>;
+}
+
+export interface SuiteProperties {
+	after: SuiteLifecycleFunction;
+	afterEach: TestLifecycleFunction;
+	bail: boolean;
+	before: SuiteLifecycleFunction;
+	beforeEach: TestLifecycleFunction;
+	executor: Executor<Events>;
+	grep: RegExp;
+	parent: Suite;
+	publishAfterSetup: boolean;
+	timeout: number;
+}
+
+export interface RequiredSuiteProperties extends SuiteProperties {
+	name: string;
+	tests: (Suite | Test)[];
+}
+
+export type SuiteOptions = Partial<SuiteProperties> & {
+	// only name is required
+	name: string;
+	tests?: (Suite | Test)[];
+};
 
 // BAIL_REASON needs to be a string so that Intern can tell when a remote has bailed during unit tests so that it
 // can skip functional tests.

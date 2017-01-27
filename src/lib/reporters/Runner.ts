@@ -5,10 +5,11 @@ import TextSummaryReport = require('istanbul/lib/report/text-summary');
 import TextReport = require('istanbul/lib/report/text');
 import Test from '../Test';
 import Suite from '../Suite';
-import Reporter, { createEventHandler, ReporterProperties } from './Reporter';
+import { createEventHandler } from './Reporter';
+import Coverage, { CoverageProperties } from './Coverage';
 import { Writable } from 'stream';
 import Proxy from '../Proxy';
-import Executor from '../executors/Executor';
+import { CoverageMessage, DeprecationMessage } from '../executors/Executor';
 import WebDriver, { Events, TunnelMessage } from '../executors/WebDriver';
 
 const LIGHT_RED = '\x1b[91m';
@@ -19,9 +20,13 @@ export type Charm = charm.Charm;
 
 const eventHandler = createEventHandler<Events>();
 
-export default class Runner extends Reporter {
+export default class Runner extends Coverage {
 	sessions: { [sessionId: string]: any };
+
 	hasErrors: boolean;
+
+	mode: 'client' | 'webdriver';
+
 	proxyOnly: boolean;
 
 	private _summaryReporter: TextSummaryReport;
@@ -29,17 +34,17 @@ export default class Runner extends Reporter {
 
 	protected charm: Charm;
 
-	constructor(executor: WebDriver, config: Partial<ReporterProperties> = {}) {
+	constructor(executor: WebDriver, config: Partial<CoverageProperties> = {}) {
 		super(executor, config);
 
 		this.sessions = {};
 		this.hasErrors = false;
 		this.proxyOnly = executor.config.proxyOnly;
 		this._summaryReporter = new TextSummaryReport({
-			watermarks: executor.config.watermarks
+			watermarks: this.watermarks
 		});
 		this._detailedReporter = new TextReport({
-			watermarks: config.watermarks
+			watermarks: this.watermarks
 		});
 
 		this.charm = charm();
@@ -48,31 +53,31 @@ export default class Runner extends Reporter {
 	}
 
 	@eventHandler()
-	coverage(sessionId: string, coverage: Object) {
+	coverage(message: CoverageMessage) {
 		// coverage will be called for the runner host, which has no session ID -- ignore that
-		if (intern.mode === 'client' || sessionId) {
-			const session = this.sessions[sessionId || ''];
+		if (intern.mode === 'client' || message.sessionId) {
+			const session = this.sessions[message.sessionId || ''];
 			session.coverage = session.coverage || new Collector();
-			session.coverage.add(coverage);
+			session.coverage.add(message.coverage);
 		}
 	}
 
 	@eventHandler()
-	deprecated(name: string, replacement: string, extra: string) {
+	deprecated(message: DeprecationMessage) {
 		this.charm
 			.write(LIGHT_YELLOW)
-			.write('⚠︎ ' + name + ' is deprecated. ');
+			.write('⚠︎ ' + message.original + ' is deprecated. ');
 
-		if (replacement) {
-			this.charm.write('Use ' + replacement + ' instead.');
+		if (message.replacement) {
+			this.charm.write('Use ' + message.replacement + ' instead.');
 		}
 		else {
 			this.charm.write('Please open a ticket at https://github.com/theintern/intern/issues if you still ' +
 				'require access to this function.');
 		}
 
-		if (extra) {
-			this.charm.write(' ' + extra);
+		if (message.message) {
+			this.charm.write(' ' + message.message);
 		}
 
 		this.charm.write('\n').display('reset');
@@ -83,7 +88,7 @@ export default class Runner extends Reporter {
 		this.charm
 			.foreground('red')
 			.write('(ノಠ益ಠ)ノ彡┻━┻\n')
-			.write(util.getErrorMessage(error))
+			.write(this.formatter.format(error))
 			.display('reset')
 			.write('\n');
 
@@ -92,7 +97,7 @@ export default class Runner extends Reporter {
 
 	@eventHandler()
 	proxyStart(proxy: Proxy) {
-		this.charm.write('Listening on 0.0.0.0:' + proxy.config.port + '\n');
+		this.charm.write('Listening on 0.0.0.0:' + proxy.port + '\n');
 	}
 
 	@eventHandler()

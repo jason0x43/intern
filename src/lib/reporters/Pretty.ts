@@ -14,43 +14,51 @@ import charm = require('charm');
 import TextReport = require('istanbul/lib/report/text');
 import Collector = require('istanbul/lib/collector');
 import encode = require('charm/lib/encode');
+import { Watermarks } from 'istanbul';
 
 const eventHandler = createEventHandler<Events>();
 
 export interface PrettyProperties extends ReporterProperties {
-	dimensions: any;
-	titleWidth: number;
-	maxProgressBarWidth: number;
 	colorReplacement: { [key: string]: string };
+	dimensions: any;
+	maxProgressBarWidth: number;
+	titleWidth: number;
+	watermarks: Watermarks;
 }
 
 export type PrettyOptions = Partial<PrettyProperties>;
 
 export default class Pretty extends Reporter implements PrettyProperties {
-	spinnerOffset: number;
-	dimensions: any;
-	titleWidth: number;
-	maxProgressBarWidth: number;
 	colorReplacement: { [key: string]: string };
-	reporters: any;
-	log: string[];
 
-	// TODO: Where should watermarks come from?
-	watermarks: any;
+	dimensions: any;
+
+	titleWidth: number;
+
+	maxProgressBarWidth: number;
 
 	tunnelState: string;
-	header: string;
 
-	private _total: Report;
+	watermarks: Watermarks;
 
-	private _charm: charm.Charm;
+	protected _header: string;
 
-	private _renderTimeout: NodeJS.Timer;
+	protected _log: string[];
+
+	protected _reports: any;
+
+	protected _spinnerOffset: number;
+
+	protected _total: Report;
+
+	protected _charm: charm.Charm;
+
+	protected _renderTimeout: NodeJS.Timer;
 
 	constructor(executor: Executor<Events>, config: PrettyOptions = {}) {
 		super(executor, config);
 
-		this.spinnerOffset = 0;
+		this._spinnerOffset = 0;
 		this.dimensions = config.dimensions || {};
 		this.titleWidth = config.titleWidth || 12;
 		this.maxProgressBarWidth = config.maxProgressBarWidth || 40;
@@ -64,9 +72,9 @@ export default class Pretty extends Reporter implements PrettyProperties {
 			'~': ANSI_COLOR.reset,
 			'⚠': ANSI_COLOR.yellow
 		}, config.colorReplacement);
-		this.header = '';
-		this.reporters = {};
-		this.log = [];
+		this._header = '';
+		this._reports = {};
+		this._log = [];
 		this.tunnelState = '';
 		this._renderTimeout = undefined;
 		this._total = new Report();
@@ -74,7 +82,7 @@ export default class Pretty extends Reporter implements PrettyProperties {
 
 	@eventHandler()
 	runStart() {
-		this.header = this.executor.config.name;
+		this._header = this.executor.config.name;
 		this._charm = this._charm || this._newCharm();
 
 		const resize = () => {
@@ -102,7 +110,7 @@ export default class Pretty extends Reporter implements PrettyProperties {
 		// write a full log of errors
 		// Sort logs: pass < deprecated < skip < errors < fail
 		const ERROR_LOG_WEIGHT = { '!': 4, '×': 3, '~': 2, '⚠': 1, '✓': 0 };
-		const logs = this.log.sort((a: any, b: any) => {
+		const logs = this._log.sort((a: any, b: any) => {
 			a = (<{ [key: string]: any }> ERROR_LOG_WEIGHT)[a.charAt(0)] || 0;
 			b = (<{ [key: string]: any }> ERROR_LOG_WEIGHT)[b.charAt(0)] || 0;
 			return a - b;
@@ -124,7 +132,7 @@ export default class Pretty extends Reporter implements PrettyProperties {
 
 	@eventHandler()
 	coverage(data: CoverageMessage) {
-		const reporter = this.reporters[data.sessionId];
+		const reporter = this._reports[data.sessionId];
 		reporter && reporter.coverage.add(data.coverage);
 		this._total.coverage.add(data.coverage);
 	}
@@ -147,7 +155,7 @@ export default class Pretty extends Reporter implements PrettyProperties {
 			this._record(suite.sessionId, FAIL);
 
 			const message = '! ' + suite.id;
-			this.log.push(message + '\n' + this.formatter.format(suite.error));
+			this._log.push(message + '\n' + this.formatter.format(suite.error));
 		}
 	}
 
@@ -155,16 +163,16 @@ export default class Pretty extends Reporter implements PrettyProperties {
 	testEnd(test: Test) {
 		if (test.skipped) {
 			this._record(test.sessionId, SKIP);
-			this.log.push('~ ' + test.id + ': ' + (test.skipped || 'skipped'));
+			this._log.push('~ ' + test.id + ': ' + (test.skipped || 'skipped'));
 		}
 		else if (test.error) {
 			const message = '× ' + test.id;
 			this._record(test.sessionId, FAIL);
-			this.log.push(message + '\n' + this.formatter.format(test.error));
+			this._log.push(message + '\n' + this.formatter.format(test.error));
 		}
 		else {
 			this._record(test.sessionId, PASS);
-			this.log.push('✓ ' + test.id);
+			this._log.push('✓ ' + test.id);
 		}
 	}
 
@@ -182,7 +190,7 @@ export default class Pretty extends Reporter implements PrettyProperties {
 	@eventHandler()
 	error(error: Error) {
 		const message = '! ' + error.message;
-		this.log.push(message + '\n' + this.formatter.format(error));
+		this._log.push(message + '\n' + this.formatter.format(error));
 		// stop the render timeout on a fatal error so Intern can exit
 		clearTimeout(this._renderTimeout);
 	}
@@ -199,17 +207,17 @@ export default class Pretty extends Reporter implements PrettyProperties {
 			text += ' ' + message.message;
 		}
 
-		this.log.push(text);
+		this._log.push(text);
 	}
 
 	/**
 	 * Return the reporter for a given session, creating it if necessary.
 	 */
 	private _getReporter(suite: Suite): Report {
-		if (!this.reporters[suite.sessionId]) {
-			this.reporters[suite.sessionId] = new Report(suite.remote && suite.remote.environmentType.toString());
+		if (!this._reports[suite.sessionId]) {
+			this._reports[suite.sessionId] = new Report(suite.remote && suite.remote.environmentType.toString());
 		}
-		return this.reporters[suite.sessionId];
+		return this._reports[suite.sessionId];
 	}
 
 	/**
@@ -222,7 +230,7 @@ export default class Pretty extends Reporter implements PrettyProperties {
 	}
 
 	private _record(sessionId: string, result: number) {
-		const reporter = this.reporters[sessionId];
+		const reporter = this._reports[sessionId];
 		reporter && reporter.record(result);
 		this._total.record(result);
 	}
@@ -234,7 +242,7 @@ export default class Pretty extends Reporter implements PrettyProperties {
 	 * @param width the maximum width for the entire progress bar
 	 */
 	private _drawProgressBar(report: Report, width: number) {
-		const spinnerCharacter = SPINNER_STATES[this.spinnerOffset];
+		const spinnerCharacter = SPINNER_STATES[this._spinnerOffset];
 		const charm = this._charm;
 		if (!report.numTotal) {
 			charm.write('Pending');
@@ -257,7 +265,7 @@ export default class Pretty extends Reporter implements PrettyProperties {
 	 * TODO split this into two lines. The first line will display the
 	 * title, OS and code coverage and the progress bar on the second
 	 */
-	private _drawSessionReporter(report: Report) {
+	private _drawSessionReport(report: Report) {
 		const charm = this._charm;
 		const titleWidth = this.titleWidth;
 		const leftOfBar = fit(this._abbreviateEnvironment(report.environment).slice(0, titleWidth - 2) + ': ',
@@ -298,15 +306,15 @@ export default class Pretty extends Reporter implements PrettyProperties {
 
 	private _render(omitLogs: boolean = false) {
 		const charm = this._charm;
-		const numReporters = Object.keys(this.reporters).length;
+		const numReporters = Object.keys(this._reports).length;
 		const logLength = this.dimensions.height - numReporters - 4 /* last line & total */ -
-			(this.tunnelState ? 2 : 0) - (numReporters ? 1 : 0) - (this.header ? 1 : 0);
-		this.spinnerOffset = (++this.spinnerOffset) % SPINNER_STATES.length;
+			(this.tunnelState ? 2 : 0) - (numReporters ? 1 : 0) - (this._header ? 1 : 0);
+		this._spinnerOffset = (++this._spinnerOffset) % SPINNER_STATES.length;
 
 		charm.display('reset');
-		if (this.header) {
+		if (this._header) {
 			charm.display('bright');
-			charm.write(this.header + '\n');
+			charm.write(this._header + '\n');
 			charm.display('reset');
 		}
 		this.tunnelState && charm.write('Tunnel: ' + this.tunnelState + '\n\n');
@@ -316,14 +324,14 @@ export default class Pretty extends Reporter implements PrettyProperties {
 		// active ones or only the total with less space
 		if (numReporters) {
 			charm.write('\n');
-			for (let key in this.reporters) {
-				this._drawSessionReporter(this.reporters[key]);
+			for (let key in this._reports) {
+				this._drawSessionReport(this._reports[key]);
 			}
 		}
 
-		if (!omitLogs && logLength > 0 && this.log.length) {
+		if (!omitLogs && logLength > 0 && this._log.length) {
 			const allowed = { '×': true, '⚠': true, '!': true };
-			const logs = this.log.filter(line => {
+			const logs = this._log.filter(line => {
 				return (<{ [key: string]: any }> allowed)[line.charAt(0)];
 			}).slice(-logLength).map(line => {
 				// truncate long lines
@@ -360,7 +368,7 @@ export default class Pretty extends Reporter implements PrettyProperties {
  * @param environment the environment associated with the report
  * @param sessionId the sessionId associated with the report
  */
-class Report {
+export class Report {
 	environment: string;
 	sessionId: string;
 	numTotal: number = 0;
@@ -443,4 +451,3 @@ function fit(text: string|number, width: number, padLeft: boolean = false): stri
 	}
 	return text.slice(0, width);
 }
-

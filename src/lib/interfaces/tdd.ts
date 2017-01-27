@@ -1,7 +1,7 @@
 import { on } from 'dojo/aspect';
 import Suite, { SuiteLifecycleFunction } from '../Suite';
 import Test, { TestFunction } from '../Test';
-import Executor from '../executors/Executor';
+import Executor, { Events } from '../executors/Executor';
 
 export interface TddInterface {
 	suite(name: string, factory: TestFunction): void;
@@ -12,18 +12,17 @@ export interface TddInterface {
 	afterEach(fn: SuiteLifecycleFunction): void;
 }
 
-export default function getInterface(executor: Executor): TddInterface {
+export default function getInterface(executor: Executor<Events>): TddInterface {
 	let currentSuite: Suite;
 
 	return {
-		suite(name: string, factory: TestFunction) {
+		suite(name: string, factory: () => void) {
 			if (!currentSuite) {
-				currentSuite = new Suite({ name, tests: [ factory ] });
+				// This is a new top-level suite, not a nested suite
+				currentSuite = new Suite({ name, tests: [] });
 				executor.addTest(currentSuite);
-			} else {
-				// TODO: this seems wrong
-				currentSuite.add(factory);
 			}
+			factory.call(currentSuite);
 		},
 
 		test(name: string, test: TestFunction) {
@@ -31,11 +30,11 @@ export default function getInterface(executor: Executor): TddInterface {
 		},
 
 		before(fn: SuiteLifecycleFunction) {
-			on(currentSuite, 'setup', fn);
+			on(currentSuite, 'before', fn);
 		},
 
 		after(fn: SuiteLifecycleFunction) {
-			on(currentSuite, 'teardown', fn);
+			on(currentSuite, 'after', fn);
 		},
 
 		beforeEach(fn: SuiteLifecycleFunction) {

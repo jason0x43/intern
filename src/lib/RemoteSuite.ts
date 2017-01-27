@@ -1,173 +1,168 @@
-import Suite, { SuiteConfig } from './Suite';
-import { Config, InternError } from '../common';
-import { mixin } from 'dojo/lang';
-import Promise  = require('dojo/Promise');
-import { objectToQuery } from 'dojo/io-query';
+import Suite, { SuiteProperties } from './Suite';
+import UrlSearchParams from 'dojo-core/UrlSearchParams';
+import { Hash } from 'dojo-interfaces/core';
 import { parse } from 'url';
 import { relative } from 'path';
+import Task from 'dojo-core/async/Task';
+import { InternError } from '../common';
+import WebDriver, { Events } from './executors/WebDriver';
+import Proxy from './Proxy';
+import { Handle } from 'dojo-interfaces/core';
 
 /**
- * A root suite class used by the Runner executor to manage remotely-run suites.
+ * RemoteSuite is a class that acts as a local proxy for one or more unit test suites being run in a remote browser.
  */
-export default class RemoteSuite extends Suite {
-	config: Config;
+export default class RemoteSuite extends Suite implements RemoteSuiteProperties {
+	executor: WebDriver;
 
-	args: any[];
+	proxy: Proxy;
 
-	proxy: any;
+	suites: string[];
 
-	constructor(config: SuiteConfig)  {
+	constructor(config: RemoteSuiteOptions) {
 		super(config);
-
-		this.config = this.config || {};
 
 		if (this.timeout == null) {
 			this.timeout = Infinity;
 		}
-
-		if (this.name == null) {
-			this.name = 'unit tests';
-		}
 	}
 
-	// TODO: Change this from using Selenium-provided sessionId to self-generated constant identifier so that
-	// sessions can be safely reset in the middle of a test run
-	run() {
-		const self = this;
-		const reporterManager = this.reporterManager;
-		const config = this.config;
+	/**
+	 * Run a suite in a remote browser.
+	 *
+	 * TODO: Change this from using Selenium-provided sessionId to self-generated constant identifier so that sessions
+	 * can be safely reset in the middle of a test run
+	 */
+	run(): Task<any> {
 		const remote = this.remote;
 		const sessionId = remote.session.sessionId;
+		const proxy = this.executor.proxy;
+		let listenerHandle: Handle;
 
-		const handle = this.proxy.subscribeToSession(sessionId, receiveEvent);
-		const dfd = new Promise.Deferred(function (reason) {
-			handle.remove();
-			return remote.setHeartbeatInterval(0).then(function () {
-				throw reason;
-			});
-		});
+		return new Task(
+			(resolve, reject) => {
+				const handleError = (error: InternError) => {
+					this.error = error;
+					reject(error);
+				};
 
-		function receiveEvent(name: string) {
-			let args = arguments;
+				// Subscribe to events on the proxy so we'll know the status of the remote suite.
+				listenerHandle = proxy.subscribe(sessionId, (name: keyof Events, data: any) => {
+					const forward = () => this.executor.emit(name, data);
+					let suite: Suite;
 
-			function forward() {
-				return reporterManager.emit.apply(reporterManager, args);
-			}
+					switch (name) {
+						case 'suiteStart':
+							suite = data;
+							if (!suite.hasParent) {
+								// This suite from the browser is a root suite; add its tests to the local suite
+								suite.tests.forEach(test => {
+									this.tests.push(test);
+								});
+								// Tell the executor that the local suite has started
+								this.executor.emit('suiteStart', this);
+							}
+							else {
+								forward();
+							}
+							break;
 
-			let suite: Suite;
-			switch (name) {
-			case 'suiteStart':
-				suite = arguments[1];
-				// The suite sent by the server is the root suite for the client-side unit tests; add its tests
-				// to the runner-side client suite
-				if (!suite.hasParent) {
-					suite.tests.forEach(function (test) {
-						self.tests.push(test);
-					});
-					return reporterManager.emit('suiteStart', self);
-				}
-				return forward();
+						case 'suiteEnd':
+							suite = data;
+							this.skipped = suite.skipped;
 
-			case 'suiteEnd':
-				suite = arguments[1];
-				self.skipped = suite.skipped;
+							if (!suite.hasParent) {
+								suite.tests.forEach((test, index) => {
+									this.tests[index] = test;
+								});
 
-				// The suite sent by the server is the root suite for the client-side unit tests; update the
-				// existing test objects with the new ones from the server that reflect all the test results
-				if (!suite.hasParent) {
-					suite.tests.forEach(function (test, index) {
-						self.tests[index] = test;
-					});
-				}
-				else {
-					return forward();
-				}
-				break;
+								// This suite from the browser is a root suite; update the existing test objects with
+								// the new ones from the server that reflect the test results
+								if (suite.error) {
+									handleError(suite.error);
+								}
+							}
+							else {
+								forward();
+							}
+							break;
 
-			case 'suiteError':
-				suite = arguments[1];
-				if (!suite.hasParent) {
-					handle.remove();
-					return handleError(arguments[2]);
-				}
-				return forward();
+						case 'runStart':
+							// Consume this event
+							break;
 
-			case 'runStart':
-				break;
+						case 'runEnd':
+							let promise = remote.setHeartbeatInterval(0);
+							if (config.excludeInstrumentation !== true) {
+								// get about:blank to always collect code coverage data from the page in case it is
+								// navigated away later by some other process; this happens during self-testing when the
+								// Leadfoot library takes over
+								promise = promise.get('about:blank');
+							}
 
-			case 'runEnd':
-				handle.remove();
-				let promise = remote.setHeartbeatInterval(0);
-				if (config.excludeInstrumentation !== true) {
-					// get about:blank to always collect code coverage data from the page in case it is
-					// navigated away later by some other process; this happens during self-testing when
-					// the new Leadfoot library takes over
-					promise = promise.get('about:blank');
-				}
-				promise.then(function () {
-					return reporterManager.emit('suiteEnd', self);
-				}).then(function () {
-					dfd.resolve();
-				}, handleError);
-				break;
+							promise.then(resolve, reject);
+							break;
 
-			case 'fatalError':
-				// A fatalError in a suite is only fatal to the suite, so it's still basically a suiteError
-				handle.remove();
-				return handleError(arguments[1]);
+						case 'error':
+							handleError(data);
+							break;
 
-			default:
-				return forward();
-			}
-		}
-
-		function handleError(error: InternError) {
-			self.error = error;
-			return self.reporterManager.emit('suiteError', self, error).then(function () {
-				dfd.reject(error);
-			});
-		}
-
-		const proxyBasePath = parse(config.proxyUrl).pathname;
-
-		let clientReporter = this.config.runnerClientReporter;
-		if (typeof clientReporter === 'object') {
-			// Need to mixin the properties of `clientReporter` to a new object before stringify because
-			// stringify only serialises an object’s own properties
-			clientReporter = JSON.stringify(mixin({}, clientReporter));
-		}
-		else {
-			clientReporter = 'WebDriver';
-		}
-
-		const options = mixin({}, this.args, {
-			// the proxy always serves the baseUrl from the loader configuration as the root of the proxy,
-			// so ensure that baseUrl is always set to that root on the client
-			basePath: proxyBasePath,
-			initialBaseUrl: proxyBasePath + relative(config.basePath, process.cwd()),
-			reporters: clientReporter,
-			rootSuiteName: self.id,
-			sessionId: sessionId
-		});
-
-		// Intern runs unit tests on the remote Selenium server by navigating to the client runner HTML page. No
-		// real commands are issued after the call to remote.get() below until all unit tests are complete, so
-		// we need to make sure that we periodically send no-ops through the channel to ensure the remote server
-		// does not treat the session as having timed out
-		const timeout = config.capabilities['idle-timeout'];
-		if (timeout >= 1 && timeout < Infinity) {
-			remote.setHeartbeatInterval((timeout - 1) * 1000);
-		}
-
-		remote
-			.get(config.proxyUrl + '__intern/client.html?' + objectToQuery(options))
-			.catch(function (error: InternError) {
-				handle.remove();
-				remote.setHeartbeatInterval(0).then(function () {
-					handleError(error);
+						default:
+							forward();
+							break;
+					}
 				});
-			});
 
-		return dfd.promise;
+				const config = this.executor.config;
+				const proxyBasePath = parse(config.proxyUrl).pathname;
+
+				// Intern runs unit tests on the remote Selenium server by navigating to the client runner HTML page. No
+				// real commands are issued after the call to remote.get() below until all unit tests are complete, so
+				// we need to make sure that we periodically send no-ops through the channel to ensure the remote server
+				// does not treat the session as having timed out
+				const timeout = config.capabilities['idle-timeout'];
+				if (timeout >= 1 && timeout < Infinity) {
+					remote.setHeartbeatInterval((timeout - 1) * 1000);
+				}
+
+				let clientReporter = config.runnerClientReporter;
+				if (typeof clientReporter !== 'object') {
+					clientReporter = { reporter: 'webdriver' };
+				}
+
+				const options = new UrlSearchParams(<Hash<any>>{
+					// The proxy always serves the baseUrl from the loader configuration as the root of the proxy, so
+					// ensure that baseUrl is always set to that root on the client
+					basePath: proxyBasePath,
+					initialBaseUrl: proxyBasePath + relative(config.basePath, process.cwd()),
+					reporter: clientReporter,
+					rootSuiteName: this.id,
+					sessionId: sessionId
+				});
+
+				remote
+					.get(config.proxyUrl + '__intern/client.html?' + options)
+					// If there's an error loading the page, kill the heartbeat and fail
+					.catch(error => remote.setHeartbeatInterval(0).finally(() => handleError(error)));
+			},
+			// Canceller
+			() => remote.setHeartbeatInterval(0)
+		).then(
+			() => this.executor.emit('suiteEnd', this),
+			error => this.executor.emit('suiteEnd', this).then(() => {
+				throw error;
+			})
+			).finally(() => {
+				listenerHandle.destroy();
+			});
 	}
 }
+
+export interface RemoteSuiteProperties extends SuiteProperties {
+	proxy: Proxy;
+
+	/** The pathnames of suite modules that will be managed by this remote suite. */
+	suites: string[];
+}
+
+export type RemoteSuiteOptions = Partial<RemoteSuiteProperties> & { name: string };

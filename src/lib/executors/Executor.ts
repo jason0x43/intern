@@ -1,6 +1,6 @@
 import Suite, { isSuiteOptions, SuiteOptions } from '../Suite';
 import Test, { isTestOptions, TestOptions } from '../Test';
-import { mixin } from 'dojo-core/lang';
+import { deepMixin } from 'dojo-core/lang';
 import { Handle } from 'dojo-interfaces/core';
 import Task from 'dojo-core/async/Task';
 import Formatter from '../Formatter';
@@ -19,7 +19,6 @@ declare global {
 export { Handle };
 
 export interface Config {
-	args?: { [name: string]: any };
 	bail?: boolean;
 	baseline?: boolean;
 	benchmark?: boolean;
@@ -33,7 +32,7 @@ export interface Config {
 	interfaces?: string[];
 	maxConcurrency?: number;
 	name?: string;
-	reporters?: [ string | typeof Reporter | { reporter: string | typeof Reporter, options?: ReporterOptions } ];
+	reporters?: (string | typeof Reporter | { reporter: string | typeof Reporter, options?: ReporterOptions })[];
 	setup?: (executor: Executor<Events>) => Task<any>;
 	teardown?: (executor: Executor<Events>) => Task<any>;
 }
@@ -49,11 +48,12 @@ export interface CoverageMessage {
 
 export interface DeprecationMessage {
 	original: string;
-	replacement: string;
+	replacement?: string;
 	message?: string;
 }
 
 export interface Events {
+	'*': any;
 	newSuite: Suite;
 	newTest: Test;
 	error: Error;
@@ -86,6 +86,8 @@ export abstract class Executor<E extends Events> {
 
 	protected _hasSuiteErrors = false;
 
+	protected _interfaces: { [name: string]: any };
+
 	protected _listeners: { [event: string]: Listener<any>[] };
 
 	protected _reporters: Reporter[];
@@ -100,9 +102,21 @@ export abstract class Executor<E extends Events> {
 
 		this._listeners = {};
 		this._reporters = [];
+		this._interfaces = {};
+
+		// config.benchmarkConfig = deepMixin({
+		// 	id: 'Benchmark',
+		// 	filename: 'baseline.json',
+		// 	mode: <BenchmarkMode>'test',
+		// 	thresholds: {
+		// 		warn: { rme: 3, mean: 5 },
+		// 		fail: { rme: 6, mean: 10 }
+		// 	},
+		// 	verbosity: 0
+		// }, config.benchmarkConfig);
 
 		if (config) {
-			this._configure(config);
+			this.configure(config);
 		}
 	}
 
@@ -132,66 +146,22 @@ export abstract class Executor<E extends Events> {
 		return this._formatter;
 	}
 
-	protected _configure(config: Config) {
-		// config.benchmarkConfig = deepMixin({
-		// 	id: 'Benchmark',
-		// 	filename: 'baseline.json',
-		// 	mode: <BenchmarkMode>'test',
-		// 	thresholds: {
-		// 		warn: { rme: 3, mean: 5 },
-		// 		fail: { rme: 6, mean: 10 }
-		// 	},
-		// 	verbosity: 0
-		// }, config.benchmarkConfig);
-
-		mixin(this._config, config);
-
-		// Process any command line or query args
-		if (config.args) {
-			const args = config.args;
-			if (args['grep']) {
-				let grep = /^\/(.*)\/([gim]*)$/.exec(args['grep']);
-
-				if (grep) {
-					this.config.grep = new RegExp(grep[1], grep[2]);
-				}
-				else {
-					this.config.grep = new RegExp(args['grep'], 'i');
-				}
-			}
-
-		}
-
-		if (this.config.grep == null) {
-			this.config.grep = new RegExp('');
-		}
-
-		if (this.config.reporters) {
-			this.config.reporters.forEach(reporter => {
-				if (typeof reporter === 'string') {
-					const ReporterClass = this._getReporter(reporter);
-					this._reporters.push(new ReporterClass(this));
-				}
-				else if (typeof reporter === 'function') {
-					this._reporters.push(new reporter(this));
-				}
-				else {
-					let ReporterClass: typeof Reporter;
-					if (typeof reporter.reporter === 'string') {
-						ReporterClass = this._getReporter(reporter.reporter);
-					}
-					else {
-						ReporterClass = reporter.reporter;
-					}
-
-					this._reporters.push(new ReporterClass(this, reporter.options));
-				}
-			});
-		}
+	/**
+	 * Update this executor's configuration with a Config object or a general args object.
+	 *
+	 * Note that non-object properties will replace existing properties. Object propery values will be deeply mixed into
+	 * any existing value.
+	 */
+	configure(config: Config | {[key in keyof Config]: string | string[] | true }) {
+		Object.keys(config).forEach((key: keyof Config) => {
+			this._processArgument(key, config[key]);
+		});
 	}
 
 	/**
 	 * Emit an event to all registered listeners.
+	 *
+	 * This method handles async listeners. Note that this method will always resolve (never reject).
 	 */
 	emit(eventName: 'runStart'): Task<any>;
 	emit(eventName: 'runEnd'): Task<any>;
@@ -201,7 +171,7 @@ export abstract class Executor<E extends Events> {
 			this._hasSuiteErrors = true;
 		}
 
-		const listeners = this._listeners[eventName] || [];
+		const listeners = (this._listeners[eventName] || []).concat(this._listeners['*'] || []);
 		if (listeners.length === 0) {
 			// Report an error when no error listeners are registered
 			if (eventName === 'error') {
@@ -221,18 +191,40 @@ export abstract class Executor<E extends Events> {
 		});
 	}
 
+	/**
+	 * Return a testing interface
+	 */
 	getInterface(name: 'object'): ObjectInterface;
 	getInterface(name: 'tdd'): TddInterface;
 	getInterface(name: 'bdd'): BddInterface;
+	getInterface(name: string): any;
 	getInterface(name: string): any {
 		switch (name) {
 			case 'object':
-				return getObjectInterface(this);
+				if (!this._interfaces['object']) {
+					this._interfaces['object'] = getObjectInterface(this);
+				}
 			case 'tdd':
-				return getTddInterface(this);
+				if (!this._interfaces['tdd']) {
+					this._interfaces['tdd'] = getTddInterface(this);
+				}
+				break;
 			case 'bdd':
-				return getBddInterface(this);
+				if (!this._interfaces['bdd']) {
+					this._interfaces['bdd'] = getBddInterface(this);
+				}
+				break;
 		}
+		return this._interfaces[name];
+	}
+
+	/**
+	 * Register a testing interface on this executor. A testing interface can be anything that will allow a test to
+	 * register tests on the executor. For example, the 'object' interface is a single method, `registerSuite`, that a
+	 * test can call to register a suite.
+	 */
+	setInterface(name: string, iface: any) {
+		this._interfaces[name] = iface;
 	}
 
 	/**
@@ -252,10 +244,7 @@ export abstract class Executor<E extends Events> {
 		const handle: Handle = {
 			destroy(this: any) {
 				this.destroy = function () { };
-				const index = listeners.indexOf(listener);
-				if (index !== -1) {
-					listeners = listeners.splice(index, 1);
-				}
+				pullFromArray(listeners, listener);
 			}
 		};
 		return handle;
@@ -291,10 +280,10 @@ export abstract class Executor<E extends Events> {
 			.then(() => {
 				return Task.resolve(this.config.setup && this.config.setup(this)).then(() => {
 					return this.emit('runStart')
-						.then(() => this._runTests(this.config.maxConcurrency))
+						.then(() => this._runTests())
 						.finally(() => this.emit('runEnd'));
 				})
-				.finally(() => Promise.resolve(this.config.teardown && this.config.teardown(this)));
+					.finally(() => Promise.resolve(this.config.teardown && this.config.teardown(this)));
 			})
 			.finally(() => this._afterRun())
 			.then(() => {
@@ -319,143 +308,254 @@ export abstract class Executor<E extends Events> {
 	 * Code to execute after the main test run has finished to shut down the test system.
 	 */
 	protected _afterRun() {
-		return Promise.resolve();
+		return Task.resolve();
 	}
 
 	/**
-	 * Code to execute before the main test run has started to set up the test system.
+	 * Code to execute before the main test run has started to set up the test system. This is where Executors can do
+	 * any last-minute configuration before the testing process begins.
 	 */
-	protected _beforeRun() {
+	protected _beforeRun(): Task<any> {
+		if (this.config.grep == null) {
+			this.config.grep = new RegExp('');
+		}
+
+		if (this.config.reporters) {
+			this.config.reporters.forEach(reporter => {
+				if (typeof reporter === 'string') {
+					const ReporterClass = this._getReporter(reporter);
+					this._reporters.push(new ReporterClass(this));
+				}
+				else if (typeof reporter === 'function') {
+					this._reporters.push(new reporter(this));
+				}
+				else {
+					let ReporterClass: typeof Reporter;
+					if (typeof reporter.reporter === 'string') {
+						ReporterClass = this._getReporter(reporter.reporter);
+					}
+					else {
+						ReporterClass = reporter.reporter;
+					}
+
+					this._reporters.push(new ReporterClass(this, reporter.options));
+				}
+			});
+		}
+
 		return Task.resolve();
 	}
 
 	/**
 	 * Return a reporter constructor corresponding to the given name
 	 */
-	abstract protected _getReporter(_name: string): typeof Reporter;
+	protected abstract _getReporter(_name: string): typeof Reporter;
+
+	/**
+	 * Process an arbitrary config value. Subclasses can override this method to pre-process arguments or handle them
+	 * instead of allowing Executor to.
+	 */
+	protected _processArgument(name: keyof Config, value: any) {
+		switch (name) {
+			// boolean
+			case 'bail':
+			case 'baseline':
+			case 'benchmark':
+			case 'filterErrorStack':
+				if (typeof value === 'boolean') {
+					this.config[name] = value;
+				}
+				else if (value === 'true') {
+					this.config[name] = true;
+				}
+				else if (value === 'false') {
+					this.config[name] = false;
+				}
+				else {
+					throw new Error(`Non-boolean value "${value}" for ${name}`);
+				}
+				break;
+
+			// number
+			case 'defaultTimeout':
+			case 'maxConcurrency':
+				const numValue = Number(value);
+				if (isNaN(numValue)) {
+					throw new Error(`Non-numeric value "${value}" for ${name}`);
+				}
+				this.config[name] = numValue;
+				break;
+
+			// RegExp or true
+			case 'excludeInstrumentation':
+				if (value === true) {
+					this.config[name] = value;
+				}
+				else if (typeof value === 'string') {
+					this.config[name] = new RegExp(value);
+				}
+				else {
+					throw new Error(`Invalid numeric value "${value}" for ${name}`);
+				}
+				break;
+
+			// RegExp or string
+			case 'grep':
+				if (typeof value === 'string') {
+					this.config[name] = new RegExp(value);
+				}
+				else if (value instanceof RegExp) {
+					this.config[name] = value;
+				}
+				else {
+					throw new Error(`Invalid value "${value}" for ${name}`);
+				}
+				break;
+
+			// object
+			case 'instrumenterOptions':
+				if (typeof value === 'string') {
+					value = JSON.parse(value);
+				}
+				else if (typeof value !== 'object') {
+					throw new Error(`Invalid value "${value}" for ${name}`);
+				}
+				this.config[name] = deepMixin(this.config[name] || {}, value);
+				break;
+
+			// array of (string | object)
+			case 'reporters':
+				this.config[name] = (Array.isArray(value) ? value : [value]).map(reporter => {
+					if (typeof reporter === 'string') {
+						try {
+							return JSON.parse(reporter);
+						}
+						catch (_error) {
+							return reporter;
+						}
+					}
+					else if (typeof reporter === 'object') {
+						return reporter;
+					}
+					else {
+						throw new Error(`Invalid value "${value}" for ${name}`);
+					}
+				});
+				break;
+
+			// string
+			case 'name':
+				if (typeof value !== 'string') {
+					throw new Error(`Non-string value "${value}" for ${name}`);
+				}
+				this.config[name] = value;
+				break;
+
+			// array of strings
+			case 'interfaces':
+				this.config[name] = (Array.isArray(value) ? value : [value]).map(value => {
+					if (typeof value !== 'string') {
+						throw new Error(`Non-string value "${value}" for ${name}`);
+					}
+					return value;
+				});
+				break;
+		}
+	}
 
 	/**
 	 * Runs each of the root suites, limited to a certain number of suites at the same time by `maxConcurrency`.
 	 */
-	protected _runTests(maxConcurrency: number) {
-		maxConcurrency = maxConcurrency || Infinity;
-
-		const suites = this._rootSuites;
+	protected _runTests() {
+		const queue = new FunctionQueue(this.config.maxConcurrency || Infinity);
+		const rootSuites = this._rootSuites;
+		const numSuitesToRun = rootSuites.length;
 		let numSuitesCompleted = 0;
-		const numSuitesToRun = suites.length;
-		const queue = createQueue(maxConcurrency);
 		let hasError = false;
-		const runningSuites: Task<any>[] = [];
 
-		return new Task<any>(
-			(resolve, reject) => {
-				const emitLocalCoverage = () => {
-					const message = 'Run failed due to one or more suite errors';
+		let suiteTasks = rootSuites.map(suite => {
+			return queue.enqueue(() => {
+				return suite.run().catch(error => {
+					console.error('error:', error);
+					hasError = true;
+				}).finally(() => {
+					numSuitesCompleted++;
+					if (numSuitesCompleted === numSuitesToRun) {
+						const message = 'Run failed due to one or more suite errors';
+						const coverage = global[this.config.instrumenterOptions.coverageVariable];
+						if (coverage) {
+							return this.emit('coverage', { coverage }).then(() => {
+								if (hasError) {
+									throw new Error(message);
+								}
+							});
+						}
 
-					const coverageData: Object = global[this.config.instrumenterOptions.coverageVariable];
-					if (coverageData) {
-						return this.emit('coverage', { coverage: coverageData }).then(() => {
-							if (hasError) {
-								throw new Error(message);
-							}
-						});
+						if (hasError) {
+							throw new Error(message);
+						}
 					}
+				});
+			});
+		});
 
-					if (hasError) {
-						return Promise.reject(new Error(message));
-					}
-
-					return Promise.resolve();
-				};
-
-				function finishSuite() {
-					if (++numSuitesCompleted === numSuitesToRun) {
-						emitLocalCoverage().then(resolve, error => {
-							console.error('errored');
-							reject(error);
-						});
-					}
-				}
-
-				if (suites && suites.length) {
-					suites.forEach(queue(function (suite: Suite) {
-						const runTask = suite.run().then(finishSuite, error => {
-							console.error('error:', error);
-							hasError = true;
-							finishSuite();
-						});
-						runningSuites.push(runTask);
-						runTask.finally(() => {
-							pullFromArray(runningSuites, runTask);
-						});
-						return runTask;
-					}));
-				}
-				else {
-					emitLocalCoverage().then(resolve, error => {
-						console.error('errored');
-						reject(error);
-					});
-				}
-			},
-			() => {
-				queue.empty();
-
-				let task: Task<any>;
-				while ((task = runningSuites.pop())) {
-					task.cancel();
-				}
-			}
-		);
+		return Task.resolve(suiteTasks);
 	}
 }
 
 export default Executor;
 
-interface Queuer {
-	(callee: Function): () => void;
-	empty?: () => void;
-}
-
 /**
- * Creates a basic FIFO function queue to limit the number of currently executing asynchronous functions.
- *
- * @param maxConcurrency Number of functions to execute at once.
- * @returns A function that can be used to push new functions onto the queue.
+ * A basic FIFO function queue to limit the number of currently executing asynchronous functions.
  */
-function createQueue(maxConcurrency: number) {
-	let numCalls = 0;
-	let queue: any[] = [];
+class FunctionQueue {
+	readonly maxConcurrency: number;
+	queue: any[];
+	activeTasks: Task<any>[];
+	funcTasks: Task<any>[];
 
-	function shiftQueue() {
-		if (queue.length) {
-			const callee = queue.shift();
-			Task.resolve(callee[0].apply(callee[1], callee[2])).finally(shiftQueue);
-		}
-		else {
-			--numCalls;
-		}
+	constructor(maxConcurrency: number) {
+		this.maxConcurrency = maxConcurrency;
+		this.queue = [];
+		this.activeTasks = [];
+		this.funcTasks = [];
 	}
 
-	// Returns a function to wrap callback function in this queue
-	let queuer: Queuer = function (callee: Function) {
-		// Calling the wrapped function either executes immediately if possible,
-		// or pushes onto the queue if not
-		return function (this: any) {
-			if (numCalls < maxConcurrency) {
-				++numCalls;
-				Task.resolve(callee.apply(this, arguments)).finally(shiftQueue);
-			}
-			else {
-				queue.push([ callee, this, arguments ]);
-			}
-		};
-	};
+	enqueue(func: () => Task<any>) {
+		let resolver: (value?: any) => void;
+		let rejecter: (error?: Error) => void;
 
-	queuer.empty = function () {
-		queue = [];
-		numCalls = 0;
-	};
+		const funcTask = new Task((resolve, reject) => {
+			resolver = resolve;
+			rejecter = reject;
+		});
+		this.funcTasks.push(funcTask);
 
-	return queuer;
+		this.queue.push({ func, resolver, rejecter });
+		if (this.activeTasks.length < this.maxConcurrency) {
+			this.next();
+		}
+
+		return funcTask;
+	}
+
+	clear() {
+		this.activeTasks.forEach(task => task.cancel());
+		this.funcTasks.forEach(task => task.cancel());
+		this.activeTasks = [];
+		this.funcTasks = [];
+		this.queue = [];
+	}
+
+	next() {
+		if (this.queue.length > 0) {
+			const { func, resolver, rejecter } = this.queue.shift();
+			const task = func().then(resolver, rejecter).finally(() => {
+				// Remove the task from the active task list and kick off the next task
+				pullFromArray(this.activeTasks, task);
+				this.next();
+			});
+			this.activeTasks.push(task);
+		}
+	}
 }
