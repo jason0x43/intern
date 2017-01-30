@@ -1,5 +1,4 @@
 import * as diffUtil from 'diff';
-import { CommandLineArguments } from '../common';
 
 export const hasFunctionName = function () {
 	function foo() {}
@@ -71,50 +70,6 @@ export function getShouldWait(waitMode: (string|boolean), message: string|any[])
 	return shouldWait;
 }
 
-/**
- * Parse arguments of the form name=value
- */
-export function parseArguments(rawArgs: string[], decoder?: (name: string) => any) {
-	let args: CommandLineArguments = {};
-	rawArgs.forEach(function (arg) {
-		const parts = arg.split('=');
-
-		const key: string = parts[0].replace(/^--?/, '');
-		let value: any;
-
-		// Support boolean flags
-		if (parts.length < 2) {
-			value = true;
-		}
-		else {
-			if (decoder) {
-				value = decoder(value);
-			}
-
-			// Support JSON-encoded properties for reporter configuration
-			if (value.charAt(0) === '{') {
-				value = JSON.parse(value);
-			}
-			else if (value.slice(0, 2) === '\\{') {
-				value = value.slice(1);
-			}
-		}
-
-		// Support multiple arguments with the same name
-		if (key in args) {
-			if (!Array.isArray(args[key])) {
-				args[key] = [args[key]];
-			}
-
-			args[key].push(value);
-		}
-		else {
-			args[key] = value;
-		}
-	});
-
-	return args;
-}
 /**
  * Remove all instances of of an item from any array and return the removed instances.
  */

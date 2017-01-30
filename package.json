@@ -17,7 +17,7 @@
     "charm": "0.2.0",
     "diff": "1.1.0",
     "digdug": "../digdug/_build/src",
-    "dojo-core": "2.0.0-alpha.18",
+    "dojo-core": "2.0.0-alpha.19",
     "glob": "7.0.3",
     "istanbul": "0.4.1",
     "leadfoot": "~1.7.0",
@@ -83,6 +83,9 @@
       "src": [
         "tests/example.intern.js"
       ],
+      "browser": [
+        "client.html"
+	  ],
       ".": [
         "src/**/*.d.ts",
         "src/**/*.css",

@@ -11,78 +11,17 @@ import getTddInterface, { TddInterface } from '../interfaces/tdd';
 import getBddInterface, { BddInterface } from '../interfaces/bdd';
 import global from 'dojo-core/global';
 
-declare global {
-	// There will be one active executor
-	export let intern: Executor<Events>;
-}
-
-export { Handle };
-
-export interface Config {
-	bail?: boolean;
-	baseline?: boolean;
-	benchmark?: boolean;
-	// benchmarkConfig?: BenchmarkReporterDescriptor;
-	defaultTimeout?: number;
-	excludeInstrumentation?: true | RegExp;
-	filterErrorStack?: boolean;
-	formatter?: Formatter;
-	grep?: RegExp;
-	instrumenterOptions?: any;
-	interfaces?: string[];
-	maxConcurrency?: number;
-	name?: string;
-	reporters?: (string | typeof Reporter | { reporter: string | typeof Reporter, options?: ReporterOptions })[];
-	setup?: (executor: Executor<Events>) => Task<any>;
-	teardown?: (executor: Executor<Events>) => Task<any>;
-}
-
-export interface Listener<T> {
-	(arg: T): void | Promise<void>;
-}
-
-export interface CoverageMessage {
-	sessionId?: string;
-	coverage: any;
-}
-
-export interface DeprecationMessage {
-	original: string;
-	replacement?: string;
-	message?: string;
-}
-
-export interface Events {
-	'*': any;
-	newSuite: Suite;
-	newTest: Test;
-	error: Error;
-	testStart: Test;
-	testEnd: Test;
-	suiteStart: Suite;
-	suiteEnd: Suite;
-	runStart: never;
-	runEnd: never;
-	coverage: CoverageMessage;
-	deprecated: DeprecationMessage;
-};
-
-export interface ExecutorClass<E extends Events, T extends Executor<E>> {
-	new (config: Config): T;
-	create(this: ExecutorClass<E, T>, config: Config): T;
-}
-
-export abstract class Executor<E extends Events> {
-	/** The type of the executor. */
-	readonly mode: string;
-
+export abstract class GenericExecutor<E extends Events, C extends Config> {
 	/** The resolved configuration for this executor. */
-	protected _config: Config;
+	protected _config: C;
 
 	protected _formatter: Formatter;
 
-	/** The root suites managed by this executor. */
-	protected _rootSuites: Suite[];
+	/**
+	 * The root suites managed by this executor. Currently only the WebDriver executor will have more than one root
+	 * suite.
+	 */
+	protected _rootSuite: Suite;
 
 	protected _hasSuiteErrors = false;
 
@@ -92,8 +31,8 @@ export abstract class Executor<E extends Events> {
 
 	protected _reporters: Reporter[];
 
-	constructor(config: Config = {}) {
-		this._config = {
+	constructor(config: C) {
+		this._config = <C>{
 			instrumenterOptions: {
 				coverageVariable: '__internCoverage'
 			},
@@ -104,30 +43,14 @@ export abstract class Executor<E extends Events> {
 		this._reporters = [];
 		this._interfaces = {};
 
-		// config.benchmarkConfig = deepMixin({
-		// 	id: 'Benchmark',
-		// 	filename: 'baseline.json',
-		// 	mode: <BenchmarkMode>'test',
-		// 	thresholds: {
-		// 		warn: { rme: 3, mean: 5 },
-		// 		fail: { rme: 6, mean: 10 }
-		// 	},
-		// 	verbosity: 0
-		// }, config.benchmarkConfig);
-
 		if (config) {
 			this.configure(config);
 		}
-	}
 
-	/**
-	 * Create a new instance of an Executor and assign it to the global intern reference. This is the method that user
-	 * code should generally use to instantiate an executor since it ensures the global reference is created.
-	 */
-	static create<E extends Events, T extends Executor<E>>(this: ExecutorClass<E, T>, config: Config = {}): T {
-		const executor = new this(config);
-		global['intern'] = executor;
-		return executor;
+		this._rootSuite = new Suite({
+			executor: this,
+			name: this.config.name
+		});
 	}
 
 	get config() {
@@ -154,7 +77,7 @@ export abstract class Executor<E extends Events> {
 	 */
 	configure(config: Config | {[key in keyof Config]: string | string[] | true }) {
 		Object.keys(config).forEach((key: keyof Config) => {
-			this._processArgument(key, config[key]);
+			this._processOption(key, config[key]);
 		});
 	}
 
@@ -266,9 +189,7 @@ export abstract class Executor<E extends Events> {
 				throw new Error('InvalidTest: argument is not a valid suite or test');
 			}
 		}
-		this._rootSuites.forEach(suite => {
-			suite.add(<Suite | Test>suiteOrTest);
-		});
+		this._rootSuite.add(<Suite | Test>suiteOrTest);
 	}
 
 	/**
@@ -283,18 +204,13 @@ export abstract class Executor<E extends Events> {
 						.then(() => this._runTests())
 						.finally(() => this.emit('runEnd'));
 				})
-					.finally(() => Promise.resolve(this.config.teardown && this.config.teardown(this)));
+				.finally(() => Promise.resolve(this.config.teardown && this.config.teardown(this)));
 			})
 			.finally(() => this._afterRun())
 			.then(() => {
 				if (this._hasSuiteErrors) {
 					throw new Error('One or more suite errors occurred during testing');
 				}
-
-				// Return total number of failed tests
-				return this._rootSuites.reduce(function (numFailedTests, suite) {
-					return numFailedTests + suite.numFailedTests;
-				}, 0);
 			})
 			.catch(error => this.emit('error', error));
 
@@ -316,12 +232,14 @@ export abstract class Executor<E extends Events> {
 	 * any last-minute configuration before the testing process begins.
 	 */
 	protected _beforeRun(): Task<any> {
-		if (this.config.grep == null) {
-			this.config.grep = new RegExp('');
+		const config = this.config;
+
+		if (config.grep == null) {
+			config.grep = new RegExp('');
 		}
 
-		if (this.config.reporters) {
-			this.config.reporters.forEach(reporter => {
+		if (config.reporters) {
+			config.reporters.forEach(reporter => {
 				if (typeof reporter === 'string') {
 					const ReporterClass = this._getReporter(reporter);
 					this._reporters.push(new ReporterClass(this));
@@ -343,6 +261,19 @@ export abstract class Executor<E extends Events> {
 			});
 		}
 
+		if (config.benchmark) {
+			config.benchmarkConfig = deepMixin({
+				id: 'Benchmark',
+				filename: 'baseline.json',
+				mode: 'test',
+				thresholds: {
+					warn: { rme: 3, mean: 5 },
+					fail: { rme: 6, mean: 10 }
+				},
+				verbosity: 0
+			}, config.benchmarkConfig);
+		}
+
 		return Task.resolve();
 	}
 
@@ -355,7 +286,7 @@ export abstract class Executor<E extends Events> {
 	 * Process an arbitrary config value. Subclasses can override this method to pre-process arguments or handle them
 	 * instead of allowing Executor to.
 	 */
-	protected _processArgument(name: keyof Config, value: any) {
+	protected _processOption(name: keyof Config, value: any) {
 		switch (name) {
 			// boolean
 			case 'bail':
@@ -378,7 +309,6 @@ export abstract class Executor<E extends Events> {
 
 			// number
 			case 'defaultTimeout':
-			case 'maxConcurrency':
 				const numValue = Number(value);
 				if (isNaN(numValue)) {
 					throw new Error(`Non-numeric value "${value}" for ${name}`);
@@ -460,6 +390,9 @@ export abstract class Executor<E extends Events> {
 					return value;
 				});
 				break;
+
+			default:
+				throw new Error(`Unknown config property "${name}"`);
 		}
 	}
 
@@ -467,95 +400,77 @@ export abstract class Executor<E extends Events> {
 	 * Runs each of the root suites, limited to a certain number of suites at the same time by `maxConcurrency`.
 	 */
 	protected _runTests() {
-		const queue = new FunctionQueue(this.config.maxConcurrency || Infinity);
-		const rootSuites = this._rootSuites;
-		const numSuitesToRun = rootSuites.length;
-		let numSuitesCompleted = 0;
-		let hasError = false;
-
-		let suiteTasks = rootSuites.map(suite => {
-			return queue.enqueue(() => {
-				return suite.run().catch(error => {
-					console.error('error:', error);
-					hasError = true;
-				}).finally(() => {
-					numSuitesCompleted++;
-					if (numSuitesCompleted === numSuitesToRun) {
-						const message = 'Run failed due to one or more suite errors';
-						const coverage = global[this.config.instrumenterOptions.coverageVariable];
-						if (coverage) {
-							return this.emit('coverage', { coverage }).then(() => {
-								if (hasError) {
-									throw new Error(message);
-								}
-							});
-						}
-
-						if (hasError) {
-							throw new Error(message);
-						}
-					}
-				});
-			});
+		return this._rootSuite.run().finally(() => {
+			const coverage = global[this.config.instrumenterOptions.coverageVariable];
+			if (coverage) {
+				return this.emit('coverage', { coverage });
+			}
 		});
-
-		return Task.resolve(suiteTasks);
 	}
 }
 
+export abstract class Executor extends GenericExecutor<Events, Config> {}
 export default Executor;
 
-/**
- * A basic FIFO function queue to limit the number of currently executing asynchronous functions.
- */
-class FunctionQueue {
-	readonly maxConcurrency: number;
-	queue: any[];
-	activeTasks: Task<any>[];
-	funcTasks: Task<any>[];
-
-	constructor(maxConcurrency: number) {
-		this.maxConcurrency = maxConcurrency;
-		this.queue = [];
-		this.activeTasks = [];
-		this.funcTasks = [];
-	}
-
-	enqueue(func: () => Task<any>) {
-		let resolver: (value?: any) => void;
-		let rejecter: (error?: Error) => void;
-
-		const funcTask = new Task((resolve, reject) => {
-			resolver = resolve;
-			rejecter = reject;
-		});
-		this.funcTasks.push(funcTask);
-
-		this.queue.push({ func, resolver, rejecter });
-		if (this.activeTasks.length < this.maxConcurrency) {
-			this.next();
-		}
-
-		return funcTask;
-	}
-
-	clear() {
-		this.activeTasks.forEach(task => task.cancel());
-		this.funcTasks.forEach(task => task.cancel());
-		this.activeTasks = [];
-		this.funcTasks = [];
-		this.queue = [];
-	}
-
-	next() {
-		if (this.queue.length > 0) {
-			const { func, resolver, rejecter } = this.queue.shift();
-			const task = func().then(resolver, rejecter).finally(() => {
-				// Remove the task from the active task list and kick off the next task
-				pullFromArray(this.activeTasks, task);
-				this.next();
-			});
-			this.activeTasks.push(task);
-		}
-	}
+export interface ExecutorConstructor<E extends Events, C extends Config, T extends GenericExecutor<E, C>> {
+	new (config: C): T;
 }
+
+export { Handle };
+
+export interface Config {
+	bail?: boolean;
+	baseline?: boolean;
+	benchmark?: boolean;
+	benchmarkConfig?: {
+		id: string;
+		filename: string;
+		mode: 'test' | 'baseline',
+		thresholds: {
+			warn: { rme: number, mean: number },
+			fail: { rme: number, mean: number }
+		};
+		verbosity: number;
+	};
+	defaultTimeout?: number;
+	excludeInstrumentation?: true | RegExp;
+	filterErrorStack?: boolean;
+	formatter?: Formatter;
+	grep?: RegExp;
+	instrumenterOptions?: any;
+	interfaces?: string[];
+	name?: string;
+	reporters?: (string | typeof Reporter | { reporter: string | typeof Reporter, options?: ReporterOptions })[];
+	setup?: (executor: Executor) => Task<any>;
+	teardown?: (executor: Executor) => Task<any>;
+}
+
+export interface Listener<T> {
+	(arg: T): void | Promise<void>;
+}
+
+export interface CoverageMessage {
+	sessionId?: string;
+	coverage: any;
+}
+
+export interface DeprecationMessage {
+	original: string;
+	replacement?: string;
+	message?: string;
+}
+
+export interface Events {
+	'*': any;
+	newSuite: Suite;
+	newTest: Test;
+	error: Error;
+	testStart: Test;
+	testEnd: Test;
+	suiteStart: Suite;
+	suiteEnd: Suite;
+	runStart: never;
+	runEnd: never;
+	coverage: CoverageMessage;
+	deprecated: DeprecationMessage;
+};

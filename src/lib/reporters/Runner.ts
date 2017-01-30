@@ -25,8 +25,6 @@ export default class Runner extends Coverage {
 
 	hasErrors: boolean;
 
-	mode: 'client' | 'webdriver';
-
 	proxyOnly: boolean;
 
 	private _summaryReporter: TextSummaryReport;
@@ -48,14 +46,14 @@ export default class Runner extends Coverage {
 		});
 
 		this.charm = charm();
-		this.charm.pipe(<Writable>config.output);
+		this.charm.pipe(<Writable>this.output);
 		this.charm.display('reset');
 	}
 
 	@eventHandler()
 	coverage(message: CoverageMessage) {
 		// coverage will be called for the runner host, which has no session ID -- ignore that
-		if (intern.mode === 'client' || message.sessionId) {
+		if (message.sessionId) {
 			const session = this.sessions[message.sessionId || ''];
 			session.coverage = session.coverage || new Collector();
 			session.coverage.add(message.coverage);
@@ -157,11 +155,6 @@ export default class Runner extends Coverage {
 			this.hasErrors = true;
 		}
 		else if (!suite.hasParent) {
-			// runEnd will report all of this information, so do not repeat it
-			if (intern.mode === 'client') {
-				return;
-			}
-
 			// Runner mode test with no sessionId was some failed test, not a bug
 			if (!suite.sessionId) {
 				return;

@@ -1,11 +1,11 @@
 import Task from 'dojo-core/async/Task';
 import Deferred from './Deferred';
-import Executor, { Events } from './executors/Executor';
+import Executor from './executors/Executor';
 import Test, { isTest, SKIP } from './Test';
-import { InternError } from '../common';
+import { InternError } from '../intern';
 import { Remote } from './executors/WebDriver';
 
-export default class Suite implements RequiredSuiteProperties {
+export default class Suite implements SuiteProperties {
 	after: SuiteLifecycleFunction;
 
 	afterEach: TestLifecycleFunction;
@@ -23,8 +23,8 @@ export default class Suite implements RequiredSuiteProperties {
 	parent: Suite;
 
 	/**
-	 * If true, the suite will publish its start topic after the setup callback has finished,
-	 * and will publish its end topic before the teardown callback has finished.
+	 * If true, the suite will publish its start topic after the before callback has finished,
+	 * and will publish its end topic before the after callback has finished.
 	 */
 	publishAfterSetup: boolean = false;
 
@@ -36,7 +36,7 @@ export default class Suite implements RequiredSuiteProperties {
 
 	private _bail: boolean;
 
-	private _executor: Executor<Events>;
+	private _executor: Executor;
 
 	private _grep: RegExp;
 
@@ -46,9 +46,9 @@ export default class Suite implements RequiredSuiteProperties {
 
 	private _timeout: number;
 
-	constructor(options: SuiteOptions) {
-		if (!options.name) {
-			throw new Error('A Suite requires a name');
+	constructor(options: SuiteOptions | RootSuiteOptions) {
+		if (!options.name && !options.executor) {
+			throw new Error('A Suite requires a name or executor');
 		}
 
 		Object.keys(options).filter(key => {
@@ -76,11 +76,11 @@ export default class Suite implements RequiredSuiteProperties {
 	/**
 	 * The executor used to run this Suite.
 	 */
-	get executor(): Executor<Events> {
+	get executor(): Executor {
 		return this._executor || (this.parent && this.parent._executor);
 	}
 
-	set executor(value: Executor<Events>) {
+	set executor(value: Executor) {
 		if (this._executor) {
 			throw new Error('AlreadyAssigned: an executor may only be set once per suite');
 		}
@@ -124,7 +124,7 @@ export default class Suite implements RequiredSuiteProperties {
 
 	/**
 	 * The WebDriver interface for driving a remote environment. This value is only guaranteed to exist from the
-	 * setup/beforeEach/afterEach/teardown and test methods, since environments are not instantiated until they are
+	 * before/beforeEach/afterEach/after and test methods, since environments are not instantiated until they are
 	 * actually ready to be tested against.
 	 */
 	get remote() {
@@ -244,21 +244,23 @@ export default class Suite implements RequiredSuiteProperties {
 	/**
 	 * Runs test suite in order:
 	 *
-	 * * setup
-	 * * for each test:
+	 * * before
+	 * * <for each test>
 	 *   * beforeEach
 	 *   * test
 	 *   * afterEach
-	 * * teardown
+	 * * after
 	 *
-	 * If setup, beforeEach, afterEach, or teardown throw, the suite itself will be marked as failed
+	 * If before, beforeEach, afterEach, or after throw, the suite itself will be marked as failed
 	 * and no further tests in the suite will be executed.
-	 *
-	 * @returns {module:dojo/Promise}
 	 */
 	run(): Task<any> {
-		const executor = this.executor;
 		let startTime: number;
+
+		const end = () => {
+			this.timeElapsed = Date.now() - startTime;
+			return this.executor.emit('suiteEnd', this);
+		};
 
 		const runLifecycleMethod = (suite: Suite, name: string, ...args: any[]) => {
 			return new Task(resolve => {
@@ -322,173 +324,18 @@ export default class Suite implements RequiredSuiteProperties {
 			});
 		};
 
-		const end = () => {
-			this.timeElapsed = Date.now() - startTime;
-			return this.executor.emit('suiteEnd', this);
-		};
-
-		const runTestLifecycle = (name: string, test: Test) => {
-			// beforeEach executes in order parent -> child;
-			// afterEach executes in order child -> parent
-			const orderMethod: ('push' | 'unshift') = name === 'beforeEach' ? 'push' : 'unshift';
-
-			// LIFO queue
-			let suiteQueue: Suite[] = [];
-			let suite: Suite = this;
-
-			do {
-				(<any>suiteQueue)[orderMethod](suite);
-			}
-			while ((suite = suite.parent));
-
-			let current: Task<any>;
-
-			return new Task(
-				(resolve, reject) => {
-					let firstError: Error;
-
-					function handleError(error: Error) {
-						if (name === 'afterEach') {
-							firstError = firstError || error;
-							next();
-						}
-						else {
-							reject(error);
-						}
-					}
-
-					function next() {
-						const suite = suiteQueue.pop();
-
-						if (!suite) {
-							firstError ? reject(firstError) : resolve();
-							return;
-						}
-
-						current = runLifecycleMethod(suite, name, test).then(next, handleError);
-					}
-
-					next();
-				},
-				() => {
-					suiteQueue.splice(0, suiteQueue.length);
-					if (current) {
-						current.cancel();
-					}
-				}
-			);
-		};
-
-		const runTests = () => {
-			let i = 0;
-			let tests = this.tests;
-			let current: Task<any>;
-
-			return new Task(
-				(resolve, reject) => {
-					let firstError: Error;
-
-					const next = () => {
-						const test = tests[i++];
-
-						if (!test) {
-							firstError ? reject(firstError) : resolve();
-							return;
-						}
-
-						const reportAndContinue = (error: InternError) => {
-							// An error may be associated with a deeper test already, in which case we do not
-							// want to reassociate it with a more generic parent
-							if (!error.relatedTest) {
-								error.relatedTest = <Test>test;
-							}
-							// TODO: Emit a non-fatal suite error
-							this.executor.emit('error', error);
-							return Promise.resolve();
-						};
-
-						function runWithCatch() {
-							// Errors raised when running child tests should be reported but should not cause
-							// this suite’s run to reject, since this suite itself has not failed.
-							return new Task((resolve, reject) => {
-								test.run().then(resolve, reject);
-							}).catch(reportAndContinue);
-						}
-
-						// If the suite will be skipped, mark the current test as skipped. This will skip both
-						// individual tests and nested suites.
-						if (this.skipped != null) {
-							test.skipped = this.skipped;
-						}
-
-						// test is a suite
-						if ((<Suite>test).tests) {
-							current = runWithCatch();
-						}
-						// test is a single test
-						else {
-							if (!this.grep.test(test.id)) {
-								test.skipped = 'grep';
-							}
-
-							if (test.skipped != null) {
-								executor.emit('testEnd', <Test>test).then(next);
-								return;
-							}
-
-							current = runTestLifecycle('beforeEach', <Test>test)
-								.then(runWithCatch)
-								.finally(function () {
-									return runTestLifecycle('afterEach', <Test>test);
-								})
-								.catch(function (error: InternError) {
-									firstError = firstError || error;
-									return reportAndContinue(error);
-								});
-						}
-
-						current.then(() => {
-							const skipRestOfSuite = () => {
-								this.skipped = this.skipped != null ? this.skipped : BAIL_REASON;
-							};
-
-							// If the test was a suite and the suite was skipped due to bailing, skip the rest of this
-							// suite
-							if ((<Suite>test).tests && test.skipped === BAIL_REASON) {
-								skipRestOfSuite();
-							}
-							// If the test errored and bail mode is enabled, skip the rest of this suite
-							else if (test.error && this.bail) {
-								skipRestOfSuite();
-							}
-
-							next();
-						});
-					};
-
-					next();
-				},
-				() => {
-					i = Infinity;
-					if (current) {
-						current.cancel();
-					}
-				}
-			);
-		};
-
-		const setup = () => {
-			return runLifecycleMethod(this, 'setup');
-		};
-
 		const start = () => {
 			return this.executor.emit('suiteStart', this).then(function () {
 				startTime = Date.now();
 			});
 		};
 
-		const teardown = () => {
-			return runLifecycleMethod(this, 'teardown');
+		const before = () => {
+			return runLifecycleMethod(this, 'before');
+		};
+
+		const after = () => {
+			return runLifecycleMethod(this, 'after');
 		};
 
 		// Reset some state in case someone tries to re-run the same suite
@@ -497,11 +344,157 @@ export default class Suite implements RequiredSuiteProperties {
 		this.error = null;
 		this.timeElapsed = null;
 
-		let task = this.publishAfterSetup ? setup().then(start) : start().then(setup);
+		let task: Task<any> = this.publishAfterSetup ? before().then(start) : start().then(before);
 
-		return task.then(runTests)
-			.finally(() => this.publishAfterSetup ? end().then(teardown) : teardown().then(end))
-			.then(() => this.numFailedTests);
+		return task
+			.then(() => {
+				let i = 0;
+				let tests = this.tests;
+				let current: Task<any>;
+
+				const runTestLifecycle = (name: string, test: Test) => {
+					// beforeEach executes in order parent -> child;
+					// afterEach executes in order child -> parent
+					const orderMethod: ('push' | 'unshift') = name === 'beforeEach' ? 'push' : 'unshift';
+
+					// LIFO queue
+					let suiteQueue: Suite[] = [];
+					let suite: Suite = this;
+
+					do {
+						(<any>suiteQueue)[orderMethod](suite);
+					}
+					while ((suite = suite.parent));
+
+					let current: Task<any>;
+
+					return new Task(
+						(resolve, reject) => {
+							let firstError: Error;
+
+							function handleError(error: Error) {
+								if (name === 'afterEach') {
+									firstError = firstError || error;
+									next();
+								}
+								else {
+									reject(error);
+								}
+							}
+
+							function next() {
+								const suite = suiteQueue.pop();
+
+								if (!suite) {
+									firstError ? reject(firstError) : resolve();
+									return;
+								}
+
+								current = runLifecycleMethod(suite, name, test).then(next, handleError);
+							}
+
+							next();
+						},
+						() => {
+							suiteQueue.splice(0, suiteQueue.length);
+							if (current) {
+								current.cancel();
+							}
+						}
+					);
+				};
+
+				return new Task(
+					(resolve, reject) => {
+						let firstError: Error;
+
+						const next = () => {
+							const test = tests[i++];
+
+							if (!test) {
+								firstError ? reject(firstError) : resolve();
+								return;
+							}
+
+							const handleError = (error: InternError) => {
+								// An error may be associated with a deeper test already, in which case we do not
+								// want to reassociate it with a more generic parent
+								if (!error.relatedTest) {
+									error.relatedTest = <Test>test;
+								}
+								return Promise.resolve();
+							};
+
+							function runWithCatch() {
+								// Errors raised when running child tests should be reported but should not cause
+								// this suite’s run to reject, since this suite itself has not failed.
+								return new Task((resolve, reject) => {
+									test.run().then(resolve, reject);
+								}).catch(handleError);
+							}
+
+							// If the suite will be skipped, mark the current test as skipped. This will skip both
+							// individual tests and nested suites.
+							if (this.skipped != null) {
+								test.skipped = this.skipped;
+							}
+
+							// test is a suite
+							if ((<Suite>test).tests) {
+								current = runWithCatch();
+							}
+							// test is a single test
+							else {
+								if (!this.grep.test(test.id)) {
+									test.skipped = 'grep';
+								}
+
+								if (test.skipped != null) {
+									this.executor.emit('testEnd', <Test>test).then(next);
+									return;
+								}
+
+								current = runTestLifecycle('beforeEach', <Test>test)
+									.then(runWithCatch)
+									.finally(function () {
+										return runTestLifecycle('afterEach', <Test>test);
+									})
+									.catch(function (error: InternError) {
+										firstError = firstError || error;
+										return handleError(error);
+									});
+							}
+
+							current.then(() => {
+								const skipRestOfSuite = () => {
+									this.skipped = this.skipped != null ? this.skipped : BAIL_REASON;
+								};
+
+								// If the test was a suite and the suite was skipped due to bailing, skip the rest of this
+								// suite
+								if ((<Suite>test).tests && test.skipped === BAIL_REASON) {
+									skipRestOfSuite();
+								}
+								// If the test errored and bail mode is enabled, skip the rest of this suite
+								else if (test.error && this.bail) {
+									skipRestOfSuite();
+								}
+
+								next();
+							});
+						};
+
+						next();
+					},
+					() => {
+						i = Infinity;
+						if (current) {
+							current.cancel();
+						}
+					}
+				);
+			})
+			.finally(() => this.publishAfterSetup ? end().then(after) : after().then(end));
 	}
 
 	/**
@@ -565,30 +558,32 @@ export interface TestLifecycleFunction {
 	(this: Test): void | Promise<any>;
 }
 
+// Properties that define a Suite. Note that 'tests' isn't included so that other interfaces, such as the object
+// interface, can use a different definition for it.
 export interface SuiteProperties {
 	after: SuiteLifecycleFunction;
 	afterEach: TestLifecycleFunction;
 	bail: boolean;
 	before: SuiteLifecycleFunction;
 	beforeEach: TestLifecycleFunction;
-	executor: Executor<Events>;
+	executor: Executor;
 	grep: RegExp;
+	name: string;
 	parent: Suite;
 	publishAfterSetup: boolean;
 	timeout: number;
 }
 
-export interface RequiredSuiteProperties extends SuiteProperties {
-	name: string;
-	tests: (Suite | Test)[];
-}
-
 export type SuiteOptions = Partial<SuiteProperties> & {
-	// only name is required
 	name: string;
 	tests?: (Suite | Test)[];
 };
 
-// BAIL_REASON needs to be a string so that Intern can tell when a remote has bailed during unit tests so that it
-// can skip functional tests.
+export type RootSuiteOptions = Partial<SuiteProperties> & {
+	executor: Executor;
+	tests?: (Suite | Test)[];
+};
+
+// BAIL_REASON needs to be a string so that Intern can tell when a remote has bailed during unit tests so that it can
+// skip functional tests.
 const BAIL_REASON = 'bailed';

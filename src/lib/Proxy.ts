@@ -100,7 +100,7 @@ export default class Proxy implements ProxyProperties {
 		listeners.push(listener);
 		return {
 			destroy: function (this: any) {
-				this.destroy = function () {};
+				this.destroy = function () { };
 				pullFromArray(listeners, listener);
 			}
 		};
@@ -177,7 +177,12 @@ export default class Proxy implements ProxyProperties {
 		}
 	}
 
-	private _handleFile(request: http.IncomingMessage, response: http.ServerResponse, shouldInstrument?: boolean, omitContent?: boolean) {
+	private _handleFile(
+		request: http.IncomingMessage,
+		response: http.ServerResponse,
+		shouldInstrument?: boolean,
+		omitContent?: boolean
+	) {
 		function send(contentType: string, data: string) {
 			response.writeHead(200, {
 				'Content-Type': contentType,
@@ -189,8 +194,13 @@ export default class Proxy implements ProxyProperties {
 		const file = /^\/+([^?]*)/.exec(request.url)[1];
 		let wholePath: string;
 
+		// TODO: Reconcile basePath in browserland with the proxy's basePath. Browser basePath maps to proxy basePath.
+		// Provide a utility to turn relative paths into URLs based on this relationship. This won't work quite like
+		// require.toUrl since we can't get at the implicit module path, but it will at least allow users to use paths
+		// relative to a known and standard base.
+
 		if (/^__intern\//.test(file)) {
-			const basePath = path.resolve(path.join(__dirname, '..'));
+			const basePath = path.resolve(path.join(__dirname, '../..'));
 			wholePath = path.join(basePath, file.replace(/^__intern\//, ''));
 			shouldInstrument = false;
 		}

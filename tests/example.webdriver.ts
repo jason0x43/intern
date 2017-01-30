@@ -1,9 +1,13 @@
 // Import the proper executor for the current environment
 import WebDriver from '../src/lib/executors/WebDriver';
+import initialize from '../src/intern';
 
-const intern = WebDriver.create({
+initialize(WebDriver, {
 	name: 'Test config',
-	filterErrorStack: true
+	contactTimeout: 30000,
+	filterErrorStack: true,
+	environments: [ { browserName: 'firefox' } ],
+	suites: ['./unit/lib/EnvironmentType']
 });
 
 // For instrumentation to work in Node, any modules that should be instrumented

@@ -1,17 +1,15 @@
-import Executor, { Config as BaseConfig, Events } from './Executor';
+import { Config as BaseConfig, Events, GenericExecutor } from './Executor';
 import Formatter from '../browser/Formatter';
 import Reporter from '../reporters/Reporter';
 import Html from '../reporters/Html';
 import Console from '../reporters/Console';
-import Suite from '../Suite';
+import Channel, { isChannel } from '../Channel';
 
 /**
  * The Browser executor is used to run unit tests in a browser.
  */
-export default class Browser extends Executor<Events> {
-	constructor(config?: Config) {
-		config = config || {};
-
+export default class Browser extends GenericExecutor<Events, Config> {
+	constructor(config: Partial<Config> = {}) {
 		if (!config.basePath) {
 			const basePath = getThisPath().split('/').slice(0, -1).join('/');
 
@@ -23,7 +21,6 @@ export default class Browser extends Executor<Events> {
 		super(config);
 
 		this._formatter = new Formatter(config);
-		this._rootSuites = [ new Suite({ name: null, executor: this }) ];
 		this._reporters.push(new Html(this));
 	}
 
@@ -34,8 +31,8 @@ export default class Browser extends Executor<Events> {
 	/**
 	 * Resolve a path that's relative to the project root to one that's relative to the Intern root.
 	 */
-	resolvePath(_path: string) {
-		return `${this.config.basePath}/${_path}`;
+	resolvePath(path: string) {
+		return `${this.config.basePath}/${path}`;
 	}
 
 	protected _getReporter(name: string): typeof Reporter {
@@ -46,12 +43,35 @@ export default class Browser extends Executor<Events> {
 				return Console;
 		}
 	}
+
+	protected _processOption(name: keyof Config, value: any) {
+		switch (name) {
+			case 'basePath':
+				if (typeof value !== 'string') {
+					throw new Error(`${name} must be a string`);
+				}
+				this.config[name] = value;
+				break;
+
+			case 'channel':
+				if (!isChannel(value)) {
+					throw new Error(`${name} must be a Channel`);
+				}
+				this.config[name] = value;
+				break;
+
+			default:
+				super._processOption(name, value);
+				break;
+		}
+	}
 }
 
 export { Events }
 
 export interface Config extends BaseConfig {
 	basePath?: string;
+	channel?: Channel;
 }
 
 function getThisPath() {
@@ -59,7 +79,7 @@ function getThisPath() {
 	let script: HTMLScriptElement;
 	for (let i = 0; i < scripts.length; i++) {
 		script = scripts[i];
-		if (/\/browser\.js\b/.test(script.src)) {
+		if (/\/browser\.js$/.test(script.src)) {
 			return script.src;
 		}
 	}

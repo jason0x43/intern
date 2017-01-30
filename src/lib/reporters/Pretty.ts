@@ -55,7 +55,7 @@ export default class Pretty extends Reporter implements PrettyProperties {
 
 	protected _renderTimeout: NodeJS.Timer;
 
-	constructor(executor: Executor<Events>, config: PrettyOptions = {}) {
+	constructor(executor: Executor, config: PrettyOptions = {}) {
 		super(executor, config);
 
 		this._spinnerOffset = 0;

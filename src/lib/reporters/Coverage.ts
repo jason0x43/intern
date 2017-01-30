@@ -1,4 +1,4 @@
-import Executor, { Events } from '../executors/Executor';
+import Executor from '../executors/Executor';
 import Collector = require('istanbul/lib/collector');
 import TextReport = require('istanbul/lib/report/text');
 import Report = require('istanbul/lib/report');
@@ -28,7 +28,7 @@ abstract class Coverage extends Reporter implements CoverageProperties {
 
 	protected _collector: Collector;
 
-	constructor(executor: Executor<Events>, options: CoverageOptions = {}) {
+	constructor(executor: Executor, options: CoverageOptions = {}) {
 		super(executor, options);
 	}
 

@@ -2,9 +2,8 @@ import Suite, { SuiteProperties } from './Suite';
 import UrlSearchParams from 'dojo-core/UrlSearchParams';
 import { Hash } from 'dojo-interfaces/core';
 import { parse } from 'url';
-import { relative } from 'path';
-import Task from 'dojo-core/async/Task';
-import { InternError } from '../common';
+import Task, { State } from 'dojo-core/async/Task';
+import { InternError } from '../intern';
 import WebDriver, { Events } from './executors/WebDriver';
 import Proxy from './Proxy';
 import { Handle } from 'dojo-interfaces/core';
@@ -13,6 +12,8 @@ import { Handle } from 'dojo-interfaces/core';
  * RemoteSuite is a class that acts as a local proxy for one or more unit test suites being run in a remote browser.
  */
 export default class RemoteSuite extends Suite implements RemoteSuiteProperties {
+	contactTimeout: number;
+
 	executor: WebDriver;
 
 	proxy: Proxy;
@@ -25,6 +26,12 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 		if (this.timeout == null) {
 			this.timeout = Infinity;
 		}
+
+		if (this.contactTimeout == null) {
+			this.contactTimeout = 5000;
+		}
+
+		this.tests = [];
 	}
 
 	/**
@@ -39,7 +46,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 		const proxy = this.executor.proxy;
 		let listenerHandle: Handle;
 
-		return new Task(
+		const task = new Task(
 			(resolve, reject) => {
 				const handleError = (error: InternError) => {
 					this.error = error;
@@ -48,8 +55,13 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 
 				// Subscribe to events on the proxy so we'll know the status of the remote suite.
 				listenerHandle = proxy.subscribe(sessionId, (name: keyof Events, data: any) => {
-					const forward = () => this.executor.emit(name, data);
 					let suite: Suite;
+					const forward = () => this.executor.emit(name, data);
+
+					if (contactTimer) {
+						clearTimeout(contactTimer);
+						contactTimer = null;
+					}
 
 					switch (name) {
 						case 'suiteStart':
@@ -131,34 +143,46 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 				}
 
 				const options = new UrlSearchParams(<Hash<any>>{
-					// The proxy always serves the baseUrl from the loader configuration as the root of the proxy, so
-					// ensure that baseUrl is always set to that root on the client
 					basePath: proxyBasePath,
-					initialBaseUrl: proxyBasePath + relative(config.basePath, process.cwd()),
+					// initialBaseUrl: proxyBasePath + relative(config.basePath, process.cwd()),
 					reporter: clientReporter,
-					rootSuiteName: this.id,
-					sessionId: sessionId
+					name: this.id,
+					sessionId: sessionId,
+					suites: this.suites
 				});
 
+				let contactTimer: NodeJS.Timer;
+
 				remote
-					.get(config.proxyUrl + '__intern/client.html?' + options)
+					.get(config.proxyUrl + '__intern/browser/client.html?' + options)
+					.then(() => {
+						// If the task hasn't been resolved yet, start a timer that will cancel this suite if no contact
+						// is received from the remote in a given time. The task could be resolved if, for example, the
+						// static configuration code run in client.html sends an error message back through the proxy.
+						if (task.state === State.Pending) {
+							contactTimer = setTimeout(() => {
+								handleError(new Error('No contact from remote browser'));
+							}, this.contactTimeout);
+						}
+					})
 					// If there's an error loading the page, kill the heartbeat and fail
 					.catch(error => remote.setHeartbeatInterval(0).finally(() => handleError(error)));
 			},
 			// Canceller
 			() => remote.setHeartbeatInterval(0)
-		).then(
-			() => this.executor.emit('suiteEnd', this),
-			error => this.executor.emit('suiteEnd', this).then(() => {
-				throw error;
-			})
-			).finally(() => {
-				listenerHandle.destroy();
-			});
+		).finally(() => {
+			listenerHandle.destroy();
+			return this.executor.emit('suiteEnd', this);
+		});
+
+		return task;
 	}
 }
 
 export interface RemoteSuiteProperties extends SuiteProperties {
+	/** Time to wait for contact from remote server */
+	contactTimeout: number;
+
 	proxy: Proxy;
 
 	/** The pathnames of suite modules that will be managed by this remote suite. */

@@ -1,5 +1,4 @@
-import Executor, { Config as BaseConfig, Events } from './Executor';
-import Suite from '../Suite';
+import { Config as BaseConfig, Events, GenericExecutor } from './Executor';
 import Task from 'dojo-core/async/Task';
 import { instrument } from '../instrument';
 import { normalizePath } from '../node/util';
@@ -13,7 +12,7 @@ import Simple from '../reporters/Simple';
 /**
  * The Node executor is used to run unit tests in a Node environment.
  */
-export default class Node extends Executor<Events> {
+export default class Node extends GenericExecutor<Events, Config> {
 	readonly config: Config;
 
 	constructor(config: Config) {
@@ -22,11 +21,6 @@ export default class Node extends Executor<Events> {
 		if (this.config.excludeInstrumentation == null) {
 			this.config.excludeInstrumentation = /(?:node_modules|tests)\//;
 		}
-
-		this._rootSuites = [ new Suite({
-			executor: this,
-			name: this.config.rootSuiteName || 'root'
-		}) ];
 
 		this._formatter = new Formatter(config);
 
@@ -41,11 +35,9 @@ export default class Node extends Executor<Events> {
 				this._reporters.push(new Simple(this));
 			}
 
-			const suite = this._rootSuites[0];
+			const suite = this._rootSuite;
 			suite.name = this.config.rootSuiteName || null;
 			suite.grep = this.config.grep;
-			// TODO: Does node need a session ID?
-			suite.sessionId = this.config.sessionId;
 			suite.timeout = this.config.defaultTimeout;
 			suite.bail = this.config.bail;
 		});
@@ -94,7 +86,6 @@ export interface Config extends BaseConfig {
 	basePath?: string;
 	globalName?: string;
 	rootSuiteName?: string;
-	sessionId?: string;
 }
 
 export { Events };

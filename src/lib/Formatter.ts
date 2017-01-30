@@ -1,4 +1,4 @@
-import { InternError } from '../common';
+import { InternError } from '../intern';
 import { createDiff } from './util';
 import { mixin } from 'dojo-core/lang';
 

@@ -1,7 +1,7 @@
 import { on } from 'dojo/aspect';
 import Suite, { SuiteLifecycleFunction } from '../Suite';
 import Test, { TestFunction } from '../Test';
-import Executor, { Events } from '../executors/Executor';
+import Executor from '../executors/Executor';
 
 export interface TddInterface {
 	suite(name: string, factory: TestFunction): void;
@@ -12,7 +12,7 @@ export interface TddInterface {
 	afterEach(fn: SuiteLifecycleFunction): void;
 }
 
-export default function getInterface(executor: Executor<Events>): TddInterface {
+export default function getInterface(executor: Executor): TddInterface {
 	let currentSuite: Suite;
 
 	return {

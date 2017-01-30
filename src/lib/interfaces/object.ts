@@ -4,7 +4,7 @@
 
 import Suite, { isSuiteOptions, SuiteOptions, SuiteProperties, SuiteLifecycleFunction } from '../Suite';
 import Test, { isTestOptions, TestFunction, TestOptions } from '../Test';
-import Executor, { Events } from '../executors/Executor';
+import Executor from '../executors/Executor';
 
 export interface ObjectInterface {
 	registerSuite(mainDescriptor: ObjectSuiteOptions | ObjectSuiteFactory): void;
@@ -25,7 +25,7 @@ export type ObjectSuiteOptions = Partial<ObjectSuiteProperties> & {
 	tests: { [name: string]: SuiteOptions | TestOptions | TestFunction };
 };
 
-export default function getInterface(executor: Executor<Events>) {
+export default function getInterface(executor: Executor) {
 	return {
 		registerSuite(mainDescriptor: ObjectSuiteOptions) {
 			_registerSuite(executor, mainDescriptor);
@@ -33,20 +33,30 @@ export default function getInterface(executor: Executor<Events>) {
 	};
 }
 
-const propertyMap: { [key: string]: keyof SuiteProperties } = {
-	teardown: 'after',
-	setup: 'before'
-};
-
 function createSuite(descriptor: ObjectSuiteOptions) {
 	let options: SuiteOptions = { name: null, tests: [] };
 
-	Object.keys(descriptor).filter(k => {
-		return k !== 'tests';
-	}).map((k: keyof ObjectSuiteOptions) => {
-		return <keyof SuiteProperties>(propertyMap[k] || k);
-	}).forEach(k => {
-		options[k] = descriptor[k];
+	Object.keys(descriptor).forEach((k: keyof ObjectSuiteOptions) => {
+		switch (k) {
+			case 'tests':
+				break;
+
+			case 'TestClass':
+				break;
+
+			case 'before':
+			case 'setup':
+				options.before = descriptor[k];
+				break;
+
+			case 'after':
+			case 'teardown':
+				options.after = descriptor[k];
+				break;
+
+			default:
+				options[k] = descriptor[k];
+		}
 	});
 
 	const TestClass = descriptor.TestClass || Test;
@@ -73,7 +83,7 @@ function createSuite(descriptor: ObjectSuiteOptions) {
  *
  * @param mainDescriptor Object or IIFE describing the suite
  */
-function _registerSuite(executor: Executor<Events>, mainDescriptor: ObjectSuiteOptions) {
+function _registerSuite(executor: Executor, mainDescriptor: ObjectSuiteOptions) {
 	let descriptor = mainDescriptor;
 
 	// Enable per-suite closure, to match feature parity with other interfaces like tdd/bdd more closely; without this,

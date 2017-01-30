@@ -1,2 +1,3 @@
 import Browser from './lib/executors/Browser';
-Browser.create();
+import initialize from './intern';
+initialize(Browser);

@@ -1,7 +1,7 @@
-import Executor, { Events } from './executors/Executor';
+import Executor from './executors/Executor';
 import Deferred from './Deferred';
 import Task, { isTask } from 'dojo-core/async/Task';
-import { InternError } from '../common';
+import { InternError } from '../intern';
 import { Remote } from './executors/WebDriver';
 import Suite from './Suite';
 import { mixin } from 'dojo-core/lang';
@@ -39,7 +39,7 @@ export default class Test implements TestProperties {
 		mixin(this, options);
 	}
 
-	get executor(): Executor<Events> {
+	get executor(): Executor {
 		return this.parent && this.parent.executor;
 	}
 

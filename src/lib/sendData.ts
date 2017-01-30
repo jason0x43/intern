@@ -1,6 +1,40 @@
 import request = require('dojo/request');
 import Promise = require('dojo/Promise');
 
+export function getSequence() {
+	return sequence;
+}
+
+export function setSequence(seq: number) {
+	sequence = seq;
+}
+
+export function setMaxPostSize(size: number) {
+	maxPostSize = size;
+}
+
+export default function send(url: string, data: any, sessionId: string) {
+	data = data.map(function (item: any) {
+		return item instanceof Error ?
+			{ name: item.name, message: item.message, stack: item.stack } : item;
+	});
+
+	messageBuffer.push(JSON.stringify({
+		sequence: sequence,
+		// Although sessionId may be passed as part of the payload, it is passed in the message object as well to
+		// allow the conduit to be fully separate and encapsulated from the rest of the code
+		sessionId: sessionId,
+		payload: data
+	}));
+
+	// The sequence must not be incremented until after the data is successfully serialised, since an error
+	// during serialisation might occur, which would mean the request is never sent, which would mean the
+	// dispatcher on the server-side will stall because the sequence numbering will be wrong
+	sequence++;
+
+	return sendRequest(url);
+};
+
 // Send a message, or schedule it to be sent. Return a promise that resolves when the message has been sent.
 function sendRequest(url: string) {
 	// Send all buffered messages and empty the buffer. Note that the posted data will always be an array of
@@ -63,37 +97,3 @@ let maxPostSize = 5000;
 let messageBuffer: string[] = [];
 let pendingRequest: Promise<any>;
 let sequence = 0;
-
-export function getSequence() {
-	return sequence;
-}
-
-export function setSequence(seq: number) {
-	sequence = seq;
-}
-
-export function setMaxPostSize(size: number) {
-	maxPostSize = size;
-}
-
-export function send(url: string, data: any, sessionId: string) {
-	data = data.map(function (item: any) {
-		return item instanceof Error ?
-			{ name: item.name, message: item.message, stack: item.stack } : item;
-	});
-
-	messageBuffer.push(JSON.stringify({
-		sequence: sequence,
-		// Although sessionId may be passed as part of the payload, it is passed in the message object as well to
-		// allow the conduit to be fully separate and encapsulated from the rest of the code
-		sessionId: sessionId,
-		payload: data
-	}));
-
-	// The sequence must not be incremented until after the data is successfully serialised, since an error
-	// during serialisation might occur, which would mean the request is never sent, which would mean the
-	// dispatcher on the server-side will stall because the sequence numbering will be wrong
-	sequence++;
-
-	return sendRequest(url);
-};

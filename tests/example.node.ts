@@ -2,10 +2,10 @@
 import Node from '../src/lib/executors/Node';
 import Suite from '../src/lib/Suite';
 import Test from '../src/lib/Test';
-
+import initialize from '../src/intern';
 import { assert } from 'chai';
 
-const intern = Node.create({
+initialize(Node, {
 	name: 'Test config',
 	filterErrorStack: true,
 	reporters: [ 'simple' ]

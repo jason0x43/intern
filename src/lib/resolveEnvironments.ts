@@ -1,4 +1,4 @@
-import * as lang from 'dojo/lang';
+import { mixin } from 'dojo-core/lang';
 import EnvironmentType from './EnvironmentType';
 import { NormalizedEnvironment } from 'digdug/Tunnel';
 
@@ -19,7 +19,7 @@ export default function resolveEnvironments(capabilities: { [key: string]: any }
 
 	// Expand any version ranges or aliases in the environments.
 	environments = flatEnvironments.map(function (environment) {
-		return lang.mixin({}, environment, {
+		return mixin({}, environment, {
 			version: resolveVersions(environment, available)
 		});
 	});
@@ -188,7 +188,7 @@ function resolveVersions(environment: FlatEnvironment, available: NormalizedEnvi
 function createPermutations(base: { [key: string]: string }, sources?: Environment[]): FlatEnvironment[] {
 	// If no expansion sources were given, the set of permutations consists of just the base
 	if (!sources || sources.length === 0) {
-		return [ lang.mixin({}, base) ];
+		return [ mixin({}, base) ];
 	}
 
 	// Expand the permutation set for each source
@@ -199,7 +199,7 @@ function createPermutations(base: { [key: string]: string }, sources?: Environme
 				// combination of these copies as the new value of `permutations`
 				permutations = source[key].map(function (value: any) {
 					return permutations.map(function (permutation) {
-						let clone: { [key: string]: any } = lang.mixin({}, permutation);
+						let clone: { [key: string]: any } = mixin({}, permutation);
 						clone[key] = value;
 						return clone;
 					});
@@ -214,7 +214,7 @@ function createPermutations(base: { [key: string]: string }, sources?: Environme
 				});
 			}
 			return permutations;
-		}, [ lang.mixin({}, base) ]);
+		}, [ mixin({}, base) ]);
 	}).reduce(function (newPermutations, sourcePermutations) {
 		return newPermutations.concat(sourcePermutations);
 	}, []);
