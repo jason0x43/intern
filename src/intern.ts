@@ -12,7 +12,8 @@ declare global {
  * should generally use to instantiate an executor since it ensures the global reference is created.
  */
 export default function initialize<C extends Config, E extends Events, T extends GenericExecutor<E, C>>(
-	ExecutorClass: ExecutorConstructor<E, C, T>, config?: C
+	ExecutorClass: ExecutorConstructor<E, C, T>,
+	config?: C
 ): T {
 	if (global['intern']) {
 		throw new Error('Intern has already been initialized in this environment');

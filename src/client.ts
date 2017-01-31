@@ -2,18 +2,19 @@ import Channel from './lib/Channel';
 
 function loadSuite(suite: string) {
 	return new Promise((resolve, reject) => {
+		const src = basePath + suite;
 		const script = document.createElement('script');
 		script.addEventListener('load', resolve);
 		script.addEventListener('error', event => {
-			console.error(`Error loading ${suite}:`, event);
-			reject(new Error('Error loading ' + suite));
+			console.error(`Error loading ${src}:`, event);
+			reject(new Error(`Unable to load ${src}`));
 		});
-		script.src = suite;
+		script.src = src;
 		document.body.appendChild(script);
 	});
 }
 
-const args = location.search.slice(1).split('&').filter(arg => {
+const params = location.search.slice(1).split('&').filter(arg => {
 	return arg !== '' && arg[0] !== '=';
 }).map(arg => {
 	const parts = arg.split('=');
@@ -28,7 +29,8 @@ const config: { [name: string]: any } = {};
 let sessionId: string;
 let suites: string[] = [];
 
-args.filter(({ name, value }) => {
+params.filter(({ name, value }) => {
+	// Filter out parameeters than the executor won't understand
 	switch (name) {
 		case 'reporter':
 			return false;
@@ -53,14 +55,30 @@ args.filter(({ name, value }) => {
 	}
 });
 
-const channel = new Channel('/', sessionId);
-config['channel'] = channel;
+// TODO: ensure the channel is created with the proper URL
+const basePath = config['basePath'];
+const channel = new Channel(basePath, sessionId);
 const sendError = (error: Error) => channel.sendMessage('error', error);
+
+// The executor should use the same channel we're using here to ensure sequence numbers match up
+config['channel'] = channel;
+
+// Forward all executor events back to the host Intern
+intern.on('*', data => {
+	channel.sendMessage('debug', { data: data });
+	channel.sendMessage(data.name, data.data);
+});
+
+channel.sendMessage('debug', { data: suites });
 
 try {
 	intern.configure(config);
+	channel.sendMessage('debug', { data: 'configured intern' });
 	Promise.all(suites.map(loadSuite)).then(() => {
-		intern.run();
+		channel.sendMessage('debug', { data: 'starting intern' });
+		intern.run().then(() => {
+			channel.sendMessage('debug', { data: 'finished intern' });
+		});
 	}).catch(sendError);
 }
 catch (error) {

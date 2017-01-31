@@ -1,5 +1,10 @@
 import { Config as BaseConfig, Events as BaseEvents, GenericExecutor } from './Executor';
 import Tunnel, { TunnelOptions } from 'digdug/Tunnel';
+import BrowserStackTunnel, { BrowserStackOptions } from 'digdug/BrowserStackTunnel';
+import SeleniumTunnel, { SeleniumOptions } from 'digdug/SeleniumTunnel';
+import SauceLabsTunnel from 'digdug/SauceLabsTunnel';
+import TestingBotTunnel from 'digdug/TestingBotTunnel';
+import CrossBrowserTestingTunnel from 'digdug/CrossBrowserTestingTunnel';
 import NullTunnel from 'digdug/NullTunnel';
 import Proxy from '../Proxy';
 import Formatter from '../node/Formatter';
@@ -95,7 +100,11 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		}
 
 		config.proxyUrl = config.proxyUrl.replace(/\/*$/, '/');
-		config.tunnelOptions.servers = (config.tunnelOptions.servers || []).concat(config.proxyUrl);
+
+		if (config.tunnel === BrowserStackTunnel || config.tunnel === 'browserstack') {
+			const options = <BrowserStackOptions>config.tunnelOptions;
+			options.servers = (options.servers || []).concat(config.proxyUrl);
+		}
 
 		const promise = super._beforeRun().then(() => {
 			const proxy = this._createProxy();
@@ -129,7 +138,14 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 		return promise
 			.then(() => {
-				this.tunnel = new config.tunnel(this.config.tunnelOptions);
+				let TunnelConstructor: typeof Tunnel;
+				if (typeof config.tunnel === 'string') {
+					TunnelConstructor = Tunnels[config.tunnel];
+				}
+				else {
+					TunnelConstructor = config.tunnel;
+				}
+				this.tunnel = new TunnelConstructor(this.config.tunnelOptions);
 			})
 			.then(() => this._createSessionSuites())
 			.then(() => {
@@ -302,6 +318,12 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 				break;
 
 			case 'tunnel':
+				if (typeof value === 'string') {
+					value = Tunnels[<keyof typeof Tunnels>value];
+					if (!value) {
+						throw new Error(`Invalid tunnel name ${value}`);
+					}
+				}
 				if (typeof value !== 'function') {
 					throw new Error(`Non-constructor value "${value}" for ${name}`);
 				}
@@ -367,6 +389,17 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 	}
 }
 
+export const Tunnels = {
+	'null': NullTunnel,
+	browserstack: BrowserStackTunnel,
+	crossbrowsertesting: CrossBrowserTestingTunnel,
+	saucelabs: SauceLabsTunnel,
+	selenium: SeleniumTunnel,
+	testingbot: TestingBotTunnel
+};
+
+export type TunnelNames = keyof typeof Tunnels;
+
 export interface Config extends BaseConfig {
 	basePath?: string;
 	capabilities?: {
@@ -386,8 +419,9 @@ export interface Config extends BaseConfig {
 		reporter: string;
 		waitForRunner?: boolean;
 	};
-	tunnel?: typeof Tunnel;
-	tunnelOptions?: TunnelOptions & { servers?: string[] };
+	tunnel?: TunnelNames | typeof Tunnel;
+	// TODO: The type of tunnelOptions should be dependendant on the tunnel class
+	tunnelOptions?: TunnelOptions | BrowserStackOptions | SeleniumOptions;
 
 	/** A list of unit test suites that will be run in remote browsers */
 	suites?: string[];
@@ -405,6 +439,7 @@ export interface TunnelMessage {
 }
 
 export interface Events extends BaseEvents {
+	debug: any;
 	proxyEnd: Proxy;
 	proxyStart: Proxy;
 	sessionStart: Remote;

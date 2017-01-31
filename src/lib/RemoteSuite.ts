@@ -2,7 +2,7 @@ import Suite, { SuiteProperties } from './Suite';
 import UrlSearchParams from 'dojo-core/UrlSearchParams';
 import { Hash } from 'dojo-interfaces/core';
 import { parse } from 'url';
-import Task, { State } from 'dojo-core/async/Task';
+import Task from 'dojo-core/async/Task';
 import { InternError } from '../intern';
 import WebDriver, { Events } from './executors/WebDriver';
 import Proxy from './Proxy';
@@ -45,6 +45,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 		const sessionId = remote.session.sessionId;
 		const proxy = this.executor.proxy;
 		let listenerHandle: Handle;
+		let contactTimer: NodeJS.Timer | false;
 
 		const task = new Task(
 			(resolve, reject) => {
@@ -60,10 +61,14 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 
 					if (contactTimer) {
 						clearTimeout(contactTimer);
-						contactTimer = null;
 					}
+					contactTimer = false;
 
 					switch (name) {
+						case 'debug':
+							console.log('DEBUG:', data.data);
+							break;
+
 						case 'suiteStart':
 							suite = data;
 							if (!suite.hasParent) {
@@ -126,7 +131,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 				});
 
 				const config = this.executor.config;
-				const proxyBasePath = parse(config.proxyUrl).pathname;
+				const proxyUrlPath = parse(config.proxyUrl).pathname;
 
 				// Intern runs unit tests on the remote Selenium server by navigating to the client runner HTML page. No
 				// real commands are issued after the call to remote.get() below until all unit tests are complete, so
@@ -143,7 +148,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 				}
 
 				const options = new UrlSearchParams(<Hash<any>>{
-					basePath: proxyBasePath,
+					basePath: proxyUrlPath,
 					// initialBaseUrl: proxyBasePath + relative(config.basePath, process.cwd()),
 					reporter: clientReporter,
 					name: this.id,
@@ -151,15 +156,14 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 					suites: this.suites
 				});
 
-				let contactTimer: NodeJS.Timer;
-
 				remote
 					.get(config.proxyUrl + '__intern/browser/client.html?' + options)
 					.then(() => {
 						// If the task hasn't been resolved yet, start a timer that will cancel this suite if no contact
 						// is received from the remote in a given time. The task could be resolved if, for example, the
-						// static configuration code run in client.html sends an error message back through the proxy.
-						if (task.state === State.Pending) {
+						// static configuration code run in client.html sends an error message back through the proxy
+						// before execution gets here.
+						if (contactTimer !== false) {
 							contactTimer = setTimeout(() => {
 								handleError(new Error('No contact from remote browser'));
 							}, this.contactTimeout);

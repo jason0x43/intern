@@ -94,8 +94,22 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			this._hasSuiteErrors = true;
 		}
 
-		const listeners = (this._listeners[eventName] || []).concat(this._listeners['*'] || []);
-		if (listeners.length === 0) {
+		const notifications: Promise<any>[] = [];
+
+		(this._listeners[eventName] || []).forEach(listener => {
+			notifications.push(Promise.resolve(listener(data)));
+		});
+
+		const starListeners = this._listeners['*'] || [];
+		if (starListeners.length > 0) {
+			// '*' listeners get an ExecutorEvent that includes the event name
+			const starEvent = { name: eventName, data };
+			starListeners.forEach(listener => {
+				notifications.push(Promise.resolve(listener(starEvent)));
+			});
+		}
+
+		if (notifications.length === 0) {
 			// Report an error when no error listeners are registered
 			if (eventName === 'error') {
 				console.error('ERROR:', this.formatter.format(<any>data));
@@ -105,11 +119,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		}
 
 		// TODO: Remove Promise.all call once Task.all works
-		return Task.resolve(Promise.all(listeners.map(listener => {
-			return new Promise<void>(resolve => {
-				resolve(listener(data));
-			});
-		}))).catch(error => {
+		return Task.resolve(Promise.all(notifications)).catch(error => {
 			console.error(`Error emitting ${eventName}: ${this.formatter.format(error)}`);
 		});
 	}
@@ -460,8 +470,13 @@ export interface DeprecationMessage {
 	message?: string;
 }
 
+export interface ExecutorEvent {
+	name: string;
+	data: any;
+}
+
 export interface Events {
-	'*': any;
+	'*': ExecutorEvent;
 	newSuite: Suite;
 	newTest: Test;
 	error: Error;

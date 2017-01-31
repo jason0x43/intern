@@ -7,7 +7,9 @@ initialize(WebDriver, {
 	contactTimeout: 30000,
 	filterErrorStack: true,
 	environments: [ { browserName: 'firefox' } ],
-	suites: ['./unit/lib/EnvironmentType']
+	tunnel: 'selenium' as 'selenium',
+	tunnelOptions: { drivers: [ 'firefox' ] },
+	suites: ['./_build/tests/unit/lib/EnvironmentType.js']
 });
 
 // For instrumentation to work in Node, any modules that should be instrumented

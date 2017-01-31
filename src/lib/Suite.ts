@@ -57,6 +57,8 @@ export default class Suite implements SuiteProperties {
 			(<any>this)[key] = options[key];
 		});
 
+		this.tests = [];
+
 		if (options.tests) {
 			options.tests.forEach(suiteOrTest => this.add(suiteOrTest));
 		}
@@ -229,10 +231,6 @@ export default class Suite implements SuiteProperties {
 	 * Add a test or suite to this suite.
 	 */
 	add(suiteOrTest: Suite | Test) {
-		if (!this.tests) {
-			this.tests = [];
-		}
-
 		if (!isTest(suiteOrTest) && !isSuite(suiteOrTest)) {
 			throw new Error('Tried to add invalid suite or test');
 		}
