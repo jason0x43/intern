@@ -1,21 +1,24 @@
 import Channel from '../lib/WebSocketChannel';
-import { loadScript } from './util';
+import { getQueryParams, loadScript } from './util';
+import Browser, { Config } from '../lib/executors/Browser';
 
-const params = location.search.slice(1).split('&').filter(arg => {
-	return arg !== '' && arg[0] !== '=';
-}).map(arg => {
-	const parts = arg.split('=');
-	return {
-		name: decodeURIComponent(parts[0]),
-		// An arg name with no value is treated as having the value 'true'
-		value: decodeURIComponent(parts[1]) || true
-	};
-});
+declare let intern: Browser;
 
-const config: { [name: string]: any } = {};
+export interface ClientParams extends Config {
+	debug?: boolean;
+	// initialBaseUrl: string;
+	loaderScript?: string;
+	name: string;
+	runInSync?: boolean;
+	sessionId: string;
+	socketPort?: number;
+	suites: string[];
+}
+
+const config: Config  = {};
 let sessionId: string;
 let suites: string[] = [];
-let loader: string;
+let loaderScript: string;
 let runInSync: boolean;
 let socketPort: number;
 
@@ -23,11 +26,13 @@ let socketPort: number;
 // (below)
 let debug = (_data: any) => Promise.resolve();
 
-params.filter(({ name, value }) => {
+const params: ClientParams = <any>getQueryParams();
+
+Object.keys(params).forEach((name: keyof ClientParams) => {
+	const value = params[name];
+
 	// Filter out parameeters than the executor won't understand
 	switch (name) {
-		case 'reporter':
-			break;
 		case 'sessionId':
 			sessionId = <string>value;
 			break;
@@ -37,8 +42,8 @@ params.filter(({ name, value }) => {
 		case 'debug':
 			debug = (data: any) => channel.sendMessage('debug', { data: data });
 			break;
-		case 'loader':
-			loader = <string>value;
+		case 'loaderScript':
+			loaderScript = <string>value;
 			break;
 		case 'runInSync':
 			runInSync = <boolean>value;
@@ -47,29 +52,21 @@ params.filter(({ name, value }) => {
 			socketPort = Number(value);
 			break;
 		default:
-			return true;
-	}
-
-	return false;
-}).forEach(({ name, value }) => {
-	if (name in config) {
-		if (!Array.isArray(config[name])) {
-			config[name] = [config[name]];
-		}
-		config[name].push(value);
-	}
-	else {
-		config[name] = value;
+			config[name] = value;
 	}
 });
 
 // TODO: ensure the channel is created with the proper URL
-const basePath = config['basePath'];
+const basePath = config.basePath;
 const channel = new Channel({ url: basePath, sessionId, port: socketPort });
 const sendError = (error: Error) => channel.sendMessage('error', error);
 
+intern.debug = debug;
+debug(`Query: ${location.search}`);
+debug(`Params: ${JSON.stringify(params)}`);
+
 // The executor should use the same channel we're using here to ensure sequence numbers match up
-config['channel'] = channel;
+config.channel = channel;
 
 // Forward all executor events back to the host Intern
 intern.on('*', data => {
@@ -80,30 +77,22 @@ intern.on('*', data => {
 	}
 });
 
-(<any>window)['channel'] = channel;
-
-debug(suites);
-
 try {
 	intern.configure(config);
-	debug('configured intern');
-	if (loader) {
-		loadScript(loader, basePath);
+	debug('Configured intern');
+	if (loaderScript) {
+		debug(`Loading loader script ${loaderScript}`);
+		loadScript(loaderScript, basePath);
 	}
 	else {
-		loadScript('node_modules/dojo-loader/loader.js', basePath).then(() => {
-			const loader = (<any>window).require;
-			loader.config({
-				packages: [
-					{ name: 'chai', location: '../../node_modules/chai', main: 'chai' }
-				]
-			});
-			return loader(suites, () => {
-				debug(`starting intern with ${intern['_rootSuite'].tests.length} tests`);
-				intern.run().then(() => {
-					debug('finished intern');
-				});
-			});
+		debug(`Loading suites ${JSON.stringify(suites)}`);
+		Promise.all(suites.map(suite => {
+			loadScript(suite, basePath);
+		})).then(() => {
+			debug(`Starting intern with ${intern['_rootSuite'].tests.length} tests`);
+			return intern.run();
+		}).then(() => {
+			debug('Finished intern');
 		}).catch(sendError);
 	}
 }

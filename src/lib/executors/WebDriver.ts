@@ -283,6 +283,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 						contactTimeout: config.contactTimeout,
 						name: 'unit tests',
 						suites: config.suites,
+						loaderScript: config.loaderScript,
 						proxy: proxy
 					}));
 				}
@@ -304,6 +305,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 	protected _processOption(name: keyof Config, value: any) {
 		switch (name) {
 			case 'basePath':
+			case 'loaderScript':
 			case 'proxyUrl':
 				if (typeof value !== 'string') {
 					throw new Error(`Non-string value "${value}" for ${name}`);
@@ -339,7 +341,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 				if (value === 'true') {
 					this.config[name] = true;
 				}
-				else if (typeof value !== 'string') {
+				else if (typeof value !== 'boolean') {
 					throw new Error(`Non-boolean value "${value}" for ${name}`);
 				}
 				this.config[name] = value;
@@ -416,6 +418,7 @@ export interface Config extends BaseConfig {
 	environments: any[];
 	environmentRetries?: number;
 	leaveRemoteOpen?: boolean | 'fail';
+	loaderScript?: string;
 	maxConcurrency?: number;
 	proxyOnly?: boolean;
 	proxyPort?: number;

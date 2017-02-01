@@ -9,6 +9,8 @@ import Channel, { isChannel } from '../Channel';
  * The Browser executor is used to run unit tests in a browser.
  */
 export default class Browser extends GenericExecutor<Events, Config> {
+	channel: Channel;
+
 	constructor(config: Partial<Config> = {}) {
 		if (!config.basePath) {
 			const basePath = getThisPath().split('/').slice(0, -1).join('/');
@@ -26,6 +28,12 @@ export default class Browser extends GenericExecutor<Events, Config> {
 
 	get config(): Config {
 		return this._config;
+	}
+
+	/**
+	 * Can be called in a WebDriver context to send data back to an Intern host
+	 */
+	debug(_data: any) {
 	}
 
 	/**
@@ -57,7 +65,7 @@ export default class Browser extends GenericExecutor<Events, Config> {
 				if (!isChannel(value)) {
 					throw new Error(`${name} must be a Channel`);
 				}
-				this.config[name] = value;
+				this.channel = value;
 				break;
 
 			default:

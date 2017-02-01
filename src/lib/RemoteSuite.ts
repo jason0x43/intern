@@ -8,6 +8,7 @@ import WebDriver, { Events } from './executors/WebDriver';
 import Proxy from './Proxy';
 import { Handle } from 'dojo-interfaces/core';
 import { inspect } from 'util';
+import { ClientParams } from '../scripts/client';
 
 /**
  * RemoteSuite is a class that acts as a local proxy for one or more unit test suites being run in a remote browser.
@@ -16,6 +17,8 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 	contactTimeout: number;
 
 	executor: WebDriver;
+
+	loaderScript: string;
 
 	proxy: Proxy;
 
@@ -145,22 +148,31 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 					remote.setHeartbeatInterval((timeout - 1) * 1000);
 				}
 
-				const options = new UrlSearchParams(<Hash<any>>{
+				const options: ClientParams = {
 					basePath: proxyUrlPath,
 					// initialBaseUrl: proxyBasePath + relative(config.basePath, process.cwd()),
-					runInSync: this.runInSync,
+					loaderScript: this.loaderScript,
 					name: this.id,
 					sessionId: sessionId,
-					socketPort: proxy.socketPort,
 					suites: this.suites
-				});
+				};
 
 				if (process.env['INTERN_DEBUG'] === '1') {
-					options.set('debug', '');
+					options.debug = true;
 				}
 
+				if (this.runInSync) {
+					options.runInSync = true;
+				}
+
+				if (proxy.socketPort) {
+					options.socketPort = proxy.socketPort;
+				}
+
+				const query = new UrlSearchParams(<Hash<any>>options);
+
 				remote
-					.get(config.proxyUrl + '__intern/browser/client.html?' + options)
+					.get(config.proxyUrl + '__intern/browser/client.html?' + query)
 					.then(() => {
 						// If the task hasn't been resolved yet, start a timer that will cancel this suite if no contact
 						// is received from the remote in a given time. The task could be resolved if, for example, the
@@ -190,6 +202,7 @@ export interface RemoteSuiteProperties extends SuiteProperties {
 	/** Time to wait for contact from remote server */
 	contactTimeout: number;
 
+	loaderScript: string;
 	proxy: Proxy;
 
 	/** If true, the remote suite will wait for ackowledgements from the host for runtime events. */

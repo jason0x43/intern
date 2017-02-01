@@ -26,6 +26,10 @@ export default class Channel {
 			data = { name: data.name, message: data.message, stack: data.stack };
 		}
 
+		return this._sendData(name, data);
+	}
+
+	protected _sendData(name: string, data: any) {
 		this._messageBuffer.push(JSON.stringify({
 			sequence: this._sequence,
 			// Although sessionId may be passed as part of the payload, it is passed in the message object as well to

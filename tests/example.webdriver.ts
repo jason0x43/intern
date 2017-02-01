@@ -2,7 +2,7 @@
 import WebDriver from '../src/lib/executors/WebDriver';
 import initialize from '../src/intern';
 
-const browser = 'chrome';
+const browser = 'firefox';
 
 initialize(WebDriver, {
 	name: 'Test config',
@@ -12,6 +12,8 @@ initialize(WebDriver, {
 	tunnel: 'selenium' as 'selenium',
 	tunnelOptions: { drivers: [ browser ] },
 	socketPort: 9001,
+	loaderScript: '_build/browser/scripts/dojo.js',
+	runInSync: true,
 	suites: ['../tests/unit/lib/EnvironmentType.js']
 });
 

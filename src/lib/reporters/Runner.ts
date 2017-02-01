@@ -95,7 +95,11 @@ export default class Runner extends Coverage {
 
 	@eventHandler()
 	proxyStart(proxy: Proxy) {
-		this.charm.write('Listening on 0.0.0.0:' + proxy.port + '\n');
+		let message = `Listening on localhost:${proxy.port}`;
+		if (proxy.socketPort) {
+			message += ` (ws ${proxy.socketPort})`;
+		}
+		this.charm.write(`${message}\n`);
 	}
 
 	@eventHandler()
