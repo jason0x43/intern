@@ -1,16 +1,16 @@
 import Channel from './lib/Channel';
 
-function loadSuite(suite: string) {
+function loadScript(script: string) {
 	return new Promise((resolve, reject) => {
-		const src = basePath + suite;
-		const script = document.createElement('script');
-		script.addEventListener('load', resolve);
-		script.addEventListener('error', event => {
+		const src = basePath + script;
+		const scriptTag = document.createElement('script');
+		scriptTag.addEventListener('load', resolve);
+		scriptTag.addEventListener('error', event => {
 			console.error(`Error loading ${src}:`, event);
 			reject(new Error(`Unable to load ${src}`));
 		});
-		script.src = src;
-		document.body.appendChild(script);
+		scriptTag.src = src;
+		document.body.appendChild(scriptTag);
 	});
 }
 
@@ -28,7 +28,10 @@ const params = location.search.slice(1).split('&').filter(arg => {
 const config: { [name: string]: any } = {};
 let sessionId: string;
 let suites: string[] = [];
-let debug = (_data: any) => {};
+
+// If there's a 'debug' query param, this will be be a function that sends messages over the instantiated Channel
+// (below)
+let debug = (_data: any) => Promise.resolve();
 
 params.filter(({ name, value }) => {
 	// Filter out parameeters than the executor won't understand
@@ -82,10 +85,18 @@ debug(suites);
 try {
 	intern.configure(config);
 	debug('configured intern');
-	Promise.all(suites.map(loadSuite)).then(() => {
-		debug(`starting intern with ${intern['_rootSuite'].tests.length} tests`);
-		intern.run().then(() => {
-			debug('finished intern');
+	loadScript('node_modules/dojo-loader/loader.js').then(() => {
+		const loader = (<any>window).require;
+		loader.config({
+			packages: [
+				{ name: 'chai', location: '../../node_modules/chai', main: 'chai' }
+			]
+		});
+		return loader(suites, () => {
+			debug(`starting intern with ${intern['_rootSuite'].tests.length} tests`);
+			intern.run().then(() => {
+				debug('finished intern');
+			});
 		});
 	}).catch(sendError);
 }

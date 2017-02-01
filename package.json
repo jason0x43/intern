@@ -18,6 +18,7 @@
     "diff": "1.1.0",
     "digdug": "../digdug/_build/src",
     "dojo-core": "2.0.0-alpha.19",
+    "dojo-loader": "2.0.0-beta.7",
     "glob": "7.0.3",
     "istanbul": "0.4.1",
     "leadfoot": "~1.7.0",

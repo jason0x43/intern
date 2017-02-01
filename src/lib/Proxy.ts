@@ -210,6 +210,10 @@ export default class Proxy implements ProxyProperties {
 
 		wholePath = normalizePath(wholePath);
 
+		if (process.env['INTERN_DEBUG'] === '1') {
+			process.stderr.write(`DEBUG: serving ${file} from ${wholePath}\n`);
+		}
+
 		if (wholePath.charAt(wholePath.length - 1) === '/') {
 			wholePath += 'index.html';
 		}

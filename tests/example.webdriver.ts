@@ -11,7 +11,7 @@ initialize(WebDriver, {
 	environments: [ { browserName: browser } ],
 	tunnel: 'selenium' as 'selenium',
 	tunnelOptions: { drivers: [ browser ] },
-	suites: ['./_build/browser/tests/unit/all.js']
+	suites: ['../tests/unit/lib/EnvironmentType.js']
 });
 
 // For instrumentation to work in Node, any modules that should be instrumented
