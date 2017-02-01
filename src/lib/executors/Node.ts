@@ -24,6 +24,10 @@ export default class Node extends GenericExecutor<Events, Config> {
 
 		this._formatter = new Formatter(config);
 
+		if (typeof this.config.excludeInstrumentation === 'undefined') {
+			this.config.excludeInstrumentation = /(?:node_modules|tests)\//;
+		}
+
 		if (this.config.excludeInstrumentation !== true) {
 			this._setInstrumentationHooks(this.config.excludeInstrumentation);
 		}

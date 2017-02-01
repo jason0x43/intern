@@ -28,21 +28,27 @@ const params = location.search.slice(1).split('&').filter(arg => {
 const config: { [name: string]: any } = {};
 let sessionId: string;
 let suites: string[] = [];
+let debug = (_data: any) => {};
 
 params.filter(({ name, value }) => {
 	// Filter out parameeters than the executor won't understand
 	switch (name) {
 		case 'reporter':
-			return false;
+			break;
 		case 'sessionId':
 			sessionId = <string>value;
-			return false;
+			break;
 		case 'suites':
 			suites.push(<string>value);
-			return false;
+			break;
+		case 'debug':
+			debug = (data: any) => channel.sendMessage('debug', { data: data });
+			break;
 		default:
 			return true;
 	}
+
+	return false;
 }).forEach(({ name, value }) => {
 	if (name in config) {
 		if (!Array.isArray(config[name])) {
@@ -65,19 +71,21 @@ config['channel'] = channel;
 
 // Forward all executor events back to the host Intern
 intern.on('*', data => {
-	channel.sendMessage('debug', { data: data });
+	debug(data);
 	channel.sendMessage(data.name, data.data);
 });
 
-channel.sendMessage('debug', { data: suites });
+(<any>window)['channel'] = channel;
+
+debug(suites);
 
 try {
 	intern.configure(config);
-	channel.sendMessage('debug', { data: 'configured intern' });
+	debug('configured intern');
 	Promise.all(suites.map(loadSuite)).then(() => {
-		channel.sendMessage('debug', { data: 'starting intern' });
+		debug(`starting intern with ${intern['_rootSuite'].tests.length} tests`);
 		intern.run().then(() => {
-			channel.sendMessage('debug', { data: 'finished intern' });
+			debug('finished intern');
 		});
 	}).catch(sendError);
 }

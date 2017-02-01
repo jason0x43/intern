@@ -2,14 +2,16 @@
 import WebDriver from '../src/lib/executors/WebDriver';
 import initialize from '../src/intern';
 
+const browser = 'chrome';
+
 initialize(WebDriver, {
 	name: 'Test config',
 	contactTimeout: 30000,
 	filterErrorStack: true,
-	environments: [ { browserName: 'firefox' } ],
+	environments: [ { browserName: browser } ],
 	tunnel: 'selenium' as 'selenium',
-	tunnelOptions: { drivers: [ 'firefox' ] },
-	suites: ['./_build/tests/unit/lib/EnvironmentType.js']
+	tunnelOptions: { drivers: [ browser ] },
+	suites: ['./_build/browser/tests/unit/all.js']
 });
 
 // For instrumentation to work in Node, any modules that should be instrumented

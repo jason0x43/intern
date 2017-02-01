@@ -7,6 +7,7 @@ import { InternError } from '../intern';
 import WebDriver, { Events } from './executors/WebDriver';
 import Proxy from './Proxy';
 import { Handle } from 'dojo-interfaces/core';
+import { inspect } from 'util';
 
 /**
  * RemoteSuite is a class that acts as a local proxy for one or more unit test suites being run in a remote browser.
@@ -66,7 +67,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 
 					switch (name) {
 						case 'debug':
-							console.log('DEBUG:', data.data);
+							process.stderr.write('DEBUG: ' + inspect(data.data, { colors: true }) + '\n');
 							break;
 
 						case 'suiteStart':
@@ -155,6 +156,10 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 					sessionId: sessionId,
 					suites: this.suites
 				});
+
+				if (process.env['INTERN_DEBUG'] === '1') {
+					options.set('debug', '');
+				}
 
 				remote
 					.get(config.proxyUrl + '__intern/browser/client.html?' + options)
