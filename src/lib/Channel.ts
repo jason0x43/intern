@@ -11,9 +11,9 @@ export default class Channel {
 	protected _sequence: number;
 	protected _maxPostSize: number;
 
-	constructor(url: string, sessionId: string) {
-		this.sessionId = sessionId;
-		this.url = url;
+	constructor(options: ChannelOptions) {
+		this.sessionId = options.sessionId;
+		this.url = options.url;
 		this._sequence = 0;
 		this._messageBuffer = [];
 	}
@@ -101,4 +101,9 @@ export default class Channel {
 
 export function isChannel(value: any): value is Channel {
 	return value && typeof value === 'object' && typeof value.sendMessage === 'function';
+}
+
+export interface ChannelOptions {
+	sessionId: string;
+	url: string;
 }

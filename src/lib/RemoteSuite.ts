@@ -21,6 +21,8 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 
 	suites: string[];
 
+	runInSync: boolean;
+
 	constructor(config: RemoteSuiteOptions) {
 		super(config);
 
@@ -143,17 +145,13 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 					remote.setHeartbeatInterval((timeout - 1) * 1000);
 				}
 
-				let clientReporter = config.runnerClientReporter;
-				if (typeof clientReporter !== 'object') {
-					clientReporter = { reporter: 'webdriver' };
-				}
-
 				const options = new UrlSearchParams(<Hash<any>>{
 					basePath: proxyUrlPath,
 					// initialBaseUrl: proxyBasePath + relative(config.basePath, process.cwd()),
-					reporter: clientReporter,
+					runInSync: this.runInSync,
 					name: this.id,
 					sessionId: sessionId,
+					socketPort: proxy.socketPort,
 					suites: this.suites
 				});
 
@@ -193,6 +191,9 @@ export interface RemoteSuiteProperties extends SuiteProperties {
 	contactTimeout: number;
 
 	proxy: Proxy;
+
+	/** If true, the remote suite will wait for ackowledgements from the host for runtime events. */
+	runInSync: boolean;
 
 	/** The pathnames of suite modules that will be managed by this remote suite. */
 	suites: string[];

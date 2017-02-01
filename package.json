@@ -12,20 +12,21 @@
     "@types/benchmark": "~1.0.30",
     "@types/chai": "~3.4.34",
     "@types/source-map": "~0.1.28",
+    "@types/ws": "~0.0.38",
     "benchmark": "2.1.1",
     "chai": "3.5.0",
     "charm": "0.2.0",
     "diff": "1.1.0",
     "digdug": "../digdug/_build/src",
     "dojo-core": "2.0.0-alpha.19",
-    "dojo-loader": "2.0.0-beta.7",
     "glob": "7.0.3",
     "istanbul": "0.4.1",
     "leadfoot": "~1.7.0",
     "lodash-amd": "4.16.4",
     "mime-types": "2.1.13",
     "platform": "1.3.1",
-    "source-map": "0.1.33"
+    "source-map": "0.1.33",
+    "ws": "~1.1.0"
   },
   "devDependencies": {
     "@types/browserify": "~12.0.30",
@@ -37,6 +38,7 @@
     "@types/node": "~6.0.0",
     "@types/shelljs": "~0.3.32",
     "browserify": "~13.3.0",
+    "dojo-loader": "2.0.0-beta.7",
     "intern": "~3.4.2",
     "intern-dev": "https://github.com/theintern/intern-dev/releases/download/0.1.4/intern-dev-0.1.4.tgz"
   },

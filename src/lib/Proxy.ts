@@ -9,17 +9,7 @@ import { lookup } from 'mime-types';
 import * as net from 'net';
 import { mixin } from 'dojo-core/lang';
 import { Handle } from 'dojo-interfaces/core';
-
-export interface ProxyProperties {
-	basePath: string;
-	excludeInstrumentation: boolean | RegExp;
-	instrument: boolean;
-	instrumenterOptions: any;
-	port: number;
-	waitForRunner: boolean;
-};
-
-export type ProxyOptions = Partial<ProxyProperties>;
+import WebSocket = require('ws');
 
 export default class Proxy implements ProxyProperties {
 	basePath: string;
@@ -32,9 +22,13 @@ export default class Proxy implements ProxyProperties {
 
 	port: number;
 
+	runInSync: boolean;
+
 	server: http.Server;
 
-	waitForRunner: boolean;
+	socketPort: number;
+
+	protected _wsServer: WebSocket.Server;
 
 	private _codeCache: { [filename: string]: { mtime: number, data: string } };
 
@@ -75,20 +69,38 @@ export default class Proxy implements ProxyProperties {
 				});
 			});
 
+			if (this.socketPort != null) {
+				this._wsServer = new WebSocket.Server({ port: this.port + 1 });
+				this._wsServer.on('connection', client => {
+					this._handleWebSocket(client);
+				});
+			}
+
 			server.listen(this.port, resolve);
 		});
 	}
 
 	stop() {
-		return new Promise((resolve) => {
-			if (this.server) {
-				this.server.close(resolve);
-			}
-			else {
-				resolve();
-			}
+		const promises: Promise<any>[] = [];
 
-			this.server = this._codeCache = null;
+		if (this.server) {
+			promises.push(new Promise(resolve => {
+				this.server.close(resolve);
+			}).then(() => {
+				this.server = null;
+			}));
+		}
+
+		if (this._wsServer) {
+			promises.push(new Promise(resolve => {
+				this._wsServer.close(resolve);
+			}).then(() => {
+				this._wsServer = null;
+			}));
+		}
+
+		return Promise.all(promises).then(() => {
+			this._codeCache = null;
 		});
 	}
 
@@ -140,30 +152,16 @@ export default class Proxy implements ProxyProperties {
 						return JSON.parse(messageString);
 					});
 
-					const runnerReporterPromise = Promise.all(messages.map((message) => {
-						return this._publishInSequence(message);
-					}));
-
-					let shouldWait = messages.some((message) => {
-						return getShouldWait(this.waitForRunner, message.payload);
-					});
-
-					if (shouldWait) {
-						runnerReporterPromise.then(
-							function () {
-								response.statusCode = 204;
-								response.end();
-							},
-							function () {
-								response.statusCode = 500;
-								response.end();
-							}
-						);
-					}
-					else {
-						response.statusCode = 204;
-						response.end();
-					}
+					this._handleMessages(messages).then(
+						() => {
+							response.statusCode = 204;
+							response.end();
+						},
+						() => {
+							response.statusCode = 500;
+							response.end();
+						}
+					);
 				}
 				catch (error) {
 					response.statusCode = 500;
@@ -288,6 +286,36 @@ export default class Proxy implements ProxyProperties {
 		});
 	}
 
+	private _handleMessages(messages: Message[]): Promise<any> {
+		const runnerReporterPromise = Promise.all(messages.map((message) => {
+			return this._publishInSequence(message);
+		}));
+
+		let shouldWait = messages.some(message => {
+			return getShouldWait(this.runInSync, message.payload);
+		});
+
+		if (shouldWait) {
+			return runnerReporterPromise;
+		}
+		else {
+			return Promise.resolve();
+		}
+	}
+
+	private _handleWebSocket(client: WebSocket) {
+		client.on('message', data => {
+			const message: Message = JSON.parse(data);
+			this._handleMessages([message]).catch(console.error).then(() => {
+				client.send(JSON.stringify({ sequence: message.sequence }), error => {
+					if (error) {
+						console.error(error);
+					}
+				});
+			});
+		});
+	}
+
 	private _publishInSequence(message: Message) {
 		const session = this._getSession(message.sessionId);
 
@@ -330,6 +358,18 @@ export default class Proxy implements ProxyProperties {
 			`<!-- ${new Array(512).join('.')} -->`);
 	}
 }
+
+export interface ProxyProperties {
+	basePath: string;
+	excludeInstrumentation: boolean | RegExp;
+	instrument: boolean;
+	instrumenterOptions: any;
+	port: number;
+	runInSync: boolean;
+	socketPort: number;
+};
+
+export type ProxyOptions = Partial<ProxyProperties>;
 
 interface Message {
 	sessionId: string;

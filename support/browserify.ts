@@ -42,7 +42,7 @@ function bundle(files: string | string[], output: string) {
 		}
 
 		await bundle(join(srcDir, 'browser.js'), join(dstDir, 'browser.js'));
-		await bundle(join(srcDir, 'client.js'), join(dstDir, 'client.js'));
+		await bundle(join(srcDir, 'scripts', 'client.js'), join(dstDir, 'scripts', 'client.js'));
 		await bundle(join(testDir, 'unit', 'all.js'), join(testDstDir, 'unit', 'all.js'));
 	}
 	catch (error) {

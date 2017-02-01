@@ -48,7 +48,6 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			environments: [],
 			maxConcurrency: Infinity,
 			reporters: ['runner'],
-			runnerClientReporter: { reporter: 'webdriver' },
 			tunnel: NullTunnel,
 			tunnelOptions: { tunnelId: String(Date.now()) }
 		};
@@ -181,8 +180,9 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			instrumenterOptions: this.config.instrumenterOptions,
 			excludeInstrumentation: this.config.excludeInstrumentation,
 			instrument: true,
-			waitForRunner: this.config.runnerClientReporter.waitForRunner,
-			port: this.config.proxyPort
+			port: this.config.proxyPort,
+			runInSync: this.config.runInSync,
+			socketPort: this.config.socketPort
 		});
 	}
 
@@ -313,7 +313,6 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 			case 'capabilities':
 			case 'environments':
-			case 'runnerClientReporter':
 			case 'tunnelOptions':
 				if (typeof value !== 'object') {
 					throw new Error(`Non-object value "${value}" for ${name}`);
@@ -336,6 +335,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 			case 'leaveRemoteOpen':
 			case 'proxyOnly':
+			case 'runInSync':
 				if (value === 'true') {
 					this.config[name] = true;
 				}
@@ -356,6 +356,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			case 'maxConcurrency':
 			case 'environmentRetries':
 			case 'proxyPort':
+			case 'socketPort':
 				const numValue = Number(value);
 				if (isNaN(numValue)) {
 					throw new Error(`Non-numeric value "${value}" for ${name}`);
@@ -419,10 +420,8 @@ export interface Config extends BaseConfig {
 	proxyOnly?: boolean;
 	proxyPort?: number;
 	proxyUrl?: string;
-	runnerClientReporter?: {
-		reporter: string;
-		waitForRunner?: boolean;
-	};
+	runInSync?: boolean;
+	socketPort?: number;
 	tunnel?: TunnelNames | typeof Tunnel;
 	// TODO: The type of tunnelOptions should be dependendant on the tunnel class
 	tunnelOptions?: TunnelOptions | BrowserStackOptions | SeleniumOptions;

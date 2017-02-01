@@ -11,6 +11,7 @@ initialize(WebDriver, {
 	environments: [ { browserName: browser } ],
 	tunnel: 'selenium' as 'selenium',
 	tunnelOptions: { drivers: [ browser ] },
+	socketPort: 9001,
 	suites: ['../tests/unit/lib/EnvironmentType.js']
 });
 
