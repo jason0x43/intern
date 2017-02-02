@@ -8,7 +8,7 @@ function getCoverageData(coverageVariable: string) {
 }
 
 /**
- * A ProxiedSession object represents a WebDriver session that interacts with the Intern instrumenting proxy. It
+ * A ProxiedSession object represents a WebDriver session that interacts with the Intern instrumenting server. It
  * collects code instrumentation data from pages and converts local filesystem paths into URLs for use with
  * {@link module:leadfoot/Session#get}.
  *
@@ -39,14 +39,14 @@ export default class ProxiedSession extends Session {
 	 *
 	 * @type {number}
 	 */
-	proxyBasePathLength = 0;
+	serverBasePathLength = 0;
 
 	/**
-	 * The base URL of the proxy server in use.
+	 * The base URL of the server server in use.
 	 *
 	 * @type {string}
 	 */
-	proxyUrl = '';
+	serverUrl = '';
 
 	reporterManager: any;
 
@@ -61,7 +61,7 @@ export default class ProxiedSession extends Session {
 
 		// At least two letters are required in the scheme to avoid Windows paths being misinterpreted as URLs
 		if (!/^[A-Za-z][A-Za-z0-9+.-]+:/.test(args[0])) {
-			args[0] = this.proxyUrl + args[0].slice(this.proxyBasePathLength);
+			args[0] = this.serverUrl + args[0].slice(this.serverBasePathLength);
 		}
 
 		if (this.coverageEnabled) {

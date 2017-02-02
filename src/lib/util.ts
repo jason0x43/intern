@@ -45,8 +45,7 @@ export function createDiff(actual: Object, expected: Object): string {
 }
 
 /**
- * Indicate whether Proxy or WebDriver should wait for an event to process
- * before continuing.
+ * Indicate whether Server or WebDriver should wait for an event to process before continuing.
  */
 export function getShouldWait(waitMode: (string|boolean), message: Message) {
 	let shouldWait = false;

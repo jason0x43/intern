@@ -6,14 +6,14 @@ import SauceLabsTunnel from 'digdug/SauceLabsTunnel';
 import TestingBotTunnel from 'digdug/TestingBotTunnel';
 import CrossBrowserTestingTunnel from 'digdug/CrossBrowserTestingTunnel';
 import NullTunnel from 'digdug/NullTunnel';
-import Proxy from '../Proxy';
+import Server from '../Server';
 import Formatter from '../node/Formatter';
 import { deepMixin } from 'dojo-core/lang';
 import Reporter from '../reporters/Reporter';
 import Runner from '../reporters/Runner';
 import Pretty from '../reporters/Pretty';
 import Task from 'dojo-core/async/Task';
-import Server = require('leadfoot/Server');
+import LeadfootServer = require('leadfoot/Server');
 import ProxiedSession from '../ProxiedSession';
 import resolveEnvironments from '../resolveEnvironments';
 import Suite from '../Suite';
@@ -34,7 +34,7 @@ import Command = require('leadfoot/Command');
 export default class WebDriver extends GenericExecutor<Events, Config> {
 	config: Config;
 
-	proxy: Proxy;
+	server: Server;
 
 	tunnel: Tunnel;
 
@@ -61,8 +61,8 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		return super._afterRun()
 			.finally(() => {
 				const tasks: Promise<any>[] = [];
-				if (this.proxy) {
-					tasks.push(this.proxy.stop().then(() => this.emit('proxyEnd', this.proxy)));
+				if (this.server) {
+					tasks.push(this.server.stop().then(() => this.emit('serverEnd', this.server)));
 				}
 				if (this.tunnel) {
 					tasks.push(this.tunnel.stop().then(() => this.emit('tunnelStop', { tunnel: this.tunnel })));
@@ -86,37 +86,37 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			config.capabilities.build = buildId;
 		}
 
-		if (!config.proxyPort) {
-			config.proxyPort = 9000;
+		if (!config.serverPort) {
+			config.serverPort = 9000;
 		}
 
-		if (!config.proxyUrl) {
-			config.proxyUrl = 'http://localhost:' + config.proxyPort;
+		if (!config.serverUrl) {
+			config.serverUrl = 'http://localhost:' + config.serverPort;
 		}
 
 		if (!config.basePath) {
 			config.basePath = process.cwd();
 		}
 
-		config.proxyUrl = config.proxyUrl.replace(/\/*$/, '/');
+		config.serverUrl = config.serverUrl.replace(/\/*$/, '/');
 
 		if (config.tunnel === BrowserStackTunnel || config.tunnel === 'browserstack') {
 			const options = <BrowserStackOptions>config.tunnelOptions;
-			options.servers = (options.servers || []).concat(config.proxyUrl);
+			options.servers = (options.servers || []).concat(config.serverUrl);
 		}
 
 		const promise = super._beforeRun().then(() => {
-			const proxy = this._createProxy();
-			return proxy.start().then(() => {
-				this.proxy = proxy;
-				return this.emit('proxyStart', proxy);
+			const server = this._createServer();
+			return server.start().then(() => {
+				this.server = server;
+				return this.emit('serverStart', server);
 			});
 		});
 
-		// If we're in proxyOnly mode, just start the proxy server. Don't create session suites or start a tunnel.
-		if (config.proxyOnly) {
+		// If we're in serveOnly mode, just start the server server. Don't create session suites or start a tunnel.
+		if (config.serveOnly) {
 			return promise.then(() => {
-				// This is normally handled in Executor#run, but in proxyOnly mode we short circuit the normal sequence
+				// This is normally handled in Executor#run, but in serveOnly mode we short circuit the normal sequence
 				return Task.resolve(config.setup && config.setup.call(config, this))
 					.then(function () {
 						// Pause indefinitely until canceled
@@ -126,7 +126,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 						return Task.resolve(config.teardown && config.teardown.call(config, this));
 					})
 					.finally(() => {
-						return this.proxy && this.proxy.stop();
+						return this.server && this.server.stop();
 					});
 			});
 		}
@@ -167,22 +167,22 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 	}
 
 	/**
-	 * Creates an instrumenting proxy for sending instrumented code to the remote environment and receiving
+	 * Creates an instrumenting server for sending instrumented code to the remote environment and receiving
 	 * data back from the remote environment.
 	 */
-	protected _createProxy() {
+	protected _createServer() {
 		// Need an explicitly declared variable for typing
-		const proxy: Proxy = new Proxy({
+		const server: Server = new Server({
 			basePath: this.config.basePath,
 			instrumenterOptions: this.config.instrumenterOptions,
 			excludeInstrumentation: this.config.excludeInstrumentation,
 			executor: this,
 			instrument: true,
-			port: this.config.proxyPort,
+			port: this.config.serverPort,
 			runInSync: this.config.runInSync,
 			socketPort: this.config.socketPort
 		});
-		return proxy;
+		return server;
 	}
 
 	/**
@@ -196,13 +196,13 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			return;
 		}
 
-		const proxy = this.proxy;
+		const server = this.server;
 		const tunnel = this.tunnel;
-		const server = new Server<ProxiedSession>(tunnel.clientUrl, {
-			proxy: tunnel.proxy
+		const leadfootServer = new LeadfootServer<ProxiedSession>(tunnel.clientUrl, {
+			server: tunnel.proxy
 		});
 
-		server.sessionConstructor = ProxiedSession;
+		leadfootServer.sessionConstructor = ProxiedSession;
 
 		// TODO: The Promise.resolve check is just to get around some Task-related typing issues with
 		// Tunnel#getEnvironments.
@@ -226,13 +226,13 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 					before() {
 						return retry(
-							() => server.createSession(environmentType),
+							() => leadfootServer.createSession(environmentType),
 							config.environmentRetries
 						).then(session => {
 							session.coverageEnabled = config.excludeInstrumentation !== true;
 							session.coverageVariable = config.instrumenterOptions.coverageVariable;
-							session.proxyUrl = config.proxyUrl;
-							session.proxyBasePathLength = config.basePath.length;
+							session.serverUrl = config.serverUrl;
+							session.serverBasePathLength = config.basePath.length;
 
 							let command: Remote = <Remote>new Command(session);
 							command.environmentType = new EnvironmentType(session.capabilities);
@@ -283,7 +283,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 						name: 'unit tests',
 						suites: config.suites,
 						loaderScript: config.loaderScript,
-						proxy: proxy
+						server: server
 					}));
 				}
 
@@ -305,7 +305,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		switch (name) {
 			case 'basePath':
 			case 'loaderScript':
-			case 'proxyUrl':
+			case 'serverUrl':
 				if (typeof value !== 'string') {
 					throw new Error(`Non-string value "${value}" for ${name}`);
 				}
@@ -335,7 +335,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 				break;
 
 			case 'leaveRemoteOpen':
-			case 'proxyOnly':
+			case 'serveOnly':
 			case 'runInSync':
 				if (value === 'true') {
 					this.config[name] = true;
@@ -356,7 +356,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			case 'contactTimeout':
 			case 'maxConcurrency':
 			case 'environmentRetries':
-			case 'proxyPort':
+			case 'serverPort':
 			case 'socketPort':
 				const numValue = Number(value);
 				if (isNaN(numValue)) {
@@ -419,9 +419,9 @@ export interface Config extends BaseConfig {
 	leaveRemoteOpen?: boolean | 'fail';
 	loaderScript?: string;
 	maxConcurrency?: number;
-	proxyOnly?: boolean;
-	proxyPort?: number;
-	proxyUrl?: string;
+	serveOnly?: boolean;
+	serverPort?: number;
+	serverUrl?: string;
 	runInSync?: boolean;
 	socketPort?: number;
 	tunnel?: TunnelNames | typeof Tunnel;
@@ -445,8 +445,8 @@ export interface TunnelMessage {
 
 export interface Events extends BaseEvents {
 	debug: any;
-	proxyEnd: Proxy;
-	proxyStart: Proxy;
+	serverEnd: Server;
+	serverStart: Server;
 	sessionStart: Remote;
 	sessionEnd: Remote;
 	tunnelDownloadProgress: TunnelMessage;

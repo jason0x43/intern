@@ -64,7 +64,7 @@ export default class Node extends GenericExecutor<Events, Config> {
 
 			return filename.indexOf(basePath) === 0 &&
 				// if the string passed to `excludeInstrumentation` changes here, it must also change in
-				// `lib/Proxy.js`
+				// `lib/Server.js`
 				!excludeInstrumentation.test(filename.slice(basePath.length));
 		}
 

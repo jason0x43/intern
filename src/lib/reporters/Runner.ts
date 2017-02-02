@@ -8,7 +8,7 @@ import Suite from '../Suite';
 import { createEventHandler } from './Reporter';
 import Coverage, { CoverageProperties } from './Coverage';
 import { Writable } from 'stream';
-import Proxy from '../Proxy';
+import Server from '../Server';
 import { CoverageMessage, DeprecationMessage } from '../executors/Executor';
 import WebDriver, { Events, TunnelMessage } from '../executors/WebDriver';
 
@@ -25,7 +25,7 @@ export default class Runner extends Coverage {
 
 	hasErrors: boolean;
 
-	proxyOnly: boolean;
+	serveOnly: boolean;
 
 	private _summaryReporter: TextSummaryReport;
 	private _detailedReporter: TextReport;
@@ -37,7 +37,7 @@ export default class Runner extends Coverage {
 
 		this.sessions = {};
 		this.hasErrors = false;
-		this.proxyOnly = executor.config.proxyOnly;
+		this.serveOnly = executor.config.serveOnly;
 		this._summaryReporter = new TextSummaryReport({
 			watermarks: this.watermarks
 		});
@@ -94,10 +94,10 @@ export default class Runner extends Coverage {
 	}
 
 	@eventHandler()
-	proxyStart(proxy: Proxy) {
-		let message = `Listening on localhost:${proxy.port}`;
-		if (proxy.socketPort) {
-			message += ` (ws ${proxy.socketPort})`;
+	serverStart(server: Server) {
+		let message = `Listening on localhost:${server.port}`;
+		if (server.socketPort) {
+			message += ` (ws ${server.socketPort})`;
 		}
 		this.charm.write(`${message}\n`);
 	}
@@ -169,7 +169,7 @@ export default class Runner extends Coverage {
 			}
 
 			if (!this.sessions[suite.sessionId]) {
-				if (!this.proxyOnly) {
+				if (!this.serveOnly) {
 					this.charm
 						.write(LIGHT_YELLOW)
 						.write('BUG: suiteEnd was received for invalid session ' + suite.sessionId)

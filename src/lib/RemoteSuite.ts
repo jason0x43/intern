@@ -5,12 +5,12 @@ import { parse } from 'url';
 import Task from 'dojo-core/async/Task';
 import { InternError } from '../intern';
 import WebDriver, { Events } from './executors/WebDriver';
-import Proxy from './Proxy';
+import Server from './Server';
 import { Handle } from 'dojo-interfaces/core';
 import { RemoteParams } from '../remote';
 
 /**
- * RemoteSuite is a class that acts as a local proxy for one or more unit test suites being run in a remote browser.
+ * RemoteSuite is a class that acts as a local server for one or more unit test suites being run in a remote browser.
  */
 export default class RemoteSuite extends Suite implements RemoteSuiteProperties {
 	contactTimeout: number;
@@ -19,7 +19,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 
 	loaderScript: string;
 
-	proxy: Proxy;
+	server: Server;
 
 	suites: string[];
 
@@ -48,7 +48,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 	run(): Task<any> {
 		const remote = this.remote;
 		const sessionId = remote.session.sessionId;
-		const proxy = this.executor.proxy;
+		const server = this.executor.server;
 		let listenerHandle: Handle;
 		let contactTimer: NodeJS.Timer | false;
 
@@ -59,8 +59,8 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 					reject(error);
 				};
 
-				// Subscribe to events on the proxy so we'll know the status of the remote suite.
-				listenerHandle = proxy.subscribe(sessionId, (name: keyof Events, data: any) => {
+				// Subscribe to events on the server so we'll know the status of the remote suite.
+				listenerHandle = server.subscribe(sessionId, (name: keyof Events, data: any) => {
 					let suite: Suite;
 					const forward = () => this.executor.emit(name, data);
 
@@ -132,7 +132,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 				});
 
 				const config = this.executor.config;
-				const proxyUrlPath = parse(config.proxyUrl).pathname;
+				const serverUrlPath = parse(config.serverUrl).pathname;
 
 				// Intern runs unit tests on the remote Selenium server by navigating to the client runner HTML page. No
 				// real commands are issued after the call to remote.get() below until all unit tests are complete, so
@@ -144,8 +144,8 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 				}
 
 				const options: RemoteParams = {
-					basePath: proxyUrlPath,
-					// initialBaseUrl: proxyBasePath + relative(config.basePath, process.cwd()),
+					basePath: serverUrlPath,
+					// initialBaseUrl: serverBasePath + relative(config.basePath, process.cwd()),
 					loaderScript: this.loaderScript,
 					name: this.id,
 					sessionId: sessionId,
@@ -160,18 +160,18 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 					options.runInSync = true;
 				}
 
-				if (proxy.socketPort) {
-					options.socketPort = proxy.socketPort;
+				if (server.socketPort) {
+					options.socketPort = server.socketPort;
 				}
 
 				const query = new UrlSearchParams(<Hash<any>>options);
 
 				remote
-					.get(config.proxyUrl + '__intern/browser/remote.html?' + query)
+					.get(config.serverUrl + '__intern/browser/remote.html?' + query)
 					.then(() => {
 						// If the task hasn't been resolved yet, start a timer that will cancel this suite if no contact
 						// is received from the remote in a given time. The task could be resolved if, for example, the
-						// static configuration code run in client.html sends an error message back through the proxy
+						// static configuration code run in client.html sends an error message back through the server
 						// before execution gets here.
 						if (contactTimer !== false) {
 							contactTimer = setTimeout(() => {
@@ -198,7 +198,7 @@ export interface RemoteSuiteProperties extends SuiteProperties {
 	contactTimeout: number;
 
 	loaderScript: string;
-	proxy: Proxy;
+	server: Server;
 
 	/** If true, the remote suite will wait for ackowledgements from the host for runtime events. */
 	runInSync: boolean;

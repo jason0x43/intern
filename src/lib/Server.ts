@@ -13,7 +13,7 @@ import Executor from './executors/Executor';
 import { Message } from './Channel';
 import WebSocket = require('ws');
 
-export default class Proxy implements ProxyProperties {
+export default class Server implements ServerProperties {
 	basePath: string;
 
 	excludeInstrumentation: boolean | RegExp;
@@ -36,9 +36,9 @@ export default class Proxy implements ProxyProperties {
 
 	private _codeCache: { [filename: string]: { mtime: number, data: string } };
 
-	private _sessions: { [id: string]: { listeners: ProxyListener[] } };
+	private _sessions: { [id: string]: { listeners: ServerListener[] } };
 
-	constructor(options: ProxyOptions) {
+	constructor(options: ServerOptions) {
 		mixin(this, options);
 	}
 
@@ -114,7 +114,7 @@ export default class Proxy implements ProxyProperties {
 	/**
 	 * Listen for all events for a specific session
 	 */
-	subscribe(sessionId: string, listener: ProxyListener): Handle {
+	subscribe(sessionId: string, listener: ServerListener): Handle {
 		const listeners = this._getSession(sessionId).listeners;
 		listeners.push(listener);
 		return {
@@ -205,7 +205,7 @@ export default class Proxy implements ProxyProperties {
 		const file = /^\/+([^?]*)/.exec(request.url)[1];
 		let wholePath: string;
 
-		// TODO: Reconcile basePath in browserland with the proxy's basePath. Browser basePath maps to proxy basePath.
+		// TODO: Reconcile basePath in browserland with the server's basePath. Browser basePath maps to server basePath.
 		// Provide a utility to turn relative paths into URLs based on this relationship. This won't work quite like
 		// require.toUrl since we can't get at the implicit module path, but it will at least allow users to use paths
 		// relative to a known and standard base.
@@ -240,7 +240,7 @@ export default class Proxy implements ProxyProperties {
 
 		const contentType = lookup(basename(wholePath)) || 'application/octet-stream';
 		fs.stat(wholePath, (error, stats) => {
-			// The proxy server was stopped before this file was served
+			// The server was stopped before this file was served
 			if (!this.server) {
 				return;
 			}
@@ -257,7 +257,7 @@ export default class Proxy implements ProxyProperties {
 				}
 				else {
 					fs.readFile(wholePath, 'utf8', (error, data) => {
-						// The proxy server was stopped in the middle of the file read
+						// The server was stopped in the middle of the file read
 						if (!this.server) {
 							return;
 						}
@@ -334,7 +334,7 @@ export default class Proxy implements ProxyProperties {
 	}
 }
 
-export interface ProxyProperties {
+export interface ServerProperties {
 	basePath: string;
 	excludeInstrumentation: boolean | RegExp;
 	executor: Executor;
@@ -345,8 +345,8 @@ export interface ProxyProperties {
 	socketPort: number;
 };
 
-export interface ProxyListener {
+export interface ServerListener {
 	(name: string, data: any): void;
 }
 
-export type ProxyOptions = Partial<ProxyProperties> & { executor: Executor };
+export type ServerOptions = Partial<ServerProperties> & { executor: Executor };
