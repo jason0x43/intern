@@ -1,7 +1,8 @@
-declare global {
-	export let internLoader: SuiteLoader;
-}
-
+/**
+ * Load a script via script injection.
+ *
+ * @returns a Promise that resolves when the script has loaded
+ */
 export function loadScript(script: string, basePath: string) {
 	return new Promise((resolve, reject) => {
 		const src = basePath + script;
@@ -16,6 +17,11 @@ export function loadScript(script: string, basePath: string) {
 	});
 }
 
+/**
+ * Parse the current query params.
+ *
+ * @returns an object mapping param names to values.
+ */
 export function getQueryParams() {
 	const rawParams = location.search.slice(1).split('&').filter(arg => {
 		return arg !== '' && arg[0] !== '=';
@@ -42,8 +48,4 @@ export function getQueryParams() {
 	});
 
 	return params;
-}
-
-export interface SuiteLoader {
-	loaded: Promise<any>;
 }

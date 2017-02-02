@@ -8,7 +8,7 @@ import WebDriver, { Events } from './executors/WebDriver';
 import Proxy from './Proxy';
 import { Handle } from 'dojo-interfaces/core';
 import { inspect } from 'util';
-import { ClientParams } from '../scripts/client';
+import { RemoteParams } from '../remote';
 
 /**
  * RemoteSuite is a class that acts as a local proxy for one or more unit test suites being run in a remote browser.
@@ -72,7 +72,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 
 					switch (name) {
 						case 'debug':
-							process.stderr.write('DEBUG: ' + inspect(data.data, { colors: true }) + '\n');
+							process.stderr.write('DEBUG: ' + inspect(data, { colors: true }) + '\n');
 							break;
 
 						case 'suiteStart':
@@ -148,7 +148,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 					remote.setHeartbeatInterval((timeout - 1) * 1000);
 				}
 
-				const options: ClientParams = {
+				const options: RemoteParams = {
 					basePath: proxyUrlPath,
 					// initialBaseUrl: proxyBasePath + relative(config.basePath, process.cwd()),
 					loaderScript: this.loaderScript,
@@ -172,7 +172,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 				const query = new UrlSearchParams(<Hash<any>>options);
 
 				remote
-					.get(config.proxyUrl + '__intern/browser/client.html?' + query)
+					.get(config.proxyUrl + '__intern/browser/remote.html?' + query)
 					.then(() => {
 						// If the task hasn't been resolved yet, start a timer that will cancel this suite if no contact
 						// is received from the remote in a given time. The task could be resolved if, for example, the

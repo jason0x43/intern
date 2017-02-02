@@ -75,7 +75,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	 * Note that non-object properties will replace existing properties. Object propery values will be deeply mixed into
 	 * any existing value.
 	 */
-	configure(config: Config | {[key in keyof Config]: string | string[] | true }) {
+	configure(config: C | {[key in keyof Config]: string | string[] | true }) {
 		Object.keys(config).forEach((key: keyof Config) => {
 			this._processOption(key, config[key]);
 		});
@@ -102,7 +102,6 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 
 		const starListeners = this._listeners['*'] || [];
 		if (starListeners.length > 0) {
-			// '*' listeners get an ExecutorEvent that includes the event name
 			const starEvent = { name: eventName, data };
 			starListeners.forEach(listener => {
 				notifications.push(Promise.resolve(listener(starEvent)));

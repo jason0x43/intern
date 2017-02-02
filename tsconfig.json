@@ -35,7 +35,7 @@
   },
   "files": [
     "src/browser.ts",
-    "src/scripts/client.ts",
+    "src/remote.ts",
     "src/scripts/dojo.ts",
     "src/lib/executors/Node.ts",
     "src/lib/executors/WebDriver.ts"

@@ -6,14 +6,13 @@ const browser = 'firefox';
 
 initialize(WebDriver, {
 	name: 'Test config',
-	contactTimeout: 30000,
+	contactTimeout: 6000,
 	filterErrorStack: true,
 	environments: [ { browserName: browser } ],
 	tunnel: 'selenium' as 'selenium',
 	tunnelOptions: { drivers: [ browser ] },
 	socketPort: 9001,
 	loaderScript: '_build/browser/scripts/dojo.js',
-	runInSync: true,
 	suites: ['../tests/unit/lib/EnvironmentType.js']
 });
 

@@ -19,7 +19,7 @@ export default function initialize<C extends Config, E extends Events, T extends
 		throw new Error('Intern has already been initialized in this environment');
 	}
 	const executor = new ExecutorClass(config);
-	global['intern'] = executor;
+	global.intern = executor;
 	return executor;
 }
 
