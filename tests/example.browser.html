@@ -7,13 +7,13 @@
 	<body>
 		<script src="../../_build/browser/browser.js"></script>
 		<script>
-			intern.configure({
-				reporters: [ 'console' ]
-			});
+			intern.configure({ reporters: [ 'console' ] });
 		</script>
-		<script src="../../_build/browser/tests/unit/all.js"></script>
+		<script src="../../node_modules/dojo-loader/loader.js"></script>
 		<script>
-			intern.run();
+			require([ '../../_build/tests/unit/all' ], function () {
+				intern.run();
+			});
 		</script>
 	</body>
 </html>
