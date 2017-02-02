@@ -14,7 +14,7 @@ export default class Channel {
 	constructor(options: ChannelOptions) {
 		this.sessionId = options.sessionId;
 		this.url = options.url;
-		this._sequence = 0;
+		this._sequence = 1;
 		this._messageBuffer = [];
 	}
 
@@ -30,18 +30,11 @@ export default class Channel {
 	}
 
 	protected _sendData(name: string, data: any) {
-		this._messageBuffer.push(JSON.stringify({
-			sequence: this._sequence,
-			// Although sessionId may be passed as part of the payload, it is passed in the message object as well to
-			// allow the conduit to be fully separate and encapsulated from the rest of the code
-			sessionId: this.sessionId,
-			payload: [name, data]
-		}));
+		const id = String(this._sequence++);
+		const sessionId = this.sessionId;
+		const message: Message = { id, sessionId, name, data };
 
-		// The sequence must not be incremented until after the data is successfully serialised, since an error during
-		// serialisation might occur, which would mean the request is never sent, which would mean the dispatcher on the
-		// server-side will stall because the sequence numbering will be wrong
-		this._sequence++;
+		this._messageBuffer.push(JSON.stringify(message));
 
 		if (this._activeRequest || this._pendingRequest) {
 			if (!this._pendingRequest) {
@@ -110,4 +103,11 @@ export function isChannel(value: any): value is Channel {
 export interface ChannelOptions {
 	sessionId: string;
 	url: string;
+}
+
+export interface Message {
+	sessionId: string;
+	id: string;
+	name: string;
+	data: any;
 }

@@ -1,4 +1,5 @@
 import * as diffUtil from 'diff';
+import { Message } from './Channel';
 
 export const hasFunctionName = function () {
 	function foo() {}
@@ -47,9 +48,9 @@ export function createDiff(actual: Object, expected: Object): string {
  * Indicate whether Proxy or WebDriver should wait for an event to process
  * before continuing.
  */
-export function getShouldWait(waitMode: (string|boolean), message: string|any[]) {
+export function getShouldWait(waitMode: (string|boolean), message: Message) {
 	let shouldWait = false;
-	let eventName = message[0];
+	let eventName = message.name;
 
 	if (waitMode === 'fail') {
 		if (

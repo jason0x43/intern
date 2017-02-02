@@ -52,6 +52,7 @@ export default class Runner extends Coverage {
 
 	@eventHandler()
 	coverage(message: CoverageMessage) {
+		console.log('received coverage message:', message);
 		// coverage will be called for the runner host, which has no session ID -- ignore that
 		if (message.sessionId) {
 			const session = this.sessions[message.sessionId || ''];

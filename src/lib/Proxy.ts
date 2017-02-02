@@ -10,6 +10,7 @@ import * as net from 'net';
 import { mixin } from 'dojo-core/lang';
 import { Handle } from 'dojo-interfaces/core';
 import Executor from './executors/Executor';
+import { Message } from './Channel';
 import WebSocket = require('ws');
 
 export default class Proxy implements ProxyProperties {
@@ -35,7 +36,7 @@ export default class Proxy implements ProxyProperties {
 
 	private _codeCache: { [filename: string]: { mtime: number, data: string } };
 
-	private _sessions: { [id: string]: { lastSequence: number, queue: any, listeners: any[] } };
+	private _sessions: { [id: string]: { listeners: ProxyListener[] } };
 
 	constructor(options: ProxyOptions) {
 		mixin(this, options);
@@ -77,6 +78,9 @@ export default class Proxy implements ProxyProperties {
 				this._wsServer.on('connection', client => {
 					this._handleWebSocket(client);
 				});
+				this._wsServer.on('error', error => {
+					this.executor.emit('error', error);
+				});
 			}
 
 			server.listen(this.port, resolve);
@@ -110,7 +114,7 @@ export default class Proxy implements ProxyProperties {
 	/**
 	 * Listen for all events for a specific session
 	 */
-	subscribe(sessionId: string, listener: Function): Handle {
+	subscribe(sessionId: string, listener: ProxyListener): Handle {
 		const listeners = this._getSession(sessionId).listeners;
 		listeners.push(listener);
 		return {
@@ -124,7 +128,7 @@ export default class Proxy implements ProxyProperties {
 	private _getSession(sessionId: string) {
 		let session = this._sessions[sessionId];
 		if (!session) {
-			session = this._sessions[sessionId] = { lastSequence: -1, queue: {}, listeners: [] };
+			session = this._sessions[sessionId] = { listeners: [] };
 		}
 		return session;
 	}
@@ -151,11 +155,17 @@ export default class Proxy implements ProxyProperties {
 
 			request.on('end', () => {
 				try {
-					const messages: Message[] = JSON.parse(data).map(function (messageString: string) {
+					let rawMessages: any = JSON.parse(data);
+
+					if (!Array.isArray(rawMessages)) {
+						rawMessages = [rawMessages];
+					}
+
+					const messages: Message[] = rawMessages.map(function (messageString: string) {
 						return JSON.parse(messageString);
 					});
 
-					this._handleMessages(messages).then(
+					Promise.all(messages.map(message => this._handleMessage(message))).then(
 						() => {
 							response.statusCode = 204;
 							response.end();
@@ -287,68 +297,30 @@ export default class Proxy implements ProxyProperties {
 		});
 	}
 
-	private _handleMessages(messages: Message[]): Promise<any> {
-		const runnerReporterPromise = Promise.all(messages.map((message) => {
-			return this._publishInSequence(message);
-		}));
-
-		let shouldWait = messages.some(message => {
-			return getShouldWait(this.runInSync, message.payload);
-		});
-
-		if (shouldWait) {
-			return runnerReporterPromise;
-		}
-		else {
-			return Promise.resolve();
-		}
+	private _handleMessage(message: Message): Promise<any> {
+		const promise = this._publish(message);
+		let shouldWait = getShouldWait(this.runInSync, message);
+		return shouldWait ? promise : Promise.resolve();
 	}
 
 	private _handleWebSocket(client: WebSocket) {
 		client.on('message', data => {
 			const message: Message = JSON.parse(data);
-			this._handleMessages([message]).catch(console.error).then(() => {
-				client.send(JSON.stringify({ sequence: message.sequence }), error => {
-					if (error) {
-						console.error(error);
-					}
+			this._handleMessage(message)
+				.catch(error => this.executor.emit('error', error))
+				.then(() => {
+					client.send(JSON.stringify({ id: message.id }), error => {
+						if (error) {
+							this.executor.emit('error', error);
+						}
+					});
 				});
-			});
 		});
 	}
 
-	private _publishInSequence(message: Message) {
-		const session = this._getSession(message.sessionId);
-
-		if (message.sequence <= session.lastSequence) {
-			throw new Error('Repeated sequence for session ' + message.sessionId + ': ' + session.lastSequence +
-				' last ' + message.sequence + ' cur');
-		}
-
-		message.promise = new Promise(resolve => {
-			message.resolve = resolve;
-		});
-
-		if (message.sequence > session.lastSequence + 1) {
-			session.queue[message.sequence] = message;
-			return message.promise;
-		}
-
-		let triggerMessage = message;
-
-		do {
-			session.lastSequence = message.sequence;
-			delete session.queue[session.lastSequence];
-
-			if (!message.cancelled) {
-				message.resolve(Promise.all(session.listeners.map(function (listener) {
-					return listener.apply(null, message.payload);
-				})));
-			}
-		}
-		while ((message = session.queue[message.sequence + 1]));
-
-		return triggerMessage.promise;
+	private _publish(message: Message) {
+		const listeners = this._getSession(message.sessionId).listeners;
+		return Promise.all(listeners.map(listener => listener(message.name, message.data)));
 	}
 
 	private _send404(response: http.ServerResponse) {
@@ -371,13 +343,8 @@ export interface ProxyProperties {
 	socketPort: number;
 };
 
-export type ProxyOptions = Partial<ProxyProperties> & { executor: Executor };
-
-interface Message {
-	sessionId: string;
-	sequence: number;
-	cancelled: boolean;
-	payload: string;
-	promise: Promise<any>;
-	resolve: (value?: any) => void;
+export interface ProxyListener {
+	(name: string, data: any): void;
 }
+
+export type ProxyOptions = Partial<ProxyProperties> & { executor: Executor };
