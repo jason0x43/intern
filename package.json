@@ -86,10 +86,8 @@
       "src": [
         "tests/example.intern.js"
       ],
-      "browser": [
-        "client.html"
-	  ],
       ".": [
+        "browser/remote.html",
         "src/**/*.d.ts",
         "src/**/*.css",
         "tests/**/*.xml",
@@ -97,6 +95,20 @@
         "tests/**/*.html"
       ]
     },
+	"browserify": {
+	  "browser/browser.js": [
+	    "src/browser.js"
+	  ],
+	  "browser/remote.js": [
+		"src/remote.js"
+	  ],
+	  "browser/scripts/dojo.js": [
+		"src/scripts/dojo.js"
+	  ],
+	  "browser/tests/unit/all.js": [
+		"tests/unit/all.js"
+	  ]
+	},
     "testConfig": "tests/selftest.intern.js"
   }
 }

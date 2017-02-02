@@ -1,19 +1,14 @@
 import browserify = require('browserify');
 import { echo, mkdir, test } from 'shelljs';
-import { buildDir } from 'intern-dev/common';
+import { buildDir, internDev } from 'intern-dev/common';
 import { dirname, join } from 'path';
 import { writeFileSync } from 'fs';
 import { red } from 'chalk';
 
-const srcDir = join(buildDir, 'src');
-const dstDir = join(buildDir, 'browser');
-
-const testDir = join(buildDir, 'tests');
-const testDstDir = join(buildDir, 'browser', 'tests');
-
 echo('## Browserifying');
 
-function bundle(files: string | string[], output: string) {
+function bundle(files: string[], output: string) {
+	files = files.map(file => join(buildDir, file));
 	const b = browserify(files);
 	return new Promise((resolve, reject) => {
 		b.bundle((error, data) => {
@@ -25,6 +20,7 @@ function bundle(files: string | string[], output: string) {
 			}
 		});
 	}).then(data => {
+		output = join(buildDir, output);
 		const outputDir = dirname(output);
 		if (!test('-d', outputDir)) {
 			mkdir('-p', outputDir);
@@ -33,25 +29,15 @@ function bundle(files: string | string[], output: string) {
 	});
 }
 
-(async function () {
-	let exitCode = 0;
+let exitCode = 0;
+const bundles = internDev.browserify;
 
-	try {
-		if (!test('-d', dstDir)) {
-			mkdir('-p', dstDir);
-		}
-
-		await bundle(join(srcDir, 'browser.js'), join(dstDir, 'browser.js'));
-		await bundle(join(srcDir, 'scripts', 'client.js'), join(dstDir, 'scripts', 'client.js'));
-		await bundle(join(srcDir, 'scripts', 'dojo.js'), join(dstDir, 'scripts', 'dojo.js'));
-		await bundle(join(testDir, 'unit', 'all.js'), join(testDstDir, 'unit', 'all.js'));
-	}
-	catch (error) {
-		echo(red(error));
-		exitCode = 1;
-	}
-	finally {
-		echo('## Done Browserifying');
-		process.exit(exitCode);
-	}
-})();
+Promise.all(Object.keys(bundles).map(async (outFile) => {
+	return bundle(bundles[outFile], outFile);
+})).catch (error => {
+	echo(red(error));
+	exitCode = 1;
+}).then(() => {
+	echo('## Done Browserifying');
+	process.exit(exitCode);
+});
