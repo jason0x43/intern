@@ -9,6 +9,7 @@ import Reporter, { ReporterOptions } from '../reporters/Reporter';
 import getObjectInterface, { ObjectInterface } from '../interfaces/object';
 import getTddInterface, { TddInterface } from '../interfaces/tdd';
 import getBddInterface, { BddInterface } from '../interfaces/bdd';
+import * as chai from 'chai';
 import global from 'dojo-core/global';
 
 export abstract class GenericExecutor<E extends Events, C extends Config> {
@@ -121,6 +122,25 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		return Task.resolve(Promise.all(notifications)).catch(error => {
 			console.error(`Error emitting ${eventName}: ${this.formatter.format(error)}`);
 		});
+	}
+
+	getAssertions(name: 'chai'): Chai.ChaiStatic;
+	getAssertions(name: 'assert'): Chai.AssertStatic;
+	getAssertions(name: 'expect'): Chai.ExpectStatic;
+	getAssertions(name: 'should'): Chai.Should;
+	getAssertions(name: string): any {
+		switch (name) {
+			case 'chai':
+				return chai;
+			case 'assert':
+				return chai.assert;
+			case 'expect':
+				return chai.expect;
+			case 'should':
+				return chai.should();
+			default:
+				throw new Error(`Invalid assertion name ${name}`);
+		}
 	}
 
 	/**

@@ -1,8 +1,8 @@
-import { assert } from 'chai';
 import ProxiedSession from '../../../src/lib/ProxiedSession';
 import Server = require('leadfoot/Server');
 
 const { registerSuite } = intern.getInterface('object');
+const assert = intern.getAssertions('assert');
 
 registerSuite(function () {
 	const proxyUrl = 'https://example.invalid/';

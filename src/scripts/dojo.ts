@@ -13,12 +13,7 @@ if (!Array.isArray(suites)) {
 loadScript('node_modules/dojo-loader/loader.js', intern.config.basePath).then(() => {
 	intern.debug('Loaded dojo loader');
 	const loader = global.require;
-	const config = {
-		baseUrl: intern.config.basePath,
-		packages: [
-			{ name: 'chai', location: 'node_modules/chai', main: 'chai' }
-		]
-	};
+	const config = { baseUrl: intern.config.basePath };
 	intern.debug(`Loader config: ${JSON.stringify(config)}`);
 	loader.config(config);
 
