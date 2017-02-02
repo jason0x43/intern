@@ -7,7 +7,6 @@ import { InternError } from '../intern';
 import WebDriver, { Events } from './executors/WebDriver';
 import Proxy from './Proxy';
 import { Handle } from 'dojo-interfaces/core';
-import { inspect } from 'util';
 import { RemoteParams } from '../remote';
 
 /**
@@ -71,10 +70,6 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 					contactTimer = false;
 
 					switch (name) {
-						case 'debug':
-							process.stderr.write('DEBUG: ' + inspect(data, { colors: true }) + '\n');
-							break;
-
 						case 'suiteStart':
 							suite = data;
 							if (!suite.hasParent) {
@@ -157,7 +152,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 					suites: this.suites
 				};
 
-				if (process.env['INTERN_DEBUG'] === '1') {
+				if (this.executor.config.debug) {
 					options.debug = true;
 				}
 

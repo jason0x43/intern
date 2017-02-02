@@ -9,12 +9,15 @@ import { lookup } from 'mime-types';
 import * as net from 'net';
 import { mixin } from 'dojo-core/lang';
 import { Handle } from 'dojo-interfaces/core';
+import Executor from './executors/Executor';
 import WebSocket = require('ws');
 
 export default class Proxy implements ProxyProperties {
 	basePath: string;
 
 	excludeInstrumentation: boolean | RegExp;
+
+	executor: Executor;
 
 	instrument: boolean;
 
@@ -34,7 +37,7 @@ export default class Proxy implements ProxyProperties {
 
 	private _sessions: { [id: string]: { lastSequence: number, queue: any, listeners: any[] } };
 
-	constructor(options: ProxyOptions = {}) {
+	constructor(options: ProxyOptions) {
 		mixin(this, options);
 	}
 
@@ -208,9 +211,7 @@ export default class Proxy implements ProxyProperties {
 
 		wholePath = normalizePath(wholePath);
 
-		if (process.env['INTERN_DEBUG'] === '1') {
-			process.stderr.write(`DEBUG: serving ${file} from ${wholePath}\n`);
-		}
+		this.executor.emit('debug', `serving ${file} from ${wholePath}`);
 
 		if (wholePath.charAt(wholePath.length - 1) === '/') {
 			wholePath += 'index.html';
@@ -362,6 +363,7 @@ export default class Proxy implements ProxyProperties {
 export interface ProxyProperties {
 	basePath: string;
 	excludeInstrumentation: boolean | RegExp;
+	executor: Executor;
 	instrument: boolean;
 	instrumenterOptions: any;
 	port: number;
@@ -369,7 +371,7 @@ export interface ProxyProperties {
 	socketPort: number;
 };
 
-export type ProxyOptions = Partial<ProxyProperties>;
+export type ProxyOptions = Partial<ProxyProperties> & { executor: Executor };
 
 interface Message {
 	sessionId: string;

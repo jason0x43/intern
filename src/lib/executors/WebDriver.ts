@@ -175,15 +175,18 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 	 * data back from the remote environment.
 	 */
 	protected _createProxy() {
-		return new Proxy({
+		// Need an explicitly declared variable for typing
+		const proxy: Proxy = new Proxy({
 			basePath: this.config.basePath,
 			instrumenterOptions: this.config.instrumenterOptions,
 			excludeInstrumentation: this.config.excludeInstrumentation,
+			executor: this,
 			instrument: true,
 			port: this.config.proxyPort,
 			runInSync: this.config.runInSync,
 			socketPort: this.config.socketPort
 		});
+		return proxy;
 	}
 
 	/**

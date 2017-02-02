@@ -301,6 +301,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			case 'bail':
 			case 'baseline':
 			case 'benchmark':
+			case 'debug':
 			case 'filterErrorStack':
 				if (typeof value === 'boolean') {
 					this.config[name] = value;
@@ -441,6 +442,7 @@ export interface Config {
 		};
 		verbosity: number;
 	};
+	debug?: boolean;
 	defaultTimeout?: number;
 	excludeInstrumentation?: true | RegExp;
 	filterErrorStack?: boolean;
@@ -476,6 +478,7 @@ export interface ExecutorEvent {
 
 export interface Events {
 	'*': ExecutorEvent;
+	debug: any;
 	newSuite: Suite;
 	newTest: Test;
 	error: Error;
