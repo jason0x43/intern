@@ -52,7 +52,6 @@ export default class Runner extends Coverage {
 
 	@eventHandler()
 	coverage(message: CoverageMessage) {
-		console.log('received coverage message:', message);
 		// coverage will be called for the runner host, which has no session ID -- ignore that
 		if (message.sessionId) {
 			const session = this.sessions[message.sessionId || ''];
@@ -106,19 +105,23 @@ export default class Runner extends Coverage {
 	@eventHandler()
 	runEnd() {
 		let collector = new Collector();
-		let numEnvironments = 0;
 		let numTests = 0;
 		let numFailedTests = 0;
 		let numSkippedTests = 0;
 
-		for (let sessionId in this.sessions) {
-			let session = this.sessions[sessionId];
-			session.coverage && collector.add(session.coverage.getFinalCoverage());
-			++numEnvironments;
+		const sessionIds = Object.keys(this.sessions);
+		const numEnvironments = sessionIds.length;
+
+		sessionIds.forEach(sessionId => {
+			const session = this.sessions[sessionId];
+			if (session.coverage) {
+				const finalCoverage = session.coverage.getFinalCoverage();
+				collector.add(finalCoverage);
+			}
 			numTests += session.suite.numTests;
 			numFailedTests += session.suite.numFailedTests;
 			numSkippedTests += session.suite.numSkippedTests;
-		}
+		});
 
 		// add a newline between test results and coverage results for prettier output
 		this.charm.write('\n');

@@ -48,6 +48,10 @@ export default class Remote extends GenericBrowser<Events, Config> {
 		return Task.all(this._initializers);
 	}
 
+	protected _emitCoverage(coverage: any) {
+		return this.emit('coverage', { sessionId: this.config.sessionId, coverage });
+	}
+
 	protected _getThisPath() {
 		const scripts = document.getElementsByTagName('script');
 		let script: HTMLScriptElement;

@@ -286,6 +286,10 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		return Task.resolve();
 	}
 
+	protected _emitCoverage(coverage: any) {
+		return this.emit('coverage', { coverage });
+	}
+
 	/**
 	 * Return a reporter constructor corresponding to the given name
 	 */
@@ -413,7 +417,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		return this._rootSuite.run().finally(() => {
 			const coverage = global[this.config.instrumenterOptions.coverageVariable];
 			if (coverage) {
-				return this.emit('coverage', { coverage });
+				return this._emitCoverage(coverage);
 			}
 		});
 	}

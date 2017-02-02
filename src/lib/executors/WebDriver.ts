@@ -386,7 +386,6 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		return Task.all(rootSuites.map(suite => {
 			return queue.enqueue(() => {
 				return suite.run().finally(() => {
-					console.log('suite finished');
 					numSuitesCompleted++;
 					if (numSuitesCompleted === numSuitesToRun) {
 						const coverage = global[this.config.instrumenterOptions.coverageVariable];
