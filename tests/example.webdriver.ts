@@ -15,7 +15,8 @@ initialize(WebDriver, {
 	tunnelOptions: { drivers: [ browser ] },
 	socketPort: 9001,
 	loaderScript: '_build/browser/scripts/dojo.js',
-	suites: ['../tests/unit/lib/EnvironmentType.js'],
+	suites: ['_build/tests/unit/lib/EnvironmentType.js'],
+	excludeInstrumentation: /(?:node_modules|browser|tests)\//,
 	debug
 });
 

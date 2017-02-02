@@ -63,22 +63,17 @@ try {
 	});
 
 	intern.debug('Configured intern');
-	let loadPromise: Promise<any>;
 
 	if (loaderScript) {
 		intern.debug(`Loading loader script ${loaderScript}`);
-		loadPromise = loadScript(loaderScript, config.basePath);
+		loadScript(loaderScript, config.basePath).catch(sendError);
 	}
 	else {
 		intern.debug(`Loading suites ${JSON.stringify(suites)}`);
-		loadPromise = Promise.all(suites.map(suite => {
+		Promise.all(suites.map(suite => {
 			loadScript(suite, config.basePath);
-		}));
+		})).then(() => intern.run()).catch(sendError);
 	}
-
-	loadPromise.then(() => intern.run())
-		.then(() => intern.debug('Finished intern'))
-		.catch(sendError);
 }
 catch (error) {
 	sendError(error);

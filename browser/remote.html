@@ -2,6 +2,11 @@
 <html>
 	<head>
 		<meta charset="utf-8">
+		<title>Intern</title>
+
+		<!-- Set the base URL to the root of Intern -->
+		<base href="../">
+
 		<!-- Hey you, listen up:
 	    ____             _  __     __                   __
 	   / __ \____  ____ ( )/ /_   / /_____  __  _______/ /_
@@ -14,10 +19,9 @@
 	/ /_/ / / / (__  )  / __/ / /  __/_/  add things to the page, do it from the `setup` or `before` method
 	\__/_/ /_/_/____/  /_/ /_/_/\___(_)  of the test suite that needs those things. NEVER do it here!
 		-->
-		<title>Intern</title>
 	</head>
 	<body>
 		<!-- Load intern code in the body because Html reporter needs a DOM -->
-		<script src="remote.js"></script>
+		<script src="browser/remote.js"></script>
 	</body>
 </html>

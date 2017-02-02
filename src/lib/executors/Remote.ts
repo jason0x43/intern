@@ -22,13 +22,6 @@ export default class Remote extends GenericBrowser<Events, Config> {
 	}
 
 	/**
-	 * Add an intializer promise to Intern.
-	 */
-	addInitializer(promise: Promise<any>) {
-		this._initializers.push(promise);
-	}
-
-	/**
 	 * Send debug messages to the Intern host
 	 */
 	debug(data: any) {
@@ -37,18 +30,7 @@ export default class Remote extends GenericBrowser<Events, Config> {
 		}
 	}
 
-	run() {
-		return this.waitForInitializers().then(() => super.run());
-	}
-
-	/**
-	 * Return a Task that resolves when all initializers have completed.
-	 */
-	waitForInitializers() {
-		return Task.all(this._initializers);
-	}
-
-	protected _emitCoverage(coverage: any) {
+	protected _emitCoverage(coverage: any): Task<any> {
 		return this.emit('coverage', { sessionId: this.config.sessionId, coverage });
 	}
 

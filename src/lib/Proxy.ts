@@ -3,7 +3,7 @@ import { normalizePath } from './node/util';
 import { instrument } from './instrument';
 import * as aspect from 'dojo-core/aspect';
 import * as http from 'http';
-import * as path from 'path';
+import { basename, join, resolve } from 'path';
 import * as fs from 'fs';
 import { lookup } from 'mime-types';
 import * as net from 'net';
@@ -210,18 +210,20 @@ export default class Proxy implements ProxyProperties {
 		// require.toUrl since we can't get at the implicit module path, but it will at least allow users to use paths
 		// relative to a known and standard base.
 
+		this.executor.emit('debug', `request for ${file}`);
+
 		if (/^__intern\//.test(file)) {
-			const basePath = path.resolve(path.join(__dirname, '../..'));
-			wholePath = path.join(basePath, file.replace(/^__intern\//, ''));
+			const basePath = resolve(join(__dirname, '../..'));
+			wholePath = join(basePath, file.replace(/^__intern\//, ''));
 			shouldInstrument = false;
 		}
 		else {
-			wholePath = path.join(this.basePath, file);
+			wholePath = resolve(join(this.basePath, file));
 		}
 
 		wholePath = normalizePath(wholePath);
 
-		this.executor.emit('debug', `serving ${file} from ${wholePath}`);
+		this.executor.emit('debug', `serving ${wholePath}`);
 
 		if (wholePath.charAt(wholePath.length - 1) === '/') {
 			wholePath += 'index.html';
@@ -236,7 +238,7 @@ export default class Proxy implements ProxyProperties {
 			shouldInstrument = false;
 		}
 
-		const contentType = lookup(path.basename(wholePath)) || 'application/octet-stream';
+		const contentType = lookup(basename(wholePath)) || 'application/octet-stream';
 		fs.stat(wholePath, (error, stats) => {
 			// The proxy server was stopped before this file was served
 			if (!this.server) {

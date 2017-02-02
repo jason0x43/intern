@@ -104,9 +104,6 @@
 	  ],
 	  "browser/scripts/dojo.js": [
 		"src/scripts/dojo.js"
-	  ],
-	  "browser/tests/unit/all.js": [
-		"tests/unit/all.js"
 	  ]
 	},
     "testConfig": "tests/selftest.intern.js"

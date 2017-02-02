@@ -54,10 +54,6 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 		super(deepMixin(defaults, config));
 
-		if (typeof this.config.excludeInstrumentation === 'undefined') {
-			this.config.excludeInstrumentation = /(?:node_modules|tests)\//;
-		}
-
 		this._formatter = new Formatter(config);
 	}
 

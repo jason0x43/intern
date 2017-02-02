@@ -338,8 +338,11 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 				else if (typeof value === 'string') {
 					this.config[name] = new RegExp(value);
 				}
+				else if (value instanceof RegExp) {
+					this.config[name] = value;
+				}
 				else {
-					throw new Error(`Invalid numeric value "${value}" for ${name}`);
+					throw new Error(`Invalid value "${value}" for ${name}; must be (string | RegExp | true)`);
 				}
 				break;
 
