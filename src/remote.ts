@@ -60,9 +60,6 @@ catch (error) {
 }
 
 try {
-	intern.debug('Params:', params);
-	intern.debug('Initialized intern');
-
 	// Forward all executor events back to the Intern host
 	intern.on('*', data => {
 		let promise = intern.channel.sendMessage(data.name, data.data).catch(console.error);
@@ -71,8 +68,11 @@ try {
 		}
 	});
 
-	intern.debug('Using loader script', loader);
-	intern.debug('Intern base path:', intern.internBasePath);
+	intern.log('Params:', params);
+	intern.log('Initialized intern');
+
+	intern.log('Using loader script', loader);
+	intern.log('Intern base path:', intern.internBasePath);
 
 	switch (loader) {
 		case 'dojo':

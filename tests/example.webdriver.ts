@@ -1,7 +1,6 @@
 // Import the proper executor for the current environment
 import WebDriver from '../src/lib/executors/WebDriver';
 import initialize from '../src/intern';
-import { inspect } from 'util';
 
 const browser = 'firefox';
 const debug = process.env['INTERN_DEBUG'] != null;
@@ -33,8 +32,8 @@ initialize(WebDriver, {
 require('./functional/lib/ProxiedSession');
 
 if (debug) {
-	intern.on('debug', data => {
-		process.stderr.write('DEBUG: ' + inspect(data, { colors: true }) + '\n');
+	intern.on('log', message => {
+		process.stderr.write(`DEBUG: ${message}\n`);
 	});
 }
 

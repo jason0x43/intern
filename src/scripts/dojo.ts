@@ -22,16 +22,16 @@ if (!loaderConfig.baseUrl) {
 const loader = `${intern.basePath}node_modules/dojo-loader/loader.js`;
 
 intern.loadScript(loader).then(() => {
-	intern.debug('Loaded dojo loader');
+	intern.log('Loaded dojo loader');
 
 	const loader = global.require;
 	loader.on('error', (error: Error) => intern.emit('error', error));
 
-	intern.debug('Loader config:', loaderConfig);
+	intern.log('Loader config:', loaderConfig);
 	loader.config(loaderConfig);
 
-	intern.debug('Loading suites:', suites);
-	intern.debug('Using loader', loader);
+	intern.log('Loading suites:', suites);
+	intern.log('Using loader', loader);
 	loader(suites, () => intern.run());
 }).catch(error => {
 	intern.emit('error', error);

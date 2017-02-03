@@ -26,28 +26,6 @@ export default class Remote extends GenericBrowser<Events, Config> {
 	}
 
 	/**
-	 * Send debug messages to the Intern host
-	 */
-	debug(...args: any[]) {
-		if (this._debug && this.channel) {
-			const message = args.map(arg => {
-				const type = typeof arg;
-				if (type === 'string') {
-					return arg;
-				}
-				if (type === 'function' || arg instanceof RegExp) {
-					return arg.toString();
-				}
-				if (arg instanceof Error) {
-					arg = { name: arg.name, message: arg.message, stack: arg.stack };
-				}
-				return JSON.stringify(arg);
-			}).join(' ');
-			return this.channel.sendMessage('debug', message);
-		}
-	}
-
-	/**
 	 * Parse query params into an object
 	 */
 	getQueryParams(query?: string) {

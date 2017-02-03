@@ -71,6 +71,25 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	}
 
 	/**
+	 * Add a test or suite of tests.
+	 */
+	addTest(suiteOrTest: Suite | Test | SuiteOptions | TestOptions) {
+		// Check if suiteOrTest is an instance or a simple Object
+		if (!(suiteOrTest instanceof Test) && !(suiteOrTest instanceof Suite)) {
+			if (isTestOptions(suiteOrTest)) {
+				suiteOrTest = new Test(suiteOrTest);
+			}
+			else if (isSuiteOptions(suiteOrTest)) {
+				suiteOrTest = new Suite(suiteOrTest);
+			}
+			else {
+				throw new Error('InvalidTest: argument is not a valid suite or test');
+			}
+		}
+		this._rootSuite.add(<Suite | Test>suiteOrTest);
+	}
+
+	/**
 	 * Update this executor's configuration with a Config object or a general args object.
 	 *
 	 * Note that non-object properties will replace existing properties. Object propery values will be deeply mixed into
@@ -171,12 +190,25 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	}
 
 	/**
-	 * Register a testing interface on this executor. A testing interface can be anything that will allow a test to
-	 * register tests on the executor. For example, the 'object' interface is a single method, `registerSuite`, that a
-	 * test can call to register a suite.
+	 * Convenience method for emitting log events
 	 */
-	setInterface(name: string, iface: any) {
-		this._interfaces[name] = iface;
+	log(...args: any[]) {
+		if (this.config.debug) {
+			const message = args.map(arg => {
+				const type = typeof arg;
+				if (type === 'string') {
+					return arg;
+				}
+				if (type === 'function' || arg instanceof RegExp) {
+					return arg.toString();
+				}
+				if (arg instanceof Error) {
+					arg = { name: arg.name, message: arg.message, stack: arg.stack };
+				}
+				return JSON.stringify(arg);
+			}).join(' ');
+			this.emit('log', message);
+		}
 	}
 
 	/**
@@ -200,25 +232,6 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			}
 		};
 		return handle;
-	}
-
-	/**
-	 * Add a test or suite of tests.
-	 */
-	addTest(suiteOrTest: Suite | Test | SuiteOptions | TestOptions) {
-		// Check if suiteOrTest is an instance or a simple Object
-		if (!(suiteOrTest instanceof Test) && !(suiteOrTest instanceof Suite)) {
-			if (isTestOptions(suiteOrTest)) {
-				suiteOrTest = new Test(suiteOrTest);
-			}
-			else if (isSuiteOptions(suiteOrTest)) {
-				suiteOrTest = new Suite(suiteOrTest);
-			}
-			else {
-				throw new Error('InvalidTest: argument is not a valid suite or test');
-			}
-		}
-		this._rootSuite.add(<Suite | Test>suiteOrTest);
 	}
 
 	/**
@@ -247,6 +260,15 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		this.run = () => promise;
 
 		return promise;
+	}
+
+	/**
+	 * Register a testing interface on this executor. A testing interface can be anything that will allow a test to
+	 * register tests on the executor. For example, the 'object' interface is a single method, `registerSuite`, that a
+	 * test can call to register a suite.
+	 */
+	setInterface(name: string, iface: any) {
+		this._interfaces[name] = iface;
 	}
 
 	/**
@@ -505,16 +527,16 @@ export interface ExecutorEvent {
 
 export interface Events {
 	'*': ExecutorEvent;
-	debug: any;
-	newSuite: Suite;
-	newTest: Test;
-	error: Error;
-	testStart: Test;
-	testEnd: Test;
-	suiteStart: Suite;
-	suiteEnd: Suite;
-	runStart: never;
-	runEnd: never;
 	coverage: CoverageMessage;
 	deprecated: DeprecationMessage;
+	error: Error;
+	log: string;
+	newSuite: Suite;
+	newTest: Test;
+	runEnd: never;
+	runStart: never;
+	suiteEnd: Suite;
+	suiteStart: Suite;
+	testEnd: Test;
+	testStart: Test;
 };

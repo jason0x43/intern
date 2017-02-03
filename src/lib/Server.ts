@@ -210,7 +210,7 @@ export default class Server implements ServerProperties {
 		// require.toUrl since we can't get at the implicit module path, but it will at least allow users to use paths
 		// relative to a known and standard base.
 
-		this.executor.emit('debug', `Request for ${file}`);
+		this.executor.log('Request for', file);
 
 		if (/^__intern\//.test(file)) {
 			const basePath = resolve(join(__dirname, '../..'));
@@ -244,12 +244,12 @@ export default class Server implements ServerProperties {
 			}
 
 			if (error) {
-				this.executor.emit('debug', `Unable to serve ${wholePath}`);
+				this.executor.log('Unable to serve', wholePath);
 				this._send404(response);
 				return;
 			}
 
-			this.executor.emit('debug', `Serving ${wholePath}`);
+			this.executor.log('Serving', wholePath);
 
 			if (shouldInstrument) {
 				const mtime = stats.mtime.getTime();
@@ -301,6 +301,7 @@ export default class Server implements ServerProperties {
 	}
 
 	private _handleMessage(message: Message): Promise<any> {
+		this.executor.log('Received message:', message);
 		const promise = this._publish(message);
 		let shouldWait = getShouldWait(this.runInSync, message);
 		return shouldWait ? promise : Promise.resolve();

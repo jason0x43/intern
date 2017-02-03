@@ -8,7 +8,7 @@ if (!Array.isArray(suites)) {
 	suites = [suites];
 }
 
-intern.debug('Loading suites', suites);
+intern.log('Loading suites', suites);
 
 // TODO: suites will come from the user, and should be relative to the project root. loadScript loads relative to
 // Intern's root. Reconcile these.
