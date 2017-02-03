@@ -177,7 +177,7 @@ export default class Html extends Reporter implements HtmlProperties {
 
 		const link = document.createElement('link');
 		link.rel = 'stylesheet';
-		link.href = '../src/lib/reporters/html/html.css';
+		link.href = this.executor.internBasePath + 'src/lib/reporters/html/html.css';
 
 		document.head.appendChild(style);
 		document.head.appendChild(link);

@@ -5,13 +5,13 @@
 	</head>
 
 	<body>
-		<script src="../../_build/browser/browser.js"></script>
+		<script src="../browser/browser.js"></script>
 		<script>
 			intern.configure({ reporters: [ 'console' ] });
 		</script>
 		<script src="../../node_modules/dojo-loader/loader.js"></script>
 		<script>
-			require([ '../../_build/tests/unit/all' ], function () {
+			require([ './unit/all' ], function () {
 				intern.run();
 			});
 		</script>

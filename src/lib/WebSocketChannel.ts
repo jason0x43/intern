@@ -30,7 +30,6 @@ export default class WebSocketChannel extends Channel {
 
 			return this._ready.then(() => {
 				return new Promise(resolve => {
-					console.log(`sending [${message.id}] ${message.name}`);
 					this._socket.send(JSON.stringify(message));
 					this._sendQueue[id] = resolve;
 				});
@@ -42,7 +41,6 @@ export default class WebSocketChannel extends Channel {
 	}
 
 	protected _handleMessage(message: any) {
-		console.log(`handling response for ${message.id}`);
 		const id = message.id;
 		this._sendQueue[id]();
 		this._sendQueue[id] = null;

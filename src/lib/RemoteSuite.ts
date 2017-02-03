@@ -17,7 +17,9 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 
 	executor: WebDriver;
 
-	loaderScript: string;
+	loader: string;
+
+	loaderConfig: { [key: string]: any };
 
 	server: Server;
 
@@ -145,14 +147,17 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 
 				const options: RemoteParams = {
 					basePath: serverUrlPath,
-					// initialBaseUrl: serverBasePath + relative(config.basePath, process.cwd()),
 					name: this.id,
 					sessionId: sessionId,
 					suites: this.suites
 				};
 
-				if (this.loaderScript) {
-					options.loaderScript = this.loaderScript;
+				if (this.loaderConfig) {
+					options.loaderConfig = JSON.stringify(this.loaderConfig);
+				}
+
+				if (this.loader) {
+					options.loader = this.loader;
 				}
 
 				if (this.executor.config.debug) {
@@ -200,7 +205,8 @@ export interface RemoteSuiteProperties extends SuiteProperties {
 	/** Time to wait for contact from remote server */
 	contactTimeout: number;
 
-	loaderScript: string;
+	loader: string;
+	loaderConfig: { [key: string]: any };
 	server: Server;
 
 	/** If true, the remote suite will wait for ackowledgements from the host for runtime events. */

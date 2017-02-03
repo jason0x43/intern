@@ -1,14 +1,15 @@
-import { getQueryParams, loadScript } from './scripts/util';
 import Remote, { Config } from './lib/executors/Remote';
 import initialize from './intern';
 import Channel from './lib/WebSocketChannel';
 
 declare let intern: Remote;
 
+initialize(Remote);
+
 export interface RemoteParams extends Config {
 	debug?: boolean;
-	// initialBaseUrl: string;
-	loaderScript?: string;
+	loader?: string;
+	loaderConfig?: any;
 	name: string;
 	runInSync?: boolean;
 	sessionId: string;
@@ -16,10 +17,10 @@ export interface RemoteParams extends Config {
 	suites: string[];
 }
 
-let loaderScript;
+let loader;
 let runInSync: boolean;
 
-const params: RemoteParams = <any>getQueryParams();
+const params: RemoteParams = <any>intern.getQueryParams();
 const config: Config = {
 	channel: new Channel({ url: params.basePath, sessionId: params.sessionId, port: params.socketPort })
 };
@@ -30,12 +31,13 @@ try {
 		const value = params[name];
 
 		switch (name) {
-			case 'loaderScript':
-				loaderScript = <string>value;
+			case 'loader':
+				loader = <string>value;
 				break;
 			case 'runInSync':
 				runInSync = <boolean>value;
 				break;
+			case 'loaderConfig':
 			case 'socketPort':
 			case 'suites':
 				break;
@@ -45,10 +47,11 @@ try {
 		}
 	});
 
-	initialize(Remote, config);
+	intern.configure(config);
 
-	if (!loaderScript) {
-		loaderScript = 'browser/scripts/script.js';
+	if (!loader) {
+		// Path is relative to Intern root
+		loader = 'script';
 	}
 }
 catch (error) {
@@ -57,20 +60,28 @@ catch (error) {
 }
 
 try {
-	intern.debug(`Params: ${JSON.stringify(params)}`);
+	intern.debug('Params:', params);
 	intern.debug('Initialized intern');
 
 	// Forward all executor events back to the Intern host
 	intern.on('*', data => {
-		intern.debug(data);
 		let promise = intern.channel.sendMessage(data.name, data.data).catch(console.error);
 		if (runInSync) {
 			return promise;
 		}
 	});
 
-	intern.debug(`Using loader script ${loaderScript}`);
-	loadScript(loaderScript).catch(error => {
+	intern.debug('Using loader script', loader);
+	intern.debug('Intern base path:', intern.internBasePath);
+
+	switch (loader) {
+		case 'dojo':
+		case 'script':
+			loader = `${intern.internBasePath}/browser/scripts/${loader}.js`;
+			break;
+	}
+
+	intern.loadScript(loader).catch(error => {
 		intern.emit('error', error);
 	});
 }

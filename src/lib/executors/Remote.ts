@@ -21,12 +21,29 @@ export default class Remote extends GenericBrowser<Events, Config> {
 		return this._channel;
 	}
 
+	get scriptName() {
+		return '/browser/remote.js';
+	}
+
 	/**
 	 * Send debug messages to the Intern host
 	 */
-	debug(data: any) {
+	debug(...args: any[]) {
 		if (this._debug && this.channel) {
-			return this.channel.sendMessage('debug', data);
+			const message = args.map(arg => {
+				const type = typeof arg;
+				if (type === 'string') {
+					return arg;
+				}
+				if (type === 'function' || arg instanceof RegExp) {
+					return arg.toString();
+				}
+				if (arg instanceof Error) {
+					arg = { name: arg.name, message: arg.message, stack: arg.stack };
+				}
+				return JSON.stringify(arg);
+			}).join(' ');
+			return this.channel.sendMessage('debug', message);
 		}
 	}
 
@@ -46,16 +63,25 @@ export default class Remote extends GenericBrowser<Events, Config> {
 			};
 		});
 
-		const params: { [key: string]: string | boolean | (string | boolean)[] } = {};
+		const params: { [key: string]: any } = {};
 		rawParams.forEach(({ name, value }) => {
+			try {
+				if (typeof value === 'string') {
+					value = JSON.parse(value);
+				}
+			}
+			catch (_error) {
+				// ignore
+			}
+
 			if (!(name in params)) {
 				params[name] = value;
 			}
 			else if (!Array.isArray(params[name])) {
-				params[name] = [<string | boolean>params[name], value];
+				params[name] = [params[name], value];
 			}
 			else {
-				(<(string | boolean)[]>params[name]).push(value);
+				params[name].push(value);
 			}
 		});
 
@@ -63,9 +89,16 @@ export default class Remote extends GenericBrowser<Events, Config> {
 	}
 
 	/**
-	 * Load a script via script injection
+	 * Load a script via script injection.
+	 *
+	 * @param script an absolute path to a script (e.g., `intern.basePath + 'somedir/script.js'`)
 	 */
 	loadScript(script: string) {
+		// If script isn't absolute, assume it's relative to basePath
+		if (script[0] !== '/') {
+			script = this.basePath + script;
+		}
+
 		return new Promise((resolve, reject) => {
 			const scriptTag = document.createElement('script');
 			scriptTag.addEventListener('load', resolve);
@@ -80,17 +113,6 @@ export default class Remote extends GenericBrowser<Events, Config> {
 
 	protected _emitCoverage(coverage: any): Task<any> {
 		return this.emit('coverage', { sessionId: this.config.sessionId, coverage });
-	}
-
-	protected _getThisPath() {
-		const scripts = document.getElementsByTagName('script');
-		let script: HTMLScriptElement;
-		for (let i = 0; i < scripts.length; i++) {
-			script = scripts[i];
-			if (/\/remote\.js$/.test(script.src)) {
-				return script.src;
-			}
-		}
 	}
 
 	protected _processOption(name: keyof Config, value: any) {
@@ -116,6 +138,7 @@ export default class Remote extends GenericBrowser<Events, Config> {
 				this._debug = value;
 				break;
 
+			case 'internBasePath':
 			case 'sessionId':
 				if (typeof value !== 'string') {
 					throw new Error(`${name} must be a string`);
@@ -135,5 +158,6 @@ export { Events }
 export interface Config extends BaseConfig {
 	channel?: Channel;
 	debug?: boolean;
+	internBasePath?: string;
 	sessionId?: string;
 }

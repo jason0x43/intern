@@ -282,8 +282,9 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 						contactTimeout: config.contactTimeout,
 						name: 'unit tests',
 						suites: config.suites,
-						loaderScript: config.loaderScript,
-						server: server
+						loader: config.loader,
+						loaderConfig: config.loaderConfig,
+						server
 					}));
 				}
 
@@ -304,16 +305,21 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 	protected _processOption(name: keyof Config, value: any) {
 		switch (name) {
 			case 'basePath':
-			case 'loaderScript':
+			case 'loader':
 			case 'serverUrl':
 				if (typeof value !== 'string') {
 					throw new Error(`Non-string value "${value}" for ${name}`);
+				}
+				// Ensure basePath ends with a '/'
+				if (name === 'basePath' && value[value.length - 1] !== '/') {
+					value += '/';
 				}
 				this.config[name] = value;
 				break;
 
 			case 'capabilities':
 			case 'environments':
+			case 'loaderConfig':
 			case 'tunnelOptions':
 				if (typeof value !== 'object') {
 					throw new Error(`Non-object value "${value}" for ${name}`);
@@ -417,7 +423,8 @@ export interface Config extends BaseConfig {
 	environments: any[];
 	environmentRetries?: number;
 	leaveRemoteOpen?: boolean | 'fail';
-	loaderScript?: string;
+	loader?: string;
+	loaderConfig?: { [key: string]: any };
 	maxConcurrency?: number;
 	serveOnly?: boolean;
 	serverPort?: number;
@@ -425,7 +432,6 @@ export interface Config extends BaseConfig {
 	runInSync?: boolean;
 	socketPort?: number;
 	tunnel?: TunnelNames | typeof Tunnel;
-	// TODO: The type of tunnelOptions should be dependendant on the tunnel class
 	tunnelOptions?: TunnelOptions | BrowserStackOptions | SeleniumOptions;
 
 	/** A list of unit test suites that will be run in remote browsers */

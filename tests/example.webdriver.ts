@@ -7,17 +7,25 @@ const browser = 'firefox';
 const debug = process.env['INTERN_DEBUG'] != null;
 
 initialize(WebDriver, {
-	name: 'Test config',
-	contactTimeout: 6000,
-	filterErrorStack: true,
+	contactTimeout: 60000,
+	debug,
 	environments: [ { browserName: browser } ],
+	excludeInstrumentation: /(?:node_modules|browser|tests)\//,
+	filterErrorStack: true,
+	name: 'Test config',
+	socketPort: 9001,
 	tunnel: 'selenium' as 'selenium',
 	tunnelOptions: { drivers: [ browser ] },
-	socketPort: 9001,
-	loaderScript: '_build/browser/scripts/dojo.js',
-	suites: ['_build/tests/unit/lib/EnvironmentType.js'],
-	excludeInstrumentation: /(?:node_modules|browser|tests)\//,
-	debug
+
+	loader: 'dojo',
+	loaderConfig: {
+		packages: [
+			{ name: 'tests', location: '_build/tests' },
+			{ name: 'src', location: '_build/src' }
+		]
+	},
+
+	suites: ['tests/unit/lib/EnvironmentType.js']
 });
 
 // For instrumentation to work in Node, any modules that should be instrumented

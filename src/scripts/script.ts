@@ -8,8 +8,10 @@ if (!Array.isArray(suites)) {
 	suites = [suites];
 }
 
-intern.debug(`Loading suites ${JSON.stringify(suites)}`);
+intern.debug('Loading suites', suites);
 
+// TODO: suites will come from the user, and should be relative to the project root. loadScript loads relative to
+// Intern's root. Reconcile these.
 Promise.all(suites.map(suite => {
 	intern.loadScript(suite);
 })).then(() => {

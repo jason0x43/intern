@@ -210,7 +210,7 @@ export default class Server implements ServerProperties {
 		// require.toUrl since we can't get at the implicit module path, but it will at least allow users to use paths
 		// relative to a known and standard base.
 
-		this.executor.emit('debug', `request for ${file}`);
+		this.executor.emit('debug', `Request for ${file}`);
 
 		if (/^__intern\//.test(file)) {
 			const basePath = resolve(join(__dirname, '../..'));
@@ -222,8 +222,6 @@ export default class Server implements ServerProperties {
 		}
 
 		wholePath = normalizePath(wholePath);
-
-		this.executor.emit('debug', `serving ${wholePath}`);
 
 		if (wholePath.charAt(wholePath.length - 1) === '/') {
 			wholePath += 'index.html';
@@ -246,9 +244,12 @@ export default class Server implements ServerProperties {
 			}
 
 			if (error) {
+				this.executor.emit('debug', `Unable to serve ${wholePath}`);
 				this._send404(response);
 				return;
 			}
+
+			this.executor.emit('debug', `Serving ${wholePath}`);
 
 			if (shouldInstrument) {
 				const mtime = stats.mtime.getTime();

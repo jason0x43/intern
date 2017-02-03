@@ -8,26 +8,27 @@ import Console from '../reporters/Console';
  * The Browser executor is used to run unit tests in a browser.
  */
 export class GenericBrowser<E extends Events, C extends Config> extends GenericExecutor<E, C> {
+	basePath: string;
+
+	internBasePath: string;
+
 	constructor(config: C) {
 		super(config);
 
-		if (!this.config.basePath) {
-			const basePath = this._getThisPath().split('/').slice(0, -1).join('/');
+		if (!this.basePath) {
+			this.basePath = '/';
+		}
 
-			// TODO: don't do this in the final version
-			const devBasePath = basePath.split('/').slice(0, -1).concat('src').join('/');
-			this.config.basePath = devBasePath;
+		if (!this.internBasePath) {
+			this.internBasePath = this._getInternBasePath();
 		}
 
 		this._formatter = new Formatter(config);
 		this._reporters.push(new Html(this));
 	}
 
-	/**
-	 * Resolve a path that's relative to the project root to one that's relative to the Intern root.
-	 */
-	resolvePath(path: string) {
-		return `${this.config.basePath}/${path}`;
+	get scriptName() {
+		return '/browser/browser.js';
 	}
 
 	protected _getReporter(name: string): typeof Reporter {
@@ -39,24 +40,40 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 		}
 	}
 
-	protected _getThisPath() {
+	protected _getInternBasePath() {
 		const scripts = document.getElementsByTagName('script');
+		const host = /https?:\/\/[^\/]+(?:\/)/.exec(document.baseURI)[0];
+
+		// The path of the script containing this code within intern
+		const scriptName = this.scriptName;
+
 		let script: HTMLScriptElement;
 		for (let i = 0; i < scripts.length; i++) {
 			script = scripts[i];
-			if (/\/browser\.js$/.test(script.src)) {
-				return script.src;
+			const src = script.src;
+			const targetPosition = src.length - scriptName.length;
+			if (src.lastIndexOf(scriptName) === targetPosition) {
+				const scriptBase = `/${src.slice(host.length)}`;
+				const internBasePath = scriptBase.slice(0, scriptBase.length - 'browser/browser.js'.length);
+				return internBasePath;
 			}
 		}
+
+		throw new Error('Could not find script ' + scriptName);
 	}
 
 	protected _processOption(name: keyof Config, value: any) {
 		switch (name) {
 			case 'basePath':
+			case 'internBasePath':
 				if (typeof value !== 'string') {
 					throw new Error(`${name} must be a string`);
 				}
-				this.config[name] = value;
+				// Ensure paths end with a '/'
+				if (value[value.length - 1] !== '/') {
+					value += '/';
+				}
+				this[name] = value;
 				break;
 
 			default:
@@ -71,5 +88,9 @@ export default class Browser extends GenericBrowser<Events, Config> {}
 export { Events }
 
 export interface Config extends BaseConfig {
+	/** The absolute path to the project base (defaults to '/') */
 	basePath?: string;
+
+	/** The absolute path to intern (will be auto-determined by default) */
+	internBasePath?: string;
 }
