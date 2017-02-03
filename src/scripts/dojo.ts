@@ -10,14 +10,8 @@ if (!Array.isArray(suites)) {
 	suites = [suites];
 }
 
-let loaderConfig: any = {};
-if (params['loaderConfig']) {
-	loaderConfig = params['loaderConfig'];
-}
-
-if (!loaderConfig.baseUrl) {
-	loaderConfig.baseUrl = intern.basePath;
-}
+let loaderConfig: any = params['loaderConfig'] || {};
+loaderConfig.baseUrl = loaderConfig.baseUrl || intern.basePath;
 
 const loader = `${intern.basePath}node_modules/dojo-loader/loader.js`;
 
