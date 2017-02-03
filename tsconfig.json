@@ -37,6 +37,7 @@
     "src/browser.ts",
     "src/remote.ts",
     "src/scripts/dojo.ts",
+    "src/scripts/script.ts",
     "src/lib/executors/Node.ts",
     "src/lib/executors/WebDriver.ts"
   ]

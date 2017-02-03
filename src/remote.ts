@@ -16,25 +16,20 @@ export interface RemoteParams extends Config {
 	suites: string[];
 }
 
-let suites: string[] = [];
-let loaderScript: string;
+let loaderScript;
 let runInSync: boolean;
 
 const params: RemoteParams = <any>getQueryParams();
 const config: Config = {
 	channel: new Channel({ url: params.basePath, sessionId: params.sessionId, port: params.socketPort })
 };
-const sendError = (error: Error) => config.channel.sendMessage('error', error);
 
 try {
+	// Assign query parameters to the intern config, filtering out those that aren't valid config options
 	Object.keys(params).forEach((name: keyof RemoteParams) => {
 		const value = params[name];
 
-		// Filter out parameeters than the executor won't understand
 		switch (name) {
-			case 'suites':
-				suites.push(<string>value);
-				break;
 			case 'loaderScript':
 				loaderScript = <string>value;
 				break;
@@ -42,6 +37,7 @@ try {
 				runInSync = <boolean>value;
 				break;
 			case 'socketPort':
+			case 'suites':
 				break;
 
 			default:
@@ -51,9 +47,20 @@ try {
 
 	initialize(Remote, config);
 
-	intern.debug(`Params: ${JSON.stringify(params)}`);
+	if (!loaderScript) {
+		loaderScript = 'browser/scripts/script.js';
+	}
+}
+catch (error) {
+	// Until intern is initialized, send any errors directly through the channel
+	config.channel.sendMessage('error', error);
+}
 
-	// Forward all executor events back to the host Intern
+try {
+	intern.debug(`Params: ${JSON.stringify(params)}`);
+	intern.debug('Initialized intern');
+
+	// Forward all executor events back to the Intern host
 	intern.on('*', data => {
 		intern.debug(data);
 		let promise = intern.channel.sendMessage(data.name, data.data).catch(console.error);
@@ -62,19 +69,12 @@ try {
 		}
 	});
 
-	intern.debug('Configured intern');
-
-	if (loaderScript) {
-		intern.debug(`Loading loader script ${loaderScript}`);
-		loadScript(loaderScript, config.basePath).catch(sendError);
-	}
-	else {
-		intern.debug(`Loading suites ${JSON.stringify(suites)}`);
-		Promise.all(suites.map(suite => {
-			loadScript(suite, config.basePath);
-		})).then(() => intern.run()).catch(sendError);
-	}
+	intern.debug(`Using loader script ${loaderScript}`);
+	loadScript(loaderScript).catch(error => {
+		intern.emit('error', error);
+	});
 }
 catch (error) {
-	sendError(error);
+	// After intern is successfully initialized, emit any caught errors through it
+	intern.emit('error', error);
 }

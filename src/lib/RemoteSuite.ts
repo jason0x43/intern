@@ -146,11 +146,14 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 				const options: RemoteParams = {
 					basePath: serverUrlPath,
 					// initialBaseUrl: serverBasePath + relative(config.basePath, process.cwd()),
-					loaderScript: this.loaderScript,
 					name: this.id,
 					sessionId: sessionId,
 					suites: this.suites
 				};
+
+				if (this.loaderScript) {
+					options.loaderScript = this.loaderScript;
+				}
 
 				if (this.executor.config.debug) {
 					options.debug = true;
