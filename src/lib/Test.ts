@@ -100,10 +100,7 @@ export default class Test implements TestProperties {
 	 * promise will always be used as the implied return value if a promise is not returned by the test function).
 	 *
 	 * @param timeout If provided, the amount of time to wait before rejecting the test with a timeout error, in milliseconds.
-	 *
 	 * @param numCallsUntilResolution The number of times that resolve needs to be called before the Deferred is actually resolved.
-	 *
-	 * @returns {module:dojo/Promise.Deferred}
 	 */
 	async(timeout?: number, numCallsUntilResolution?: number): Deferred<any> {
 		this.isAsync = true;
@@ -163,7 +160,6 @@ export default class Test implements TestProperties {
 
 	/**
 	 * Runs the test.
-	 * @returns {dojo/promise/Promise}
 	 */
 	run() {
 		let startTime: number;
