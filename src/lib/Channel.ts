@@ -1,12 +1,13 @@
 import request from 'dojo-core/request/xhr';
+import Task from 'dojo-core/async/Task';
 
 export default class Channel {
 	readonly sessionId: string;
 
 	readonly url: string;
 
-	protected _activeRequest: Promise<any>;
-	protected _pendingRequest: Promise<any>;
+	protected _activeRequest: Task<any>;
+	protected _pendingRequest: Task<any>;
 	protected _messageBuffer: string[];
 	protected _sequence: number;
 	protected _maxPostSize: number;
@@ -57,7 +58,7 @@ export default class Channel {
 		// Some testing services have problems handling large message POSTs, so limit the maximum size of
 		// each POST body to maxPostSize bytes. Always send at least one message, even if it's more than
 		// maxPostSize bytes.
-		const sendNextBlock = (): Promise<any> => {
+		const sendNextBlock = (): Task<any> => {
 			const block = [ messages.shift() ];
 			let size = block[0].length;
 			while (messages.length > 0 && size + messages[0].length < exports.maxPostSize) {
@@ -79,7 +80,7 @@ export default class Channel {
 		const messages = this._messageBuffer;
 		this._messageBuffer = [];
 
-		this._activeRequest = new Promise((resolve, reject) => {
+		this._activeRequest = new Task((resolve, reject) => {
 			return sendNextBlock().then(
 				() => {
 					this._activeRequest = null;
