@@ -1,4 +1,4 @@
-import { on } from 'dojo/aspect';
+import { on } from 'dojo-core/aspect';
 import Suite, { SuiteLifecycleFunction } from '../Suite';
 import Test, { TestFunction } from '../Test';
 import Executor from '../executors/Executor';

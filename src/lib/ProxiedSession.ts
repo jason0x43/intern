@@ -1,5 +1,6 @@
-import Promise = require('dojo/Promise');
-import Session = require('leadfoot/Session');
+import Session from 'leadfoot/Session';
+import Task from 'dojo-core/async/Task';
+import Executor from './executors/Executor';
 
 /* istanbul ignore next: client-side code */
 function getCoverageData(coverageVariable: string) {
@@ -21,34 +22,29 @@ function getCoverageData(coverageVariable: string) {
 export default class ProxiedSession extends Session {
 	/**
 	 * Indicate whether coverage data should be requested before performing a request.
-	 *
-	 * @type {boolean}
 	 */
 	coverageEnabled = false;
 
 	/**
 	 * The name of the global variable used to store coverage data.
-	 *
-	 * @type {string}
 	 */
 	coverageVariable = '';
 
 	/**
+	 * The Executor hosting this session.
+	 */
+	executor: Executor;
+
+	/**
 	 * The number of characters that need to be truncated from the front of file paths to get a working path-part
 	 * for a URL.
-	 *
-	 * @type {number}
 	 */
 	serverBasePathLength = 0;
 
 	/**
 	 * The base URL of the server server in use.
-	 *
-	 * @type {string}
 	 */
 	serverUrl = '';
-
-	reporterManager: any;
 
 	private _heartbeatIntervalHandle: { remove: Function };
 
@@ -56,7 +52,7 @@ export default class ProxiedSession extends Session {
 	 * Navigates the browser to a new URL like {@link module:leadfoot/Session#get}, but retrieves any code coverage
 	 * data recorded by the browser prior to navigation.
 	 */
-	get(_url: string): Promise<any> {
+	get(_url: string) {
 		let args = Array.prototype.slice.call(arguments, 0);
 
 		// At least two letters are required in the scheme to avoid Windows paths being misinterpreted as URLs
@@ -65,23 +61,23 @@ export default class ProxiedSession extends Session {
 		}
 
 		if (this.coverageEnabled) {
-			let promise: Promise<any>;
+			let promise: Task<boolean>;
 
 			// At least Safari will not inject user scripts for non http/https URLs, so we can't get coverage data.
 			if (this.capabilities.brokenExecuteForNonHttpUrl) {
-				promise = this.getCurrentUrl().then(function (url) {
-					return (/^https?:/i).test(url);
-				});
+				promise = this.getCurrentUrl().then(url => (/^https?:/i).test(url));
 			}
 			else {
-				promise = Promise.resolve(true);
+				promise = Task.resolve(true);
 			}
 
-			return promise.then((shouldGetCoverage) => {
+			return promise.then(shouldGetCoverage => {
 				if (shouldGetCoverage) {
-					return this.execute<string>(getCoverageData, [ this.coverageVariable ]).then((coverageData) => {
-						return coverageData &&
-							this.reporterManager.emit('coverage', this.sessionId, JSON.parse(coverageData));
+					return this.execute<string>(getCoverageData, [ this.coverageVariable ]).then(coverageData => {
+						return coverageData && this.executor.emit('coverage', {
+							sessionId: this.sessionId,
+							coverage: JSON.parse(coverageData)
+						});
 					});
 				}
 			}).finally(() => {
@@ -96,14 +92,16 @@ export default class ProxiedSession extends Session {
 	 * Quits the browser like {@link module:leadfoot/Session#quit}, but retrieves any code coverage data recorded
 	 * by the browser prior to quitting.
 	 */
-	quit(): Promise<any> {
+	quit() {
 		return this
 			.setHeartbeatInterval(0)
 			.then(() => {
 				if (this.coverageEnabled) {
-					return this.execute<string>(getCoverageData, [ this.coverageVariable ]).then((coverageData) => {
-						return coverageData &&
-							this.reporterManager.emit('coverage', this.sessionId, JSON.parse(coverageData));
+					return this.execute<string>(getCoverageData, [ this.coverageVariable ]).then(coverageData => {
+						return coverageData && this.executor.emit('coverage', {
+							sessionId: this.sessionId,
+							coverage: JSON.parse(coverageData)
+						});
 					});
 				}
 			})
@@ -118,7 +116,7 @@ export default class ProxiedSession extends Session {
 	 *
 	 * @param delay Amount of time to wait between heartbeats. Setting the delay to 0 will disable heartbeats.
 	 */
-	setHeartbeatInterval(delay: number): Promise<any> {
+	setHeartbeatInterval(delay: number) {
 		this._heartbeatIntervalHandle && this._heartbeatIntervalHandle.remove();
 
 		if (delay) {
@@ -127,7 +125,7 @@ export default class ProxiedSession extends Session {
 			// `setTimeout`
 			const self = this;
 			(function sendHeartbeat() {
-				let timeoutId: number;
+				let timeoutId: NodeJS.Timer;
 				let cancelled = false;
 				let startTime = Date.now();
 
@@ -140,12 +138,12 @@ export default class ProxiedSession extends Session {
 
 				self.getCurrentUrl().then(function () {
 					if (!cancelled) {
-						timeoutId = <number> (<any> setTimeout(sendHeartbeat, delay - (Date.now() - startTime)));
+						timeoutId = setTimeout(sendHeartbeat, delay - (Date.now() - startTime));
 					}
 				});
 			})();
 		}
 
-		return Promise.resolve();
+		return Task.resolve();
 	}
 }

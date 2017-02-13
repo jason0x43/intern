@@ -13,7 +13,7 @@ import Reporter from '../reporters/Reporter';
 import Runner from '../reporters/Runner';
 import Pretty from '../reporters/Pretty';
 import Task from 'dojo-core/async/Task';
-import LeadfootServer = require('leadfoot/Server');
+import LeadfootServer from 'leadfoot/Server';
 import ProxiedSession from '../ProxiedSession';
 import resolveEnvironments from '../resolveEnvironments';
 import Suite from '../Suite';
@@ -21,7 +21,7 @@ import RemoteSuite from '../RemoteSuite';
 import { pullFromArray, retry } from '../util';
 import global from 'dojo-core/global';
 import EnvironmentType from '../EnvironmentType';
-import Command = require('leadfoot/Command');
+import Command from 'leadfoot/Command';
 
 /**
  * The WebDriver executor is used to run unit tests in a remote browser, and to run functional tests against a remote
@@ -198,8 +198,8 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 		const server = this.server;
 		const tunnel = this.tunnel;
-		const leadfootServer = new LeadfootServer<ProxiedSession>(tunnel.clientUrl, {
-			server: tunnel.proxy
+		const leadfootServer = new LeadfootServer(tunnel.clientUrl, {
+			proxy: tunnel.proxy
 		});
 
 		leadfootServer.sessionConstructor = ProxiedSession;
@@ -225,10 +225,11 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 					executor: this,
 
 					before() {
-						return retry(
+						return retry<ProxiedSession>(
 							() => leadfootServer.createSession(environmentType),
 							config.environmentRetries
 						).then(session => {
+							session.executor = executor;
 							session.coverageEnabled = config.excludeInstrumentation !== true;
 							session.coverageVariable = config.instrumenterOptions.coverageVariable;
 							session.serverUrl = config.serverUrl;

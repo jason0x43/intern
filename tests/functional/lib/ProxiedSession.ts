@@ -1,5 +1,5 @@
 import ProxiedSession from '../../../src/lib/ProxiedSession';
-import Server = require('leadfoot/Server');
+import Server from 'leadfoot/Server';
 
 const { registerSuite } = intern.getInterface('object');
 const assert = intern.getAssertions('assert');
@@ -21,7 +21,7 @@ registerSuite(function () {
 		});
 	}
 
-	function createServerFromRemote(remote: any): Server<ProxiedSession> {
+	function createServerFromRemote(remote: any) {
 		// Intern 2
 		if (remote.session && remote.session.server) {
 			return new Server(remote.session.server.url, null);
@@ -34,7 +34,7 @@ registerSuite(function () {
 		throw new Error('Unsupported remote');
 	}
 
-	function createProxiedSessionFromRemote(remote: any): any {
+	function createProxiedSessionFromRemote(remote: any) {
 		const server = createServerFromRemote(remote);
 		let session: ProxiedSession;
 
@@ -57,7 +57,7 @@ registerSuite(function () {
 			}
 
 			session = new ProxiedSession(remote.sessionId, server, capabilities);
-			return server._fillCapabilities(session);
+			return server['_fillCapabilities'](session);
 		}
 
 		throw new Error('Unsupported remote');

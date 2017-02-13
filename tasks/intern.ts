@@ -1,4 +1,4 @@
-/// <reference types="grunt"/>
+import { join } from 'path';
 
 interface TaskOptions extends grunt.task.ITaskOptions {
 	cwd?: string;
@@ -67,7 +67,7 @@ function internTask(grunt: IGrunt) {
 	grunt.registerMultiTask('intern', function (this: grunt.task.ITask) {
 		const done = this.async();
 		const opts = <TaskOptions> this.options({ runType: 'client' });
-		const args = [ require('path').join(__dirname, '..', opts.runType + '.js') ];
+		const args = [ join(__dirname, '..', opts.runType + '.js') ];
 		const env = Object.create(process.env);
 		const skipOptions: { [key: string]: boolean } = {
 			browserstackAccessKey: true,

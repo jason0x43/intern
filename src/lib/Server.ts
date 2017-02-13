@@ -32,7 +32,7 @@ export default class Server implements ServerProperties {
 
 	socketPort: number;
 
-	protected _wsServer: WebSocket.Server;
+	private _wsServer: WebSocket.Server;
 
 	private _codeCache: { [filename: string]: { mtime: number, data: string } };
 
