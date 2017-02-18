@@ -1,4 +1,4 @@
-import EnvironmentType from '../../../src/lib/EnvironmentType';
+import EnvironmentType from 'src/lib/EnvironmentType';
 const { registerSuite } = intern.getInterface('object');
 const assert = intern.getAssertions('assert');
 

@@ -60,14 +60,14 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 	protected _afterRun() {
 		return super._afterRun()
 			.finally(() => {
-				const tasks: Promise<any>[] = [];
+				const promises: Promise<any>[] = [];
 				if (this.server) {
-					tasks.push(this.server.stop().then(() => this.emit('serverEnd', this.server)));
+					promises.push(this.server.stop().then(() => this.emit('serverEnd', this.server)));
 				}
 				if (this.tunnel) {
-					tasks.push(this.tunnel.stop().then(() => this.emit('tunnelStop', { tunnel: this.tunnel })));
+					promises.push(this.tunnel.stop().then(() => this.emit('tunnelStop', { tunnel: this.tunnel })));
 				}
-				return Promise.all(tasks)
+				return Promise.all(promises)
 					// We do not want to actually return an array of values, so chain a callback that resolves to
 					// undefined
 					.then(() => {});
@@ -235,6 +235,8 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 							session.serverUrl = config.serverUrl;
 							session.serverBasePathLength = config.basePath.length;
 
+							// TODO: Find a better way to handle the fact that session is mixed into the new Command
+							// instance (better than just casting to Remote)
 							let command: Remote = <Remote>new Command(session);
 							command.environmentType = new EnvironmentType(session.capabilities);
 

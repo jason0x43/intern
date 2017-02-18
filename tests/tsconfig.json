@@ -1,13 +1,20 @@
 {
   "compilerOptions": {
-    "declaration": false
+    "baseUrl": "..",
+    "declaration": false,
+    "paths": {
+      "../src/*": [
+		  "./_build/src/*",
+		  "./src/*"
+	  ]
+    }
   },
   "extends": "../tsconfig.json",
   "files": [
 	"../_build/src/browser.d.ts",
     "./example.node.ts",
     "./example.webdriver.ts",
-    "./unit/all.ts",
-    "./functional/lib/ProxiedSession.ts"
+    "./functional/lib/ProxiedSession.ts",
+    "./unit/all.ts"
   ]
 }
