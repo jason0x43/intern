@@ -3,7 +3,7 @@
     "baseUrl": "..",
     "declaration": false,
     "paths": {
-      "../src/*": [
+      "src/*": [
 		  "./_build/src/*",
 		  "./src/*"
 	  ]
@@ -11,7 +11,6 @@
   },
   "extends": "../tsconfig.json",
   "files": [
-	"../_build/src/browser.d.ts",
     "./example.node.ts",
     "./example.webdriver.ts",
     "./functional/lib/ProxiedSession.ts",

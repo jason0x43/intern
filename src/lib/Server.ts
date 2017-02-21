@@ -205,11 +205,6 @@ export default class Server implements ServerProperties {
 		const file = /^\/+([^?]*)/.exec(request.url)[1];
 		let wholePath: string;
 
-		// TODO: Reconcile basePath in browserland with the server's basePath. Browser basePath maps to server basePath.
-		// Provide a utility to turn relative paths into URLs based on this relationship. This won't work quite like
-		// require.toUrl since we can't get at the implicit module path, but it will at least allow users to use paths
-		// relative to a known and standard base.
-
 		this.executor.log('Request for', file);
 
 		if (/^__intern\//.test(file)) {

@@ -10,13 +10,6 @@ export default class Remote extends GenericBrowser<Events, Config> {
 
 	protected _debug: boolean;
 
-	protected _initializers: Promise<any>[];
-
-	constructor(config: Config) {
-		super(config);
-		this._initializers = [];
-	}
-
 	get channel() {
 		return this._channel;
 	}

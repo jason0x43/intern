@@ -1,4 +1,4 @@
-import Remote from '../lib/executors/Remote';
+import Remote from '../../lib/executors/Remote';
 
 declare let intern: Remote;
 

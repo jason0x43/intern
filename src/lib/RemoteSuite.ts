@@ -5,9 +5,9 @@ import { parse } from 'url';
 import Task from 'dojo-core/async/Task';
 import { InternError } from '../intern';
 import WebDriver, { Events } from './executors/WebDriver';
+import { Config } from './executors/Remote';
 import Server from './Server';
 import { Handle } from 'dojo-interfaces/core';
-import { RemoteParams } from '../remote';
 
 /**
  * RemoteSuite is a class that acts as a local server for one or more unit test suites being run in a remote browser.
@@ -199,6 +199,17 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 
 		return task;
 	}
+}
+
+export interface RemoteParams extends Config {
+	debug?: boolean;
+	loader?: string;
+	loaderConfig?: any;
+	name: string;
+	runInSync?: boolean;
+	sessionId: string;
+	socketPort?: number;
+	suites: string[];
 }
 
 export interface RemoteSuiteProperties extends SuiteProperties {

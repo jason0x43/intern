@@ -1,21 +1,11 @@
-import Remote, { Config } from './lib/executors/Remote';
-import initialize from './intern';
-import Channel from './lib/WebSocketChannel';
+import Remote, { Config } from '../lib/executors/Remote';
+import { RemoteParams } from '../lib/RemoteSuite';
+import initialize from '../intern';
+import Channel from '../lib/WebSocketChannel';
 
 declare let intern: Remote;
 
 initialize(Remote);
-
-export interface RemoteParams extends Config {
-	debug?: boolean;
-	loader?: string;
-	loaderConfig?: any;
-	name: string;
-	runInSync?: boolean;
-	sessionId: string;
-	socketPort?: number;
-	suites: string[];
-}
 
 let loader;
 let runInSync: boolean;

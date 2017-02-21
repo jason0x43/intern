@@ -4,13 +4,13 @@
     "declaration": true,
     "experimentalDecorators": true,
 	"lib": [
-      "ES5",
-      "ES2015.Promise",
-      "ES2015.Symbol",
-      "ES2015.Iterable",
-      "DOM"
+      "es5",
+      "es2015.promise",
+      "es2015.symbol",
+      "es2015.iterable",
+      "dom"
     ],
-    "module": "umd",
+    "module": "commonjs",
     "moduleResolution": "node",
     "noImplicitAny": true,
     "noImplicitThis": true,
@@ -21,7 +21,7 @@
     "removeComments": true,
     "rootDir": ".",
     "sourceMap": true,
-    "target": "ES5",
+    "target": "es5",
     "typeRoots": [
       "./types",
       "./node_modules/@types"
@@ -33,12 +33,12 @@
     "insertSpaceAfterFunctionKeywordForAnonymousFunctions": true,
     "insertSpaceAfterSemicolonInForStatements": true
   },
-  "files": [
-    "src/browser.ts",
-    "src/remote.ts",
-    "src/scripts/dojo.ts",
-    "src/scripts/script.ts",
+  "include": [
+    "src/intern.ts",
+    "src/browser/**/*.ts",
+    "src/lib/executors/Browser.ts",
     "src/lib/executors/Node.ts",
+    "src/lib/executors/Remote.ts",
     "src/lib/executors/WebDriver.ts"
   ]
 }
