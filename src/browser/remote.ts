@@ -1,11 +1,10 @@
 import Remote, { Config } from '../lib/executors/Remote';
 import { RemoteParams } from '../lib/RemoteSuite';
-import initialize from '../intern';
 import Channel from '../lib/WebSocketChannel';
 
 declare let intern: Remote;
 
-initialize(Remote);
+Remote.initialize();
 
 let loader;
 let runInSync: boolean;
@@ -67,7 +66,7 @@ try {
 	switch (loader) {
 		case 'dojo':
 		case 'script':
-			loader = `${intern.internBasePath}/browser/scripts/${loader}.js`;
+			loader = `${intern.internBasePath}/browser/loaders/${loader}.js`;
 			break;
 	}
 

@@ -1,11 +1,10 @@
 // Import the proper executor for the current environment
-import WebDriver from '../src/lib/executors/WebDriver';
-import initialize from '../src/intern';
+import WebDriver from '../src/WebDriver';
 
 const browser = 'firefox';
 const debug = process.env['INTERN_DEBUG'] != null;
 
-initialize(WebDriver, {
+WebDriver.initialize({
 	contactTimeout: 60000,
 	debug,
 	environments: [ { browserName: browser } ],

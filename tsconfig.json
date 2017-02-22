@@ -34,7 +34,6 @@
     "insertSpaceAfterSemicolonInForStatements": true
   },
   "include": [
-    "src/intern.ts",
     "src/browser/**/*.ts",
     "src/lib/executors/Browser.ts",
     "src/lib/executors/Node.ts",

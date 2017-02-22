@@ -1,4 +1,4 @@
-import { Config as BaseConfig, Events, GenericBrowser } from './Browser';
+import { Config as BaseConfig, Events, GenericBrowser } from '../../Browser';
 import Channel, { isChannel } from '../Channel';
 import Task from 'dojo-core/async/Task';
 
@@ -6,6 +6,10 @@ import Task from 'dojo-core/async/Task';
  * An executor for running suites in a remote browser
  */
 export default class Remote extends GenericBrowser<Events, Config> {
+	static initialize(config?: Config) {
+		return super._initialize<Events, Config, Remote>(Remote, config);
+	}
+
 	protected _channel: Channel;
 
 	protected _debug: boolean;

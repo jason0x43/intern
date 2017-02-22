@@ -9,7 +9,6 @@ export default class WebSocketChannel extends Channel {
 	constructor(options: WebSocketOptions) {
 		super(options);
 
-		// this._socket = new WebSocket(url);
 		this._socket = new WebSocket(`ws://localhost:${options.port}`);
 
 		this._ready = new Task(resolve => {

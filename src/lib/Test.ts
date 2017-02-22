@@ -1,8 +1,8 @@
 import Executor from './executors/Executor';
 import Deferred from './Deferred';
 import Task, { isTask } from 'dojo-core/async/Task';
-import { InternError } from '../intern';
-import { Remote } from './executors/WebDriver';
+import { InternError } from './common';
+import { Remote } from '../WebDriver';
 import Suite from './Suite';
 import { mixin } from 'dojo-core/lang';
 
@@ -19,7 +19,7 @@ export default class Test implements TestProperties {
 
 	isAsync = false;
 
-	timeElapsed: number = 0;
+	timeElapsed = 0;
 
 	error: InternError;
 

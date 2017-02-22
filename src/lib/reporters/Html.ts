@@ -1,4 +1,4 @@
-import Browser from '../executors/Browser';
+import Browser from '../../Browser';
 import Reporter, { eventHandler, ReporterProperties } from './Reporter';
 import Test from '../Test';
 import Suite from '../Suite';

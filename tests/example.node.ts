@@ -1,11 +1,10 @@
 // Import the proper executor for the current environment
-import Node from '../src/lib/executors/Node';
+import Node from '../src/Node';
 import Suite from '../src/lib/Suite';
 import Test from '../src/lib/Test';
-import initialize from '../src/intern';
 import { assert } from 'chai';
 
-initialize(Node, {
+Node.initialize({
 	name: 'Test config',
 	filterErrorStack: true,
 	reporters: [ 'simple' ]

@@ -12,7 +12,24 @@ import getBddInterface, { BddInterface } from '../interfaces/bdd';
 import * as chai from 'chai';
 import global from 'dojo-core/global';
 
+declare global {
+	// There will be one active executor
+	export let intern: Executor;
+}
+
 export abstract class GenericExecutor<E extends Events, C extends Config> {
+	protected static _initialize<E extends Events, C extends Config, T extends GenericExecutor<E, C>>(
+		ExecutorClass: ExecutorConstructor<E, C, T>,
+		config?: C
+	): T {
+		if (global['intern']) {
+			throw new Error('Intern has already been initialized in this environment');
+		}
+		const executor = new ExecutorClass(config);
+		global.intern = executor;
+		return executor;
+	}
+
 	/** The resolved configuration for this executor. */
 	protected _config: C;
 

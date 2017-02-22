@@ -1,4 +1,4 @@
-import { Config as BaseConfig, Events as BaseEvents, GenericExecutor } from './Executor';
+import { Config as BaseConfig, Events as BaseEvents, GenericExecutor } from './lib/executors/Executor';
 import Tunnel, { TunnelOptions } from 'digdug/Tunnel';
 import BrowserStackTunnel, { BrowserStackOptions } from 'digdug/BrowserStackTunnel';
 import SeleniumTunnel, { SeleniumOptions } from 'digdug/SeleniumTunnel';
@@ -6,21 +6,21 @@ import SauceLabsTunnel from 'digdug/SauceLabsTunnel';
 import TestingBotTunnel from 'digdug/TestingBotTunnel';
 import CrossBrowserTestingTunnel from 'digdug/CrossBrowserTestingTunnel';
 import NullTunnel from 'digdug/NullTunnel';
-import Server from '../Server';
-import Formatter from '../node/Formatter';
+import Server from './lib/Server';
+import Formatter from './lib/node/Formatter';
 import { deepMixin } from 'dojo-core/lang';
-import Reporter from '../reporters/Reporter';
-import Runner from '../reporters/Runner';
-import Pretty from '../reporters/Pretty';
+import Reporter from './lib/reporters/Reporter';
+import Runner from './lib/reporters/Runner';
+import Pretty from './lib/reporters/Pretty';
 import Task from 'dojo-core/async/Task';
 import LeadfootServer from 'leadfoot/Server';
-import ProxiedSession from '../ProxiedSession';
-import resolveEnvironments from '../resolveEnvironments';
-import Suite from '../Suite';
-import RemoteSuite from '../RemoteSuite';
-import { pullFromArray, retry } from '../util';
+import ProxiedSession from './lib/ProxiedSession';
+import resolveEnvironments from './lib/resolveEnvironments';
+import Suite from './lib/Suite';
+import RemoteSuite from './lib/RemoteSuite';
+import { pullFromArray, retry } from './lib/util';
 import global from 'dojo-core/global';
-import EnvironmentType from '../EnvironmentType';
+import EnvironmentType from './lib/EnvironmentType';
 import Command from 'leadfoot/Command';
 
 /**
@@ -32,6 +32,10 @@ import Command from 'leadfoot/Command';
  * and executed directly in this executor.
  */
 export default class WebDriver extends GenericExecutor<Events, Config> {
+	static initialize(config?: Config) {
+		return super._initialize<Events, Config, WebDriver>(WebDriver, config);
+	}
+
 	config: Config;
 
 	server: Server;
@@ -88,6 +92,10 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 		if (!config.serverPort) {
 			config.serverPort = 9000;
+		}
+
+		if (!config.socketPort) {
+			config.socketPort = 9001;
 		}
 
 		if (!config.serverUrl) {

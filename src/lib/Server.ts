@@ -3,7 +3,7 @@ import { normalizePath } from './node/util';
 import { instrument } from './instrument';
 import * as aspect from 'dojo-core/aspect';
 import * as http from 'http';
-import { basename, join, resolve } from 'path';
+import { basename, dirname, join, resolve } from 'path';
 import * as fs from 'fs';
 import { lookup } from 'mime-types';
 import * as net from 'net';
@@ -73,15 +73,13 @@ export default class Server implements ServerProperties {
 				});
 			});
 
-			if (this.socketPort != null) {
-				this._wsServer = new WebSocket.Server({ port: this.port + 1 });
-				this._wsServer.on('connection', client => {
-					this._handleWebSocket(client);
-				});
-				this._wsServer.on('error', error => {
-					this.executor.emit('error', error);
-				});
-			}
+			this._wsServer = new WebSocket.Server({ port: this.port + 1 });
+			this._wsServer.on('connection', client => {
+				this._handleWebSocket(client);
+			});
+			this._wsServer.on('error', error => {
+				this.executor.emit('error', error);
+			});
 
 			server.listen(this.port, resolve);
 		});
@@ -208,7 +206,7 @@ export default class Server implements ServerProperties {
 		this.executor.log('Request for', file);
 
 		if (/^__intern\//.test(file)) {
-			const basePath = resolve(join(__dirname, '../..'));
+			const basePath = dirname(__dirname);
 			wholePath = join(basePath, file.replace(/^__intern\//, ''));
 			shouldInstrument = false;
 		}
@@ -238,7 +236,7 @@ export default class Server implements ServerProperties {
 				return;
 			}
 
-			if (error) {
+			if (error || !stats.isFile()) {
 				this.executor.log('Unable to serve', wholePath);
 				this._send404(response);
 				return;

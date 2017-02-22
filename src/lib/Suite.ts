@@ -2,8 +2,8 @@ import Task from 'dojo-core/async/Task';
 import Deferred from './Deferred';
 import Executor from './executors/Executor';
 import Test, { isTest, SKIP } from './Test';
-import { InternError } from '../intern';
-import { Remote } from './executors/WebDriver';
+import { InternError } from './common';
+import { Remote } from '../WebDriver';
 
 export default class Suite implements SuiteProperties {
 	after: SuiteLifecycleFunction;
@@ -26,7 +26,7 @@ export default class Suite implements SuiteProperties {
 	 * If true, the suite will publish its start topic after the before callback has finished,
 	 * and will publish its end topic before the after callback has finished.
 	 */
-	publishAfterSetup: boolean = false;
+	publishAfterSetup = false;
 
 	skipped: string;
 

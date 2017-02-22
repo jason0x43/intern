@@ -1,8 +1,8 @@
-import { Config as BaseConfig, Events, GenericExecutor } from './Executor';
-import Formatter from '../browser/Formatter';
-import Reporter from '../reporters/Reporter';
-import Html from '../reporters/Html';
-import Console from '../reporters/Console';
+import { Config as BaseConfig, Events, GenericExecutor } from './lib/executors/Executor';
+import Formatter from './lib/browser/Formatter';
+import Reporter from './lib/reporters/Reporter';
+import Html from './lib/reporters/Html';
+import Console from './lib/reporters/Console';
 
 /**
  * The Browser executor is used to run unit tests in a browser.
@@ -83,7 +83,11 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 	}
 }
 
-export default class Browser extends GenericBrowser<Events, Config> {}
+export default class Browser extends GenericBrowser<Events, Config> {
+	static initialize(config?: Config) {
+		return super._initialize<Events, Config, Browser>(Browser, config);
+	}
+}
 
 export { Events }
 

@@ -10,7 +10,7 @@ import Coverage, { CoverageProperties } from './Coverage';
 import { Writable } from 'stream';
 import Server from '../Server';
 import { CoverageMessage, DeprecationMessage } from '../executors/Executor';
-import WebDriver, { Events, TunnelMessage } from '../executors/WebDriver';
+import WebDriver, { Events, TunnelMessage } from '../../WebDriver';
 
 const LIGHT_RED = '\x1b[91m';
 const LIGHT_GREEN = '\x1b[92m';
@@ -94,12 +94,10 @@ export default class Runner extends Coverage {
 	}
 
 	@eventHandler()
-	serverStart(server: Server) {
-		let message = `Listening on localhost:${server.port}`;
-		if (server.socketPort) {
-			message += ` (ws ${server.socketPort})`;
-		}
-		this.charm.write(`${message}\n`);
+	log(message: string) {
+		message.split('\n').forEach(line => {
+			console.log(`DEBUG: ${line}`);
+		});
 	}
 
 	@eventHandler()
@@ -146,6 +144,15 @@ export default class Runner extends Coverage {
 			.write(nodeUtil.format(message, numEnvironments, numFailedTests, numTests))
 			.display('reset')
 			.write('\n\n');
+	}
+
+	@eventHandler()
+	serverStart(server: Server) {
+		let message = `Listening on localhost:${server.port}`;
+		if (server.socketPort) {
+			message += ` (ws ${server.socketPort})`;
+		}
+		this.charm.write(`${message}\n`);
 	}
 
 	@eventHandler()

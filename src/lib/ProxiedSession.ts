@@ -52,40 +52,45 @@ export default class ProxiedSession extends Session {
 	 * Navigates the browser to a new URL like {@link module:leadfoot/Session#get}, but retrieves any code coverage
 	 * data recorded by the browser prior to navigation.
 	 */
-	get(_url: string) {
-		let args = Array.prototype.slice.call(arguments, 0);
+	get(url: string) {
+		console.log(`proxy getting ${url}`);
 
 		// At least two letters are required in the scheme to avoid Windows paths being misinterpreted as URLs
-		if (!/^[A-Za-z][A-Za-z0-9+.-]+:/.test(args[0])) {
-			args[0] = this.serverUrl + args[0].slice(this.serverBasePathLength);
+		if (!/^[A-Za-z][A-Za-z0-9+.-]+:/.test(url)) {
+			url = this.serverUrl + url.slice(this.serverBasePathLength);
 		}
 
-		if (this.coverageEnabled) {
-			let promise: Task<boolean>;
+		if (!this.coverageEnabled) {
+			return super.get(url);
+		}
 
-			// At least Safari will not inject user scripts for non http/https URLs, so we can't get coverage data.
-			if (this.capabilities.brokenExecuteForNonHttpUrl) {
-				promise = this.getCurrentUrl().then(url => (/^https?:/i).test(url));
-			}
-			else {
-				promise = Task.resolve(true);
-			}
+		console.log('coverage is enabled');
+		let shouldGetPromise: Task<boolean>;
 
-			return promise.then(shouldGetCoverage => {
-				if (shouldGetCoverage) {
-					return this.execute<string>(getCoverageData, [ this.coverageVariable ]).then(coverageData => {
-						return coverageData && this.executor.emit('coverage', {
-							sessionId: this.sessionId,
-							coverage: JSON.parse(coverageData)
-						});
+		// At least Safari will not inject user scripts for non http/https URLs, so we can't get coverage data.
+		if (this.capabilities.brokenExecuteForNonHttpUrl) {
+			shouldGetPromise = Task.resolve(this.getCurrentUrl().then(url => (/^https?:/i).test(url)));
+		}
+		else {
+			shouldGetPromise = Task.resolve(true);
+		}
+
+		const task: Task<void> = shouldGetPromise.then(shouldGetCoverage => {
+			if (shouldGetCoverage) {
+				console.log('getting coverage');
+				return this.execute<string>(getCoverageData, [ this.coverageVariable ]).then(coverageData => {
+					return coverageData && this.executor.emit('coverage', {
+						sessionId: this.sessionId,
+						coverage: JSON.parse(coverageData)
 					});
-				}
-			}).finally(() => {
-				return super.get.apply(this, args);
-			});
-		}
+				});
+			}
+		}).finally(() => {
+			console.log('getting coverage');
+			return super.get(url);
+		});
 
-		return super.get.apply(this, args);
+		return task;
 	}
 
 	/**

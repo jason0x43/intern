@@ -1,18 +1,22 @@
-import { Config as BaseConfig, Events, GenericExecutor } from './Executor';
+import { Config as BaseConfig, Events, GenericExecutor } from './lib/executors/Executor';
 import Task from 'dojo-core/async/Task';
-import { instrument } from '../instrument';
-import { normalizePath } from '../node/util';
-import Formatter from '../node/Formatter';
+import { instrument } from './lib/instrument';
+import { normalizePath } from './lib/node/util';
+import Formatter from './lib/node/Formatter';
 import { resolve, sep } from 'path';
 import { hook } from 'istanbul';
-import Reporter from '../reporters/Reporter';
-import Pretty from '../reporters/Pretty';
-import Simple from '../reporters/Simple';
+import Reporter from './lib/reporters/Reporter';
+import Pretty from './lib/reporters/Pretty';
+import Simple from './lib/reporters/Simple';
 
 /**
  * The Node executor is used to run unit tests in a Node environment.
  */
 export default class Node extends GenericExecutor<Events, Config> {
+	static initialize(config?: Config) {
+		return super._initialize<Events, Config, Node>(Node, config);
+	}
+
 	readonly config: Config;
 
 	constructor(config: Config) {
