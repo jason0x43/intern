@@ -76,20 +76,20 @@
     "ws": "2.1.0"
   },
   "devDependencies": {
-    "@types/chalk": "~0.4.31",
-    "@types/chokidar": "~1.4.29",
-    "@types/diff": "~0.0.31",
-    "@types/glob": "~5.0.30",
-    "@types/grunt": "~0.4.20",
-    "@types/node": "~6.0.0",
-    "@types/shelljs": "~0.3.32",
-    "browserify": "~14.1.0",
+    "@types/chalk": "^0.4.31",
+    "@types/chokidar": "^1.4.29",
+    "@types/diff": "^0.0.31",
+    "@types/glob": "^5.0.30",
+    "@types/grunt": "^0.4.20",
+    "@types/node": "^6.0.0",
+    "@types/shelljs": "^0.3.32",
+    "browserify": "^14.1.0",
     "dojo-loader": "2.0.0-beta.7",
     "intern": "~3.4.2",
     "intern-dev": "../intern-dev/_build/src",
-    "ts-node": "~2.0.0",
-    "tslint": "~4.0.0",
-    "typescript": "~2.1.4"
+    "ts-node": "^2.0.0",
+    "tslint": "^4.4.0",
+    "typescript": "^2.2.0"
   },
   "internDev": {
     "resources": {
