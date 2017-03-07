@@ -95,7 +95,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		}
 
 		if (!config.socketPort) {
-			config.socketPort = 9001;
+			config.socketPort = config.serverPort + 1;
 		}
 
 		if (!config.serverUrl) {
