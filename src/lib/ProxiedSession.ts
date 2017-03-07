@@ -1,6 +1,6 @@
 import Session from 'leadfoot/Session';
 import Task from 'dojo-core/async/Task';
-import Executor from './executors/Executor';
+import WebDriver from '../WebDriver';
 
 /* istanbul ignore next: client-side code */
 function getCoverageData(coverageVariable: string) {
@@ -33,7 +33,7 @@ export default class ProxiedSession extends Session {
 	/**
 	 * The Executor hosting this session.
 	 */
-	executor: Executor;
+	executor: WebDriver;
 
 	/**
 	 * The number of characters that need to be truncated from the front of file paths to get a working path-part
@@ -53,18 +53,19 @@ export default class ProxiedSession extends Session {
 	 * data recorded by the browser prior to navigation.
 	 */
 	get(url: string) {
-		console.log(`proxy getting ${url}`);
-
 		// At least two letters are required in the scheme to avoid Windows paths being misinterpreted as URLs
 		if (!/^[A-Za-z][A-Za-z0-9+.-]+:/.test(url)) {
-			url = this.serverUrl + url.slice(this.serverBasePathLength);
+			if (url.indexOf(this.executor.config.basePath) === 0) {
+				url = url.slice(this.serverBasePathLength);
+			}
+
+			url = this.serverUrl + url;
 		}
 
 		if (!this.coverageEnabled) {
 			return super.get(url);
 		}
 
-		console.log('coverage is enabled');
 		let shouldGetPromise: Task<boolean>;
 
 		// At least Safari will not inject user scripts for non http/https URLs, so we can't get coverage data.
@@ -77,7 +78,6 @@ export default class ProxiedSession extends Session {
 
 		const task: Task<void> = shouldGetPromise.then(shouldGetCoverage => {
 			if (shouldGetCoverage) {
-				console.log('getting coverage');
 				return this.execute<string>(getCoverageData, [ this.coverageVariable ]).then(coverageData => {
 					return coverageData && this.executor.emit('coverage', {
 						sessionId: this.sessionId,
@@ -86,7 +86,6 @@ export default class ProxiedSession extends Session {
 				});
 			}
 		}).finally(() => {
-			console.log('getting coverage');
 			return super.get(url);
 		});
 
