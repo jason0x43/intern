@@ -54,7 +54,8 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			instrumenterOptions: {
 				coverageVariable: '__internCoverage'
 			},
-			defaultTimeout: 30000
+			defaultTimeout: 30000,
+			excludeInstrumentation: /(?:node_modules|tests)\//
 		};
 
 		this._listeners = {};
