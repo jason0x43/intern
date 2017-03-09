@@ -8,7 +8,7 @@ import { red } from 'chalk';
 import 'intern-dev/intern-dev-watch';
 
 const watcher = watch(join(buildDir, 'src', '**', '*.js'), {
-	ignored: join(buildDir, 'src', 'browser.js')
+	ignored: join(buildDir, 'src', 'intern.js')
 }).on('ready', function () {
 	echo(`## Watching files in ${buildDir}`);
 

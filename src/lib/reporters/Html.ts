@@ -1,4 +1,4 @@
-import Browser from '../../Browser';
+import Browser from '../executors/Browser';
 import Reporter, { eventHandler, ReporterProperties } from './Reporter';
 import Test from '../Test';
 import Suite from '../Suite';
@@ -100,7 +100,7 @@ export default class Html extends Reporter implements HtmlProperties {
 	protected _processedTests: any = {};
 
 	// Accumulator for total number of skipped tests
-	protected _skippedCount: number = 0;
+	protected _skippedCount = 0;
 
 	// Accumulator for total number of failed tests
 	protected _failCount = 0;

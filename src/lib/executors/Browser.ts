@@ -1,8 +1,8 @@
-import { Config as BaseConfig, Events, GenericExecutor, initialize } from './lib/executors/Executor';
-import Formatter from './lib/browser/Formatter';
-import Reporter from './lib/reporters/Reporter';
-import Html from './lib/reporters/Html';
-import Console from './lib/reporters/Console';
+import { Config as BaseConfig, Events, GenericExecutor, initialize } from './Executor';
+import Formatter from '../browser/Formatter';
+import Reporter from '../reporters/Reporter';
+import Html from '../reporters/Html';
+import Console from '../reporters/Console';
 
 export class GenericBrowser<E extends Events, C extends Config> extends GenericExecutor<E, C> {
 	basePath: string;
@@ -25,7 +25,7 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 	}
 
 	get scriptName() {
-		return '/browser/browser.js';
+		return '/browser/intern.js';
 	}
 
 	protected _getReporter(name: string): typeof Reporter {
@@ -51,7 +51,7 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 			const targetPosition = src.length - scriptName.length;
 			if (src.lastIndexOf(scriptName) === targetPosition) {
 				const scriptBase = `/${src.slice(host.length)}`;
-				const internBasePath = scriptBase.slice(0, scriptBase.length - 'browser/browser.js'.length);
+				const internBasePath = scriptBase.slice(0, scriptBase.length - 'browser/intern.js'.length);
 				return internBasePath;
 			}
 		}

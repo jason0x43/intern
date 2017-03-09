@@ -1,4 +1,4 @@
-import { Config as BaseConfig, Events, GenericBrowser } from '../../Browser';
+import { Config as BaseConfig, Events, GenericBrowser } from './Browser';
 import { initialize } from './Executor';
 import Channel, { isChannel } from '../Channel';
 import Task from 'dojo-core/async/Task';
