@@ -67,12 +67,16 @@ export default class Remote extends GenericBrowser<Events, Config> {
 	/**
 	 * Load a script via script injection.
 	 *
-	 * @param script an absolute path to a script (e.g., `intern.basePath + 'somedir/script.js'`)
+	 * @param script a path to a script
 	 */
 	loadScript(script: string) {
 		// If script isn't absolute, assume it's relative to basePath
 		if (script[0] !== '/') {
 			script = this.basePath + script;
+		}
+
+		if (!(/\.js$/i).test(script)) {
+			script += '.js';
 		}
 
 		return new Promise((resolve, reject) => {
