@@ -106,8 +106,8 @@
       ]
     },
 	"browserify": {
-	  "src/browser/intern.js": [
-	    "src/browser/intern.js"
+	  "src/browser/runner.js": [
+	    "src/browser/runner.js"
 	  ],
 	  "src/browser/remote.js": [
 		"src/browser/remote.js"

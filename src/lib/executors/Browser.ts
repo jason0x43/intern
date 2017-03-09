@@ -25,7 +25,7 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 	}
 
 	get scriptName() {
-		return '/browser/intern.js';
+		return 'browser/runner.js';
 	}
 
 	protected _getReporter(name: string): typeof Reporter {
@@ -51,7 +51,7 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 			const targetPosition = src.length - scriptName.length;
 			if (src.lastIndexOf(scriptName) === targetPosition) {
 				const scriptBase = `/${src.slice(host.length)}`;
-				const internBasePath = scriptBase.slice(0, scriptBase.length - 'browser/intern.js'.length);
+				const internBasePath = scriptBase.slice(0, scriptBase.length - this.scriptName.length);
 				return internBasePath;
 			}
 		}
