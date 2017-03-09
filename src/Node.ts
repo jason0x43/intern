@@ -33,6 +33,17 @@ export default class Node extends GenericExecutor<Events, Config> {
 		}
 	}
 
+	/**
+	 * Load a script using Node's require.
+	 *
+	 * @param script a path to a script
+	 */
+	loadScript(script: string) {
+		return new Promise(resolve => {
+			resolve(require(script));
+		});
+	}
+
 	protected _beforeRun(): Task<void> {
 		return super._beforeRun().then(() => {
 			if (this._reporters.length === 0) {
