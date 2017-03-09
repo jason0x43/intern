@@ -1,8 +1,15 @@
 {
   "compilerOptions": {
+    "baseUrl": "..",
     "declaration": false,
     "module": "commonjs",
     "outDir": "../_build/src",
+    "paths": {
+      "intern/*": [
+		  "./_build/src/*",
+		  "./src/*"
+	  ]
+	},
     "rootDir": "..",
     "sourceMap": false
   },
