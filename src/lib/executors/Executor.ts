@@ -38,7 +38,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 				coverageVariable: '__internCoverage'
 			},
 			defaultTimeout: 30000,
-			excludeInstrumentation: /(?:node_modules|tests)\//
+			excludeInstrumentation: /(?:node_modules|browser|tests)\//
 		};
 
 		this._listeners = {};
