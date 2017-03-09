@@ -33,6 +33,9 @@
     "insertSpaceAfterFunctionKeywordForAnonymousFunctions": true,
     "insertSpaceAfterSemicolonInForStatements": true
   },
+  "files": [
+    "src/index.d.ts"
+  ],
   "include": [
     "src/browser/**/*.ts",
     "src/lib/executors/Browser.ts",

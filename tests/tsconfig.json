@@ -10,7 +10,7 @@
     }
   },
   "extends": "../tsconfig.json",
-  "files": [
+  "include": [
     "./example.node.ts",
     "./example.webdriver.ts",
     "./functional/lib/ProxiedSession.ts",

@@ -12,11 +12,6 @@ import getBddInterface, { BddInterface } from '../interfaces/bdd';
 import * as chai from 'chai';
 import global from 'dojo-core/global';
 
-declare global {
-	// There will be one active executor
-	export let intern: Executor;
-}
-
 export abstract class GenericExecutor<E extends Events, C extends Config> {
 	/** The resolved configuration for this executor. */
 	protected _config: C;
