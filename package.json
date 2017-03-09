@@ -44,7 +44,7 @@
     "intern-runner": "./bin/intern-runner.js"
   },
   "scripts": {
-    "build": "intern-dev-clean && intern-dev-build",
+    "build": "intern-dev-clean && stylus src/lib/reporters/html/html.styl && intern-dev-build",
     "postbuild": "intern-dev-browserify",
     "browserify": "intern-dev-browserify",
     "clean": "intern-dev-clean",
@@ -95,11 +95,11 @@
     "resources": {
       "src": [
         "tests/example.intern.js",
-		{ "base": "_build/src", "pattern": "**/*.d.ts" },
-		{ "base": "_build/src", "pattern": "**/*.css" }
+		{ "base": "_build/src", "pattern": "**/*.d.ts" }
       ],
       ".": [
 		"src/browser/remote.html",
+		"src/**/*.css",
         "tests/**/*.xml",
         "tests/**/*.js",
         "tests/**/*.html"
