@@ -1,4 +1,4 @@
-import { Config as BaseConfig, Events, GenericExecutor } from './lib/executors/Executor';
+import { Config as BaseConfig, Events, GenericExecutor, initialize } from './lib/executors/Executor';
 import Task from 'dojo-core/async/Task';
 import { instrument } from './lib/instrument';
 import { normalizePath } from './lib/node/util';
@@ -14,7 +14,7 @@ import Simple from './lib/reporters/Simple';
  */
 export default class Node extends GenericExecutor<Events, Config> {
 	static initialize(config?: Config) {
-		return super._initialize<Events, Config, Node>(Node, config);
+		return initialize<Events, Config, Node>(Node, config);
 	}
 
 	readonly config: Config;

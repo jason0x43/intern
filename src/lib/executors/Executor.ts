@@ -18,18 +18,6 @@ declare global {
 }
 
 export abstract class GenericExecutor<E extends Events, C extends Config> {
-	protected static _initialize<E extends Events, C extends Config, T extends GenericExecutor<E, C>>(
-		ExecutorClass: ExecutorConstructor<E, C, T>,
-		config?: C
-	): T {
-		if (global['intern']) {
-			throw new Error('Intern has already been initialized in this environment');
-		}
-		const executor = new ExecutorClass(config);
-		global.intern = executor;
-		return executor;
-	}
-
 	/** The resolved configuration for this executor. */
 	protected _config: C;
 
@@ -484,6 +472,18 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			}
 		});
 	}
+}
+
+export function initialize<E extends Events, C extends Config, T extends GenericExecutor<E, C>>(
+	ExecutorClass: ExecutorConstructor<E, C, T>,
+	config?: C
+): T {
+	if (global['intern']) {
+		throw new Error('Intern has already been initialized in this environment');
+	}
+	const executor = new ExecutorClass(config);
+	global.intern = executor;
+	return executor;
 }
 
 export abstract class Executor extends GenericExecutor<Events, Config> {}

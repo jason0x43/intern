@@ -1,4 +1,4 @@
-import { Config as BaseConfig, Events as BaseEvents, GenericExecutor } from './lib/executors/Executor';
+import { Config as BaseConfig, Events as BaseEvents, GenericExecutor, initialize } from './lib/executors/Executor';
 import Tunnel, { TunnelOptions } from 'digdug/Tunnel';
 import BrowserStackTunnel, { BrowserStackOptions } from 'digdug/BrowserStackTunnel';
 import SeleniumTunnel, { SeleniumOptions } from 'digdug/SeleniumTunnel';
@@ -33,7 +33,7 @@ import Command from 'leadfoot/Command';
  */
 export default class WebDriver extends GenericExecutor<Events, Config> {
 	static initialize(config?: Config) {
-		return super._initialize<Events, Config, WebDriver>(WebDriver, config);
+		return initialize<Events, Config, WebDriver>(WebDriver, config);
 	}
 
 	config: Config;

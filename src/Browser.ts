@@ -1,12 +1,9 @@
-import { Config as BaseConfig, Events, GenericExecutor } from './lib/executors/Executor';
+import { Config as BaseConfig, Events, GenericExecutor, initialize } from './lib/executors/Executor';
 import Formatter from './lib/browser/Formatter';
 import Reporter from './lib/reporters/Reporter';
 import Html from './lib/reporters/Html';
 import Console from './lib/reporters/Console';
 
-/**
- * The Browser executor is used to run unit tests in a browser.
- */
 export class GenericBrowser<E extends Events, C extends Config> extends GenericExecutor<E, C> {
 	basePath: string;
 
@@ -83,9 +80,12 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 	}
 }
 
+/**
+ * The Browser executor is used to run unit tests in a browser.
+ */
 export default class Browser extends GenericBrowser<Events, Config> {
 	static initialize(config?: Config) {
-		return super._initialize<Events, Config, Browser>(Browser, config);
+		return initialize<Events, Config, Browser>(Browser, config);
 	}
 }
 
