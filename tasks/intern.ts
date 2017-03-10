@@ -10,34 +10,6 @@ interface TaskOptions extends grunt.task.ITaskOptions {
 }
 
 export = function (grunt: IGrunt) {
-	// function logOutput(line: string) {
-	// 	let state: keyof grunt.log.CommonLogging<any> = 'write';
-
-	// 	if (/(\d+)\/(\d+) tests (pass|fail)/.test(line)) {
-	// 		const match = /(\d+)\/(\d+) tests (pass|fail)/.exec(line);
-	// 		const count = Number(match[1]);
-	// 		const total = Number(match[2]);
-
-	// 		if (match[3] === 'pass') {
-	// 			state = (count === total) ? 'ok' : 'error';
-	// 		}
-	// 		else {
-	// 			state = count ? 'error' : 'ok';
-	// 		}
-	// 	}
-	// 	else if (/\bPASS/.test(line)) {
-	// 		state = 'ok';
-	// 	}
-	// 	else if (/\bFAIL/.test(line)) {
-	// 		state = 'error';
-	// 	}
-
-	// 	state === 'error' && grunt.event.emit('intern.fail', line);
-	// 	state === 'ok' && grunt.event.emit('intern.pass', line);
-
-	// 	grunt.log[state](line);
-	// }
-
 	function loadSuites(suites: string[]) {
 		const suiteFiles = suites.map((suite: string) => {
 			return /\.js$/.test(suite) ? suite : suite + '.js';
