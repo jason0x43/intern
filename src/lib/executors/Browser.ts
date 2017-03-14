@@ -9,6 +9,8 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 
 	internBasePath: string;
 
+	private _queryParams: { [key: string]: any };
+
 	constructor(config: C) {
 		super(config);
 
@@ -26,6 +28,64 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 
 	get scriptName() {
 		return 'browser/runner.js';
+	}
+
+	/**
+	 * Return the current query params as a lightly-formatted object
+	 */
+	get queryParams() {
+		if (!this._queryParams) {
+			const query = location.search.slice(1);
+			const rawParams = query.split('&').filter(arg => {
+				return arg !== '' && arg[0] !== '=';
+			}).map(arg => {
+				const parts = arg.split('=');
+				return {
+					name: decodeURIComponent(parts[0]),
+					// An arg name with no value is treated as having the value 'true'
+					value: (parts[1] && decodeURIComponent(parts[1])) || true
+				};
+			});
+
+			const params: { [key: string]: any } = {};
+			rawParams.forEach(({ name, value }) => {
+				try {
+					if (typeof value === 'string') {
+						value = JSON.parse(value);
+					}
+				}
+				catch (_error) {
+					// ignore
+				}
+
+				if (!(name in params)) {
+					params[name] = value;
+				}
+				else if (!Array.isArray(params[name])) {
+					params[name] = [params[name], value];
+				}
+				else {
+					params[name].push(value);
+				}
+			});
+
+			// Ensure suites exists and is an array
+			if (!params.suites) {
+				params.suites = [];
+			}
+			else if (!Array.isArray(params.suites)) {
+				params.suites = [params.suites];
+			}
+
+			// Ensure loaderConfig is defined if a loader is being used
+			if (params.loader && !params.loaderConfig) {
+				params.loaderConfig = {};
+			}
+
+			this._queryParams = Object.freeze(params);
+		}
+
+		return this._queryParams;
 	}
 
 	/**

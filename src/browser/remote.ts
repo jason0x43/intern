@@ -9,7 +9,7 @@ Remote.initialize();
 let loader;
 let runInSync: boolean;
 
-const params: RemoteParams = <any>intern.getQueryParams();
+const params = <RemoteParams>intern.queryParams;
 const config: Config = {
 	channel: new Channel({ url: params.basePath, sessionId: params.sessionId, port: params.socketPort })
 };
