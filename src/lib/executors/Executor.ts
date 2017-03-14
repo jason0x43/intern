@@ -255,7 +255,10 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 					throw new Error('One or more suite errors occurred during testing');
 				}
 			})
-			.catch(error => this.emit('error', error));
+			.catch(error => {
+				this.emit('error', error);
+				throw error;
+			});
 
 		// Only allow the executor to be started once
 		this.run = () => promise;
