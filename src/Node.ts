@@ -34,14 +34,12 @@ export default class Node extends GenericExecutor<Events, Config> {
 	}
 
 	/**
-	 * Load a script using Node's require.
+	 * Load a script or scripts using Node's require.
 	 *
 	 * @param script a path to a script
 	 */
-	loadScript(script: string) {
-		return new Promise(resolve => {
-			resolve(require(script));
-		});
+	loadScript(...script: string[]) {
+		return loadScripts(...script);
 	}
 
 	protected _beforeRun(): Task<void> {
@@ -101,6 +99,10 @@ export interface Config extends BaseConfig {
 	basePath?: string;
 	globalName?: string;
 	rootSuiteName?: string;
+}
+
+export function loadScripts(...scripts: string[]) {
+	return Promise.all(scripts.map(require));
 }
 
 export { Events };

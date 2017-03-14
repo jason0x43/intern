@@ -1,4 +1,5 @@
 import { Config as BaseConfig, Events as BaseEvents, GenericExecutor, initialize } from './lib/executors/Executor';
+import { loadScripts } from './Node';
 import Tunnel, { TunnelOptions } from 'digdug/Tunnel';
 import BrowserStackTunnel, { BrowserStackOptions } from 'digdug/BrowserStackTunnel';
 import SeleniumTunnel, { SeleniumOptions } from 'digdug/SeleniumTunnel';
@@ -59,6 +60,16 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		super(deepMixin(defaults, config));
 
 		this._formatter = new Formatter(config);
+	}
+
+	/**
+	 * Load a script using Node's require. Note that this method only loads scripts in the local Node context, not in
+	 * remote browser contexts.
+	 *
+	 * @param script a path to a script
+	 */
+	loadScript(...scripts: string[]) {
+		return loadScripts(...scripts);
 	}
 
 	protected _afterRun() {

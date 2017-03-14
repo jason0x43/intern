@@ -28,6 +28,15 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 		return 'browser/runner.js';
 	}
 
+	/**
+	 * Load a script or scripts via script injection.
+	 *
+	 * @param script a path to a script
+	 */
+	loadScript(...scripts: string[]) {
+		return Promise.all(scripts.map(script => injectScript(script, this.basePath)));
+	}
+
 	protected _getReporter(name: string): typeof Reporter {
 		switch (name) {
 			case 'html':
@@ -97,4 +106,28 @@ export interface Config extends BaseConfig {
 
 	/** The absolute path to intern (will be auto-determined by default) */
 	internBasePath?: string;
+}
+
+function injectScript(script: string, basePath: string) {
+	// If script isn't absolute, assume it's relative to basePath
+	if (script[0] !== '/') {
+		script = basePath + script;
+	}
+
+	if (!(/\.js$/i).test(script)) {
+		script += '.js';
+	}
+
+	return new Promise<void>((resolve, reject) => {
+		const scriptTag = document.createElement('script');
+		scriptTag.addEventListener('load', () => {
+			resolve();
+		});
+		scriptTag.addEventListener('error', event => {
+			console.error(`Error loading ${script}:`, event);
+			reject(new Error(`Unable to load ${script}`));
+		});
+		scriptTag.src = script;
+		document.body.appendChild(scriptTag);
+	});
 }

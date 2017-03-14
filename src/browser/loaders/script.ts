@@ -8,13 +8,8 @@ if (!Array.isArray(suites)) {
 	suites = [suites];
 }
 
-intern.log('Loading suites', suites);
-
-// TODO: suites will come from the user, and should be relative to the project root. loadScript loads relative to
-// Intern's root. Reconcile these.
-Promise.all(suites.map(suite => {
-	return intern.loadScript(suite);
-})).then(() => {
+intern.log('Loading suites', intern.queryParams.suites);
+intern.loadScript(...intern.queryParams.suites).then(() => {
 	return intern.run();
 }).catch(error => {
 	return intern.emit('error', error);
