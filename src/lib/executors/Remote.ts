@@ -61,6 +61,19 @@ export default class Remote extends GenericBrowser<Events, Config> {
 			}
 		});
 
+		// Ensure suites exists and is an array
+		if (!params.suites) {
+			params.suites = [];
+		}
+		else if (!Array.isArray(params.suites)) {
+			params.suites = [params.suites];
+		}
+
+		// Ensure loaderConfig is defined if a loader is being used
+		if (params.loader && !params.loaderConfig) {
+			params.loaderConfig = {};
+		}
+
 		return params;
 	}
 
