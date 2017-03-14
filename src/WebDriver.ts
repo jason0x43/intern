@@ -327,6 +327,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 	protected _processOption(name: keyof Config, value: any) {
 		switch (name) {
 			case 'basePath':
+			case 'config':
 			case 'loader':
 			case 'serverUrl':
 				if (typeof value !== 'string') {
@@ -441,6 +442,7 @@ export interface Config extends BaseConfig {
 		build?: string;
 		[key: string]: any;
 	};
+	config?: string;
 	contactTimeout?: number;
 	environments: any[];
 	environmentRetries?: number;
