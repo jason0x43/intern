@@ -65,6 +65,7 @@ try {
 
 	switch (loader) {
 		case 'dojo':
+		case 'dojo2':
 		case 'script':
 			loader = `${intern.internBasePath}/browser/loaders/${loader}.js`;
 			break;

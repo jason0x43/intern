@@ -5,18 +5,17 @@ declare let intern: Remote;
 
 const loaderConfig: any = intern.queryParams.loaderConfig || {};
 loaderConfig.baseUrl = loaderConfig.baseUrl || intern.basePath;
-if (!('async' in loaderConfig)) {
-	loaderConfig.async = true;
-}
 
-intern.log('Loader config:', loaderConfig);
-global.dojoConfig = loaderConfig;
-
-intern.loadScript(`${intern.basePath}node_modules/dojo/dojo.js`).then(() => {
+intern.loadScript(`${intern.basePath}node_modules/dojo-loader/loader.js`).then(() => {
 	intern.log('Loaded dojo loader');
 
 	const loader = global.require;
 	intern.log('Using loader', loader);
+
+	loader.on('error', (error: Error) => intern.emit('error', error));
+
+	intern.log('Loader config:', loaderConfig);
+	loader.config(loaderConfig);
 
 	intern.log('Loading suites:', intern.queryParams.suites);
 	loader(intern.queryParams.suites, () => intern.run());
