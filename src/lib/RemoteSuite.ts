@@ -13,9 +13,13 @@ import { Handle } from 'dojo-interfaces/core';
  * RemoteSuite is a class that acts as a local server for one or more unit test suites being run in a remote browser.
  */
 export default class RemoteSuite extends Suite implements RemoteSuiteProperties {
+	/** Time to wait for contact from remote server */
 	contactTimeout: number;
 
 	executor: WebDriver;
+
+	/** The HTML page that will be used to host the tests */
+	harness: string;
 
 	loader: string;
 
@@ -23,8 +27,10 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 
 	server: Server;
 
+	/** The pathnames of suite modules that will be managed by this remote suite. */
 	suites: string[];
 
+	/** If true, the remote suite will wait for ackowledgements from the host for runtime events. */
 	runInSync: boolean;
 
 	constructor(config: RemoteSuiteOptions) {
@@ -173,9 +179,10 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 				}
 
 				const query = new UrlSearchParams(<Hash<any>>options);
+				const harness = this.harness || `${config.serverUrl}__intern/browser/remote.html`;
 
 				remote
-					.get(config.serverUrl + '__intern/browser/remote.html?' + query)
+					.get(`${harness}?${query}`)
 					.then(() => {
 						// If the task hasn't been resolved yet, start a timer that will cancel this suite if no contact
 						// is received from the remote in a given time. The task could be resolved if, for example, the
@@ -213,17 +220,12 @@ export interface RemoteParams extends Config {
 }
 
 export interface RemoteSuiteProperties extends SuiteProperties {
-	/** Time to wait for contact from remote server */
 	contactTimeout: number;
-
 	loader: string;
 	loaderConfig: { [key: string]: any };
 	server: Server;
-
-	/** If true, the remote suite will wait for ackowledgements from the host for runtime events. */
+	harness: string;
 	runInSync: boolean;
-
-	/** The pathnames of suite modules that will be managed by this remote suite. */
 	suites: string[];
 }
 
