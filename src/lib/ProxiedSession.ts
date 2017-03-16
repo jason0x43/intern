@@ -140,10 +140,12 @@ export default class ProxiedSession extends Session {
 					}
 				};
 
-				self.getCurrentUrl().then(function () {
+				self.getCurrentUrl().then(() => {
 					if (!cancelled) {
 						timeoutId = setTimeout(sendHeartbeat, delay - (Date.now() - startTime));
 					}
+				}).catch(error => {
+					self.executor.emit('error', error);
 				});
 			})();
 		}
