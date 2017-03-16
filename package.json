@@ -94,10 +94,10 @@
   "internDev": {
     "resources": {
       "src": [
-        "tests/example.intern.js",
-		{ "base": "_build/src", "pattern": "**/*.d.ts" }
+        "tests/example.intern.js"
       ],
       ".": [
+		"src/**/*.d.ts",
 		"src/browser/remote.html",
 		"src/**/*.css",
         "tests/**/*.xml",
@@ -106,17 +106,17 @@
       ]
     },
 	"browserify": {
-	  "src/browser/runner.js": [
-	    "src/browser/runner.js"
+	  "src/browser/intern.js": [
+	    "src/browser/intern.js"
 	  ],
 	  "src/browser/remote.js": [
 		"src/browser/remote.js"
 	  ],
-	  "src/browser/loaders/dojo.js": [
-		"src/browser/loaders/dojo.js"
+	  "src/browser/runners/dojo.js": [
+		"src/browser/runners/dojo.js"
 	  ],
-	  "src/browser/loaders/script.js": [
-		"src/browser/loaders/script.js"
+	  "src/browser/runners/script.js": [
+		"src/browser/runners/script.js"
 	  ]
 	},
     "testConfig": "tests/selftest.intern.js"

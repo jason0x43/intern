@@ -21,9 +21,9 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 	/** The HTML page that will be used to host the tests */
 	harness: string;
 
-	loader: string;
+	runner: string;
 
-	loaderConfig: { [key: string]: any };
+	runnerConfig: { [key: string]: any };
 
 	server: Server;
 
@@ -158,12 +158,12 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 					suites: this.suites
 				};
 
-				if (this.loaderConfig) {
-					options.loaderConfig = JSON.stringify(this.loaderConfig);
+				if (this.runnerConfig) {
+					options.runnerConfig = JSON.stringify(this.runnerConfig);
 				}
 
-				if (this.loader) {
-					options.loader = this.loader;
+				if (this.runner) {
+					options.runner = this.runner;
 				}
 
 				if (this.executor.config.debug) {
@@ -210,8 +210,8 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 
 export interface RemoteParams extends Config {
 	debug?: boolean;
-	loader?: string;
-	loaderConfig?: any;
+	runner?: string;
+	runnerConfig?: any;
 	name: string;
 	runInSync?: boolean;
 	sessionId: string;
@@ -221,8 +221,8 @@ export interface RemoteParams extends Config {
 
 export interface RemoteSuiteProperties extends SuiteProperties {
 	contactTimeout: number;
-	loader: string;
-	loaderConfig: { [key: string]: any };
+	runner: string;
+	runnerConfig: { [key: string]: any };
 	server: Server;
 	harness: string;
 	runInSync: boolean;

@@ -32,6 +32,8 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 
 	protected _reporters: Reporter[];
 
+	protected _runTask: Task<void>;
+
 	constructor(config: C) {
 		this._config = <C>{
 			instrumenterOptions: {
@@ -72,7 +74,24 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	}
 
 	/**
-	 * Add a test or suite of tests.
+	 * Load a script or scripts. This is a convenience method for loading and evaluating simple scripts, not modules. If
+	 * multiple script paths are provided, scripts will be loaded sequentially in the order given.
+	 *
+	 * @param script a path to a script
+	 */
+	abstract loadScript(script: string | string[]): Task<void>;
+
+	/**
+	 * Load a text resource. This is a convenience method that will use an environment-specific method to load the text
+	 * (e.g., fs.readFile or XHR).
+	 *
+	 * @param resource a path to a text resource
+	 */
+	abstract loadText(resource: string): Task<string>;
+	abstract loadText(resource: string[]): Task<string[]>;
+
+	/**
+	 * Add a test or suite of tests to the set of tests that will be run when `run` is called.
 	 */
 	addTest(suiteOrTest: Suite | Test | SuiteOptions | TestOptions) {
 		// Check if suiteOrTest is an instance or a simple Object
@@ -91,7 +110,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	}
 
 	/**
-	 * Update this executor's configuration with a Config object or a general args object.
+	 * Update this executor's configuration with a Config object.
 	 *
 	 * Note that non-object properties will replace existing properties. Object propery values will be deeply mixed into
 	 * any existing value.
@@ -236,34 +255,36 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	}
 
 	/**
-	 * Sets up the environment for test execution with instrumentation, reporting, and error handling. Subclasses
-	 * should typically override `_runTests` to execute tests.
+	 * Run tests. This method sets up the environment for test execution, runs the tests, and runs any finalization code
+	 * afterwards. Subclasses should override `_beforeRun`, `_runTests`, and `_afterRun` to alter how tests are run.
 	 */
-	run(): Task<void> {
-		const promise = this._beforeRun()
-			.then(() => {
-				return Task.resolve(this.config.setup && this.config.setup(this)).then(() => {
-					return this.emit('runStart')
-						.then(() => this._runTests())
-						.finally(() => this.emit('runEnd'));
-				})
-				.finally(() => Promise.resolve(this.config.teardown && this.config.teardown(this)));
-			})
-			.finally(() => this._afterRun())
-			.then(() => {
-				if (this._hasSuiteErrors) {
-					throw new Error('One or more suite errors occurred during testing');
-				}
-			})
-			.catch(error => {
-				this.emit('error', error);
-				throw error;
-			});
-
+	run() {
 		// Only allow the executor to be started once
-		this.run = () => promise;
+		if (!this._runTask) {
+			try {
+				this._runTask = this._beforeRun()
+					.then(() => this.emit('runStart'))
+					.then(() => this._runTests())
+					.finally(() => this.emit('runEnd'))
+					.finally(() => this._afterRun())
+					.then(() => {
+						if (this._hasSuiteErrors) {
+							throw new Error('One or more suite errors occurred during testing');
+						}
+					})
+					.catch(error => {
+						this.emit('error', error);
+						throw error;
+					});
+			}
+			catch (error) {
+				this._runTask = this.emit('error', error).then(() => {
+					return Promise.reject(error);
+				});
+			}
+		}
 
-		return promise;
+		return this._runTask;
 	}
 
 	/**

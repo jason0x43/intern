@@ -3,6 +3,8 @@ import Formatter from '../browser/Formatter';
 import Reporter from '../reporters/Reporter';
 import Html from '../reporters/Html';
 import Console from '../reporters/Console';
+import Task from 'dojo-core/async/Task';
+import request from 'dojo-core/request/xhr';
 
 export class GenericBrowser<E extends Events, C extends Config> extends GenericExecutor<E, C> {
 	basePath: string;
@@ -27,7 +29,7 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 	}
 
 	get scriptName() {
-		return 'browser/runner.js';
+		return 'browser/intern.js';
 	}
 
 	/**
@@ -69,19 +71,6 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 				}
 			});
 
-			// Ensure suites exists and is an array
-			if (!params.suites) {
-				params.suites = [];
-			}
-			else if (!Array.isArray(params.suites)) {
-				params.suites = [params.suites];
-			}
-
-			// Ensure loaderConfig is defined if a loader is being used
-			if (params.loader && !params.loaderConfig) {
-				params.loaderConfig = {};
-			}
-
 			this._queryParams = Object.freeze(params);
 		}
 
@@ -93,8 +82,37 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 	 *
 	 * @param script a path to a script
 	 */
-	loadScript(...scripts: string[]) {
-		return Promise.all(scripts.map(script => injectScript(script, this.basePath)));
+	loadScript(script: string | string[]) {
+		if (script == null) {
+			return Task.resolve();
+		}
+
+		if (typeof script === 'string') {
+			script = [script];
+		}
+
+		return script.reduce((previous, script) => {
+			return previous.then(() => injectScript(script, this.basePath));
+		}, Task.resolve());
+	}
+
+	/**
+	 * Load a text resource.
+	 *
+	 * @param resource a path to a resource
+	 */
+	loadText(resource: string | string[]) {
+		if (resource == null) {
+			return <Task<any>>Task.resolve();
+		}
+
+		if (typeof resource === 'string') {
+			return request(resource).then(response => response.data);
+		}
+
+		return Task.all(resource.map(resource => {
+			return request(resource).then(response => response.data);
+		}));
 	}
 
 	protected _getReporter(name: string): typeof Reporter {
@@ -178,7 +196,7 @@ function injectScript(script: string, basePath: string) {
 		script += '.js';
 	}
 
-	return new Promise<void>((resolve, reject) => {
+	return new Task<void>((resolve, reject) => {
 		const scriptTag = document.createElement('script');
 		scriptTag.addEventListener('load', () => {
 			resolve();

@@ -1,7 +1,7 @@
 import { Config as BaseConfig, Events, GenericExecutor, initialize } from './lib/executors/Executor';
 import Task from 'dojo-core/async/Task';
 import { instrument } from './lib/instrument';
-import { normalizePath } from './lib/node/util';
+import { loadScript, loadText, normalizePath } from './lib/node/util';
 import Formatter from './lib/node/Formatter';
 import { resolve, sep } from 'path';
 import { hook } from 'istanbul';
@@ -38,8 +38,19 @@ export default class Node extends GenericExecutor<Events, Config> {
 	 *
 	 * @param script a path to a script
 	 */
-	loadScript(...script: string[]) {
-		return loadScripts(...script);
+	loadScript(script: string | string[]) {
+		return loadScript(script);
+	}
+
+	/**
+	 * Load a text resource.
+	 *
+	 * @param resource a path to a text resource
+	 */
+	loadText(resource: string): Task<string>;
+	loadText(resource: string[]): Task<string[]>;
+	loadText(resource: string | string[]) {
+		return loadText(resource);
 	}
 
 	protected _beforeRun(): Task<void> {
@@ -99,10 +110,6 @@ export interface Config extends BaseConfig {
 	basePath?: string;
 	globalName?: string;
 	rootSuiteName?: string;
-}
-
-export function loadScripts(...scripts: string[]) {
-	return Promise.all(scripts.map(require));
 }
 
 export { Events };

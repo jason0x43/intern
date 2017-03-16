@@ -6,10 +6,10 @@ declare let intern: Remote;
 
 Remote.initialize();
 
-let loader;
+let runner;
 let runInSync: boolean;
 
-const params = <RemoteParams>intern.queryParams;
+const params = intern.queryParams;
 const config: Config = {
 	channel: new Channel({ url: params.basePath, sessionId: params.sessionId, port: params.socketPort })
 };
@@ -20,13 +20,13 @@ try {
 		const value = params[name];
 
 		switch (name) {
-			case 'loader':
-				loader = <string>value;
+			case 'runner':
+				runner = <string>value;
 				break;
 			case 'runInSync':
 				runInSync = <boolean>value;
 				break;
-			case 'loaderConfig':
+			case 'runnerConfig':
 			case 'socketPort':
 			case 'suites':
 				break;
@@ -38,44 +38,44 @@ try {
 
 	intern.configure(config);
 
-	if (!loader) {
+	if (!runner) {
 		// Path is relative to Intern root
-		loader = 'script';
+		runner = 'script';
+	}
+
+	try {
+		// Forward all executor events back to the Intern host
+		intern.on('*', data => {
+			let promise = intern.channel.sendMessage(data.name, data.data).catch(console.error);
+			if (runInSync) {
+				return promise;
+			}
+		});
+
+		intern.log('Params:', params);
+		intern.log('Initialized intern');
+
+		intern.log('Using runner script', runner);
+		intern.log('Intern base path:', intern.internBasePath);
+
+		switch (runner) {
+			case 'dojo':
+			case 'dojo2':
+			case 'script':
+				runner = `${intern.internBasePath}/browser/runners/${runner}.js`;
+				break;
+		}
+
+		intern.loadScript(runner).catch(error => {
+			intern.emit('error', error);
+		});
+	}
+	catch (error) {
+		// After intern is successfully initialized, emit any caught errors through it
+		intern.emit('error', error);
 	}
 }
 catch (error) {
 	// Until intern is initialized, send any errors directly through the channel
 	config.channel.sendMessage('error', error);
-}
-
-try {
-	// Forward all executor events back to the Intern host
-	intern.on('*', data => {
-		let promise = intern.channel.sendMessage(data.name, data.data).catch(console.error);
-		if (runInSync) {
-			return promise;
-		}
-	});
-
-	intern.log('Params:', params);
-	intern.log('Initialized intern');
-
-	intern.log('Using loader script', loader);
-	intern.log('Intern base path:', intern.internBasePath);
-
-	switch (loader) {
-		case 'dojo':
-		case 'dojo2':
-		case 'script':
-			loader = `${intern.internBasePath}/browser/loaders/${loader}.js`;
-			break;
-	}
-
-	intern.loadScript(loader).catch(error => {
-		intern.emit('error', error);
-	});
-}
-catch (error) {
-	// After intern is successfully initialized, emit any caught errors through it
-	intern.emit('error', error);
 }

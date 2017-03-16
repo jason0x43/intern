@@ -1,5 +1,4 @@
 import { Config as BaseConfig, Events as BaseEvents, GenericExecutor, initialize } from './lib/executors/Executor';
-import { loadScripts } from './Node';
 import Tunnel, { TunnelOptions } from 'digdug/Tunnel';
 import BrowserStackTunnel, { BrowserStackOptions } from 'digdug/BrowserStackTunnel';
 import SeleniumTunnel, { SeleniumOptions } from 'digdug/SeleniumTunnel';
@@ -20,6 +19,7 @@ import resolveEnvironments from './lib/resolveEnvironments';
 import Suite from './lib/Suite';
 import RemoteSuite from './lib/RemoteSuite';
 import { pullFromArray, retry } from './lib/util';
+import { loadScript, loadText } from './lib/node/util';
 import global from 'dojo-core/global';
 import EnvironmentType from './lib/EnvironmentType';
 import Command from 'leadfoot/Command';
@@ -68,8 +68,19 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 	 *
 	 * @param script a path to a script
 	 */
-	loadScript(...scripts: string[]) {
-		return loadScripts(...scripts);
+	loadScript(script: string | string[]) {
+		return loadScript(script);
+	}
+
+	/**
+	 * Load a text resource.
+	 *
+	 * @param resource a path to a text resource
+	 */
+	loadText(resource: string): Task<string>;
+	loadText(resource: string[]): Task<string[]>;
+	loadText(resource: string | string[]) {
+		return loadText(resource);
 	}
 
 	protected _afterRun() {
@@ -304,8 +315,8 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 						contactTimeout: config.contactTimeout,
 						name: 'unit tests',
 						suites: config.suites,
-						loader: config.loader,
-						loaderConfig: config.loaderConfig,
+						runner: config.runner,
+						runnerConfig: config.runnerConfig,
 						server
 					}));
 				}
@@ -328,7 +339,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		switch (name) {
 			case 'basePath':
 			case 'config':
-			case 'loader':
+			case 'runner':
 			case 'serverUrl':
 				if (typeof value !== 'string') {
 					throw new Error(`Non-string value "${value}" for ${name}`);
@@ -342,7 +353,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 			case 'capabilities':
 			case 'environments':
-			case 'loaderConfig':
+			case 'runnerConfig':
 			case 'tunnelOptions':
 				if (typeof value !== 'object') {
 					throw new Error(`Non-object value "${value}" for ${name}`);
@@ -447,8 +458,8 @@ export interface Config extends BaseConfig {
 	environments: any[];
 	environmentRetries?: number;
 	leaveRemoteOpen?: boolean | 'fail';
-	loader?: string;
-	loaderConfig?: { [key: string]: any };
+	runner?: string;
+	runnerConfig?: { [key: string]: any };
 	maxConcurrency?: number;
 	serveOnly?: boolean;
 	serverPort?: number;

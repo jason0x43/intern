@@ -15,8 +15,8 @@ WebDriver.initialize({
 	tunnel: 'selenium' as 'selenium',
 	tunnelOptions: { drivers: [ browser ] },
 
-	loader: 'dojo',
-	loaderConfig: {
+	runner: 'dojo',
+	runnerConfig: {
 		packages: [
 			{ name: 'tests', location: '_build/tests' },
 			{ name: 'src', location: '_build/src' }
