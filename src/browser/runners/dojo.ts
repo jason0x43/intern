@@ -3,7 +3,7 @@ import Remote from '../../lib/executors/Remote';
 
 declare let intern: Remote;
 
-const loaderConfig: any = intern.queryParams.loaderConfig || {};
+const loaderConfig: any = intern.config.runnerConfig || {};
 loaderConfig.baseUrl = loaderConfig.baseUrl || intern.basePath;
 if (!('async' in loaderConfig)) {
 	loaderConfig.async = true;
@@ -18,6 +18,6 @@ intern.loadScript(`${intern.basePath}node_modules/dojo/dojo.js`).then(() => {
 	const loader = global.require;
 	intern.log('Using loader', loader);
 
-	intern.log('Loading suites:', intern.queryParams.suites);
-	loader(intern.queryParams.suites, () => intern.run());
+	intern.log('Loading suites:', intern.config.suites);
+	loader(intern.config.suites, () => intern.run());
 }).catch(error => intern.emit('error', error));

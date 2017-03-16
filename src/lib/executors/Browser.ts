@@ -4,14 +4,11 @@ import Reporter from '../reporters/Reporter';
 import Html from '../reporters/Html';
 import Console from '../reporters/Console';
 import Task from 'dojo-core/async/Task';
-import request from 'dojo-core/request/xhr';
 
 export class GenericBrowser<E extends Events, C extends Config> extends GenericExecutor<E, C> {
 	basePath: string;
 
 	internBasePath: string;
-
-	private _queryParams: { [key: string]: any };
 
 	constructor(config: C) {
 		super(config);
@@ -33,51 +30,6 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 	}
 
 	/**
-	 * Return the current query params as a lightly-formatted object
-	 */
-	get queryParams() {
-		if (!this._queryParams) {
-			const query = location.search.slice(1);
-			const rawParams = query.split('&').filter(arg => {
-				return arg !== '' && arg[0] !== '=';
-			}).map(arg => {
-				const parts = arg.split('=');
-				return {
-					name: decodeURIComponent(parts[0]),
-					// An arg name with no value is treated as having the value 'true'
-					value: (parts[1] && decodeURIComponent(parts[1])) || true
-				};
-			});
-
-			const params: { [key: string]: any } = {};
-			rawParams.forEach(({ name, value }) => {
-				try {
-					if (typeof value === 'string') {
-						value = JSON.parse(value);
-					}
-				}
-				catch (_error) {
-					// ignore
-				}
-
-				if (!(name in params)) {
-					params[name] = value;
-				}
-				else if (!Array.isArray(params[name])) {
-					params[name] = [params[name], value];
-				}
-				else {
-					params[name].push(value);
-				}
-			});
-
-			this._queryParams = Object.freeze(params);
-		}
-
-		return this._queryParams;
-	}
-
-	/**
 	 * Load a script or scripts via script injection.
 	 *
 	 * @param script a path to a script
@@ -92,27 +44,51 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 		}
 
 		return script.reduce((previous, script) => {
-			return previous.then(() => injectScript(script, this.basePath));
+			script = normalizePath(script, this.basePath);
+			return previous.then(() => injectScript(script));
 		}, Task.resolve());
 	}
 
 	/**
-	 * Load a text resource.
-	 *
-	 * @param resource a path to a resource
+	 * Parse a query string into an object.
 	 */
-	loadText(resource: string | string[]) {
-		if (resource == null) {
-			return <Task<any>>Task.resolve();
-		}
+	parseQuery(query?: string) {
+		query = query || location.search.slice(1);
 
-		if (typeof resource === 'string') {
-			return request(resource).then(response => response.data);
-		}
+		const rawParams = query.split('&').filter(arg => {
+			return arg !== '' && arg[0] !== '=';
+		}).map(arg => {
+			const parts = arg.split('=');
+			return {
+				name: decodeURIComponent(parts[0]),
+				// An arg name with no value is treated as having the value 'true'
+				value: (parts[1] && decodeURIComponent(parts[1])) || true
+			};
+		});
 
-		return Task.all(resource.map(resource => {
-			return request(resource).then(response => response.data);
-		}));
+		const params: { [key: string]: any } = {};
+		rawParams.forEach(({ name, value }) => {
+			try {
+				if (typeof value === 'string') {
+					value = JSON.parse(value);
+				}
+			}
+			catch (_error) {
+				// ignore
+			}
+
+			if (!(name in params)) {
+				params[name] = value;
+			}
+			else if (!Array.isArray(params[name])) {
+				params[name] = [params[name], value];
+			}
+			else {
+				params[name].push(value);
+			}
+		});
+
+		return params;
 	}
 
 	protected _getReporter(name: string): typeof Reporter {
@@ -186,26 +162,22 @@ export interface Config extends BaseConfig {
 	internBasePath?: string;
 }
 
-function injectScript(script: string, basePath: string) {
-	// If script isn't absolute, assume it's relative to basePath
-	if (script[0] !== '/') {
-		script = basePath + script;
-	}
+function normalizePath(path: string, basePath: string) {
+	// If path isn't absolute, assume it's relative to basePath
+	return path[0] !== '/' ? basePath + path : path;
+}
 
-	if (!(/\.js$/i).test(script)) {
-		script += '.js';
-	}
-
+function injectScript(path: string) {
 	return new Task<void>((resolve, reject) => {
 		const scriptTag = document.createElement('script');
 		scriptTag.addEventListener('load', () => {
 			resolve();
 		});
 		scriptTag.addEventListener('error', event => {
-			console.error(`Error loading ${script}:`, event);
-			reject(new Error(`Unable to load ${script}`));
+			console.error(`Error loading ${path}:`, event);
+			reject(new Error(`Unable to load ${path}`));
 		});
-		scriptTag.src = script;
+		scriptTag.src = path;
 		document.body.appendChild(scriptTag);
 	});
 }

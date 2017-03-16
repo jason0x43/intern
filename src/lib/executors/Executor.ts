@@ -82,15 +82,6 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	abstract loadScript(script: string | string[]): Task<void>;
 
 	/**
-	 * Load a text resource. This is a convenience method that will use an environment-specific method to load the text
-	 * (e.g., fs.readFile or XHR).
-	 *
-	 * @param resource a path to a text resource
-	 */
-	abstract loadText(resource: string): Task<string>;
-	abstract loadText(resource: string[]): Task<string[]>;
-
-	/**
 	 * Add a test or suite of tests to the set of tests that will be run when `run` is called.
 	 */
 	addTest(suiteOrTest: Suite | Test | SuiteOptions | TestOptions) {
