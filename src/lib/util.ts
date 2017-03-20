@@ -71,6 +71,110 @@ export function getShouldWait(waitMode: (string|boolean), message: Message) {
 }
 
 /**
+ * Parse an array of name=value arguments into an object
+ */
+export function parseArgs(rawArgs: string[]) {
+	const args: { [key: string]: any } = {};
+	rawArgs.forEach(arg => {
+		let [name, value] = arg.split('=', 2);
+
+		if (typeof value === 'undefined') {
+			args[name] = true;
+		}
+		else {
+			try {
+				// Always try to convert string args
+				if (typeof value === 'string') {
+					value = JSON.parse(value);
+				}
+			}
+			catch (_error) {
+				// ignore
+			}
+
+			if (!(name in args)) {
+				args[name] = value;
+			}
+			else if (!Array.isArray(args[name])) {
+				args[name] = [args[name], value];
+			}
+			else {
+				args[name].push(value);
+			}
+		}
+	});
+
+	return args;
+}
+
+export function parseValue(name: string, value: any, parser: TypeName) {
+	if (typeof parser === 'string') {
+		switch (parser) {
+			case 'boolean':
+				if (typeof value === 'boolean') {
+					return value;
+				}
+				if (value === 'true') {
+					return true;
+				}
+				if (value === 'false') {
+					return false;
+				}
+				throw new Error(`Non-boolean value "${value}" for ${name}`);
+
+			case 'number':
+				const numValue = Number(value);
+				if (!isNaN(numValue)) {
+					return numValue;
+				}
+				throw new Error(`Non-numeric value "${value}" for ${name}`);
+
+			case 'regexp':
+				if (typeof value === 'string') {
+					return new RegExp(value);
+				}
+				if (value instanceof RegExp) {
+					return value;
+				}
+				throw new Error(`Non-regexp value "${value}" for ${name}`);
+
+			case 'object':
+				if (typeof value === 'string') {
+					return JSON.parse(value);
+				}
+				if (typeof value === 'object') {
+					return value;
+				}
+				throw new Error(`Non-object value "${value}" for ${name}`);
+
+			case 'string':
+				if (typeof value === 'string') {
+					return value;
+				}
+				throw new Error(`Non-string value "${value}" for ${name}`);
+
+			case 'string[]':
+				if (typeof value === 'string') {
+					return [value];
+				}
+				if (Array.isArray(value) && value.every(v => typeof v === 'string')) {
+					return value;
+				}
+				throw new Error(`Non-string[] value "${value}" for ${name}`);
+
+		}
+	}
+	else if (typeof parser === 'function') {
+		return parser(value);
+	}
+	else {
+		throw new Error('Parser must be a type name or a function');
+	}
+}
+
+export type TypeName = 'string' | 'boolean' | 'number' | 'regexp' | 'object' | 'string[]';
+
+/**
  * Remove all instances of of an item from any array and return the removed instances.
  */
 export function pullFromArray<T>(haystack: T[], needle: T): T[] {

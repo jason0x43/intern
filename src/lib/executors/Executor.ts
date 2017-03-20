@@ -4,7 +4,7 @@ import { deepMixin } from 'dojo-core/lang';
 import { Handle } from 'dojo-interfaces/core';
 import Task from 'dojo-core/async/Task';
 import Formatter from '../Formatter';
-import { pullFromArray } from '../util';
+import { parseValue, pullFromArray } from '../util';
 import Reporter, { ReporterOptions } from '../reporters/Reporter';
 import getObjectInterface, { ObjectInterface } from '../interfaces/object';
 import getTddInterface, { TddInterface } from '../interfaces/tdd';
@@ -13,6 +13,8 @@ import * as chai from 'chai';
 import global from 'dojo-core/global';
 
 export abstract class GenericExecutor<E extends Events, C extends Config> {
+	protected _availableReporters: { [name: string]: typeof Reporter };
+
 	/** The resolved configuration for this executor. */
 	protected _config: C;
 
@@ -28,6 +30,8 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 
 	protected _interfaces: { [name: string]: any };
 
+	protected _loaders: Loader[];
+
 	protected _listeners: { [event: string]: Listener<any>[] };
 
 	protected _reporters: Reporter[];
@@ -40,12 +44,15 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 				coverageVariable: '__internCoverage'
 			},
 			defaultTimeout: 30000,
-			excludeInstrumentation: /(?:node_modules|browser|tests)\//
+			excludeInstrumentation: /(?:node_modules|browser|tests)\//,
+			reporters: []
 		};
 
+		this._availableReporters = {};
 		this._listeners = {};
 		this._reporters = [];
 		this._interfaces = {};
+		this._loaders = [];
 
 		if (config) {
 			this.configure(config);
@@ -148,8 +155,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			return Task.resolve();
 		}
 
-		// TODO: Remove Promise.all call once Task.all works
-		return Task.resolve(Promise.all(notifications)).catch(error => {
+		return Task.all(notifications).catch(error => {
 			console.error(`Error emitting ${eventName}: ${this.formatter.format(error)}`);
 		});
 	}
@@ -246,6 +252,20 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	}
 
 	/**
+	 * Register a loader script that will be loaded at the beginning of the testing process
+	 */
+	registerLoader(loader: Loader) {
+		this._loaders.push(loader);
+	}
+
+	/**
+	 * Install a reporter constructor
+	 */
+	registerReporter(name: string, Class: typeof Reporter) {
+		this._availableReporters[name] = Class;
+	}
+
+	/**
 	 * Run tests. This method sets up the environment for test execution, runs the tests, and runs any finalization code
 	 * afterwards. Subclasses should override `_beforeRun`, `_runTests`, and `_afterRun` to alter how tests are run.
 	 */
@@ -253,7 +273,8 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		// Only allow the executor to be started once
 		if (!this._runTask) {
 			try {
-				this._runTask = this._beforeRun()
+				this._runTask = this._loadLoaders()
+					.then(() => this._beforeRun())
 					.then(() => this.emit('runStart'))
 					.then(() => this._runTests())
 					.finally(() => this.emit('runEnd'))
@@ -270,7 +291,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			}
 			catch (error) {
 				this._runTask = this.emit('error', error).then(() => {
-					return Promise.reject(error);
+					return Task.reject<void>(error);
 				});
 			}
 		}
@@ -351,7 +372,18 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	/**
 	 * Return a reporter constructor corresponding to the given name
 	 */
-	protected abstract _getReporter(_name: string): typeof Reporter;
+	protected _getReporter(name: string): typeof Reporter {
+		return this._availableReporters[name];
+	}
+
+	/**
+	 * Load any registered loader scripts
+	 */
+	protected _loadLoaders() {
+		return this._loaders.reduce((previous, loader) => {
+			return previous.then(() => Task.resolve(loader(this.config)));
+		}, Task.resolve());
+	}
 
 	/**
 	 * Process an arbitrary config value. Subclasses can override this method to pre-process arguments or handle them
@@ -359,115 +391,70 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	 */
 	protected _processOption(name: keyof Config, value: any) {
 		switch (name) {
-			// boolean
+			case 'basePath':
+				let parsed = parseValue(name, value, 'string');
+				if (parsed[parsed.length - 1] !== '/') {
+					parsed += '/';
+				}
+				this.config[name] = parsed;
+				break;
+
 			case 'bail':
 			case 'baseline':
 			case 'benchmark':
 			case 'debug':
 			case 'filterErrorStack':
-				if (typeof value === 'boolean') {
-					this.config[name] = value;
-				}
-				else if (value === 'true') {
-					this.config[name] = true;
-				}
-				else if (value === 'false') {
-					this.config[name] = false;
-				}
-				else {
-					throw new Error(`Non-boolean value "${value}" for ${name}`);
-				}
+				this.config[name] = parseValue(name, value, 'string');
 				break;
 
-			// number
 			case 'defaultTimeout':
-				const numValue = Number(value);
-				if (isNaN(numValue)) {
-					throw new Error(`Non-numeric value "${value}" for ${name}`);
-				}
-				this.config[name] = numValue;
+				this.config[name] = parseValue(name, value, 'number');
 				break;
 
-			// RegExp or true
 			case 'excludeInstrumentation':
 				if (value === true) {
 					this.config[name] = value;
 				}
-				else if (typeof value === 'string') {
-					this.config[name] = new RegExp(value);
-				}
-				else if (value instanceof RegExp) {
-					this.config[name] = value;
+				else if (typeof value === 'string' || value instanceof RegExp) {
+					this.config[name] = parseValue(name, value, 'regexp');
 				}
 				else {
 					throw new Error(`Invalid value "${value}" for ${name}; must be (string | RegExp | true)`);
 				}
 				break;
 
-			// RegExp or string
 			case 'grep':
-				if (typeof value === 'string') {
-					this.config[name] = new RegExp(value);
-				}
-				else if (value instanceof RegExp) {
-					this.config[name] = value;
-				}
-				else {
-					throw new Error(`Invalid value "${value}" for ${name}`);
-				}
+				this.config[name] = parseValue(name, value, 'regexp');
 				break;
 
-			// object
 			case 'instrumenterOptions':
-				if (typeof value === 'string') {
-					value = JSON.parse(value);
-				}
-				else if (typeof value !== 'object') {
-					throw new Error(`Invalid value "${value}" for ${name}`);
-				}
-				this.config[name] = deepMixin(this.config[name] || {}, value);
+				this.config[name] = deepMixin(this.config[name] || {}, parseValue(name, value, 'object'));
 				break;
 
-			// array of (string | object)
 			case 'reporters':
 				this.config[name] = (Array.isArray(value) ? value : [value]).map(reporter => {
 					if (typeof reporter === 'string') {
 						try {
-							return JSON.parse(reporter);
+							reporter = JSON.parse(reporter);
 						}
-						catch (_error) {
-							return reporter;
+						catch (error) {
+							// ignore
 						}
-					}
-					else if (typeof reporter === 'object') {
 						return reporter;
 					}
-					else {
-						throw new Error(`Invalid value "${value}" for ${name}`);
+					if (typeof reporter === 'object') {
+						return reporter;
 					}
+					throw new Error('Reporter must be a string or object');
 				});
 				break;
 
-			// string
 			case 'name':
-				if (typeof value !== 'string') {
-					throw new Error(`Non-string value "${value}" for ${name}`);
-				}
-				this.config[name] = value;
-				break;
-
-			// array of strings
-			case 'interfaces':
-				this.config[name] = (Array.isArray(value) ? value : [value]).map(value => {
-					if (typeof value !== 'string') {
-						throw new Error(`Non-string value "${value}" for ${name}`);
-					}
-					return value;
-				});
+				this.config[name] = parseValue(name, value, 'string');
 				break;
 
 			default:
-				throw new Error(`Unknown config property "${name}"`);
+				this.config[name] = value;
 		}
 	}
 
@@ -508,6 +495,7 @@ export { Handle };
 export interface Config {
 	bail?: boolean;
 	baseline?: boolean;
+	basePath?: string;
 	benchmark?: boolean;
 	benchmarkConfig?: {
 		id: string;
@@ -526,11 +514,9 @@ export interface Config {
 	formatter?: Formatter;
 	grep?: RegExp;
 	instrumenterOptions?: any;
-	interfaces?: string[];
 	name?: string;
 	reporters?: (string | typeof Reporter | { reporter: string | typeof Reporter, options?: ReporterOptions })[];
-	setup?: (executor: Executor) => Task<any>;
-	teardown?: (executor: Executor) => Task<any>;
+	[key: string]: any;
 }
 
 export interface Listener<T> {
@@ -568,3 +554,11 @@ export interface Events {
 	testEnd: Test;
 	testStart: Test;
 };
+
+/**
+ * A loader callback. Intern doesn't care what the method returns, but it will wait for it to resolve if a Promise is
+ * returned.
+ */
+export interface Loader {
+	(config: { [key: string]: any }): Promise<any> | any;
+}

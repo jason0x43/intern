@@ -2,16 +2,6 @@ import { InternError } from './common';
 import { createDiff } from './util';
 import { mixin } from 'dojo-core/lang';
 
-export interface FormatterProperties {
-	filterErrorStack: boolean;
-}
-
-export type FormatterOptions = Partial<FormatterProperties>;
-
-export interface FormatOptions {
-	space?: string;
-}
-
 export default class Formatter implements FormatterProperties {
 	filterErrorStack = false;
 
@@ -92,6 +82,16 @@ export default class Formatter implements FormatterProperties {
 	protected _getSource(tracepath: string): string {
 		return tracepath;
 	}
+}
+
+export interface FormatterProperties {
+	filterErrorStack: boolean;
+}
+
+export type FormatterOptions = Partial<FormatterProperties>;
+
+export interface FormatOptions {
+	space?: string;
 }
 
 /**

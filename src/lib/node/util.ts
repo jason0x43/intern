@@ -1,28 +1,51 @@
-import { normalize } from 'path';
+import { normalize, relative, resolve } from 'path';
 import { readFile } from 'fs';
+import { parseArgs } from '../util';
+import { deepMixin } from 'dojo-core/lang';
 import Task from 'dojo-core/async/Task';
-import { runInThisContext } from 'vm';
+
+/**
+ * Get the user-supplied config data, which may include query args and a config file.
+ */
+export function getConfig(): Task<any> {
+	const args = parseArgs(process.argv.slice(2));
+
+	if (args.config) {
+		// If a config parameter was provided, load it and mix in any other command line args.
+		return loadJson(args.config).then(config => {
+			return deepMixin(config, args);
+		});
+	}
+
+	else {
+		// If no config parameter was provided, try 'intern.json', or just resolve to the original args
+		try {
+			return loadJson('intern.json').then(config => {
+				return deepMixin(config, args);
+			});
+		}
+		catch (error) {
+			return Task.resolve(args);
+		}
+	}
+}
 
 /**
  * Loads a text resource.
  *
  * @param resource a path to a text resource
  */
-export function loadText(resource: string): Task<string>;
-export function loadText(resource: string[]): Task<string[]>;
-export function loadText(resource: string | string[]): Task<string> | Task<string[]>;
-export function loadText(resource: string | string[]): Task<string> | Task<string[]> {
-	if (resource == null) {
-		return <Task<any>>Task.resolve();
-	}
-
-	if (Array.isArray(resource)) {
-		return Task.all(resource.map((resource: string) => {
-			return loadSingleText(resource);
-		}));
-	}
-
-	return loadSingleText(resource);
+export function loadJson(resource: string): Task<string> {
+	return new Task<string>((resolve, reject) => {
+		readFile(resource, { encoding: 'utf8' }, (error, data) => {
+			if (error) {
+				reject(error);
+			}
+			else {
+				resolve(JSON.parse(data));
+			}
+		});
+	});
 }
 
 /**
@@ -31,19 +54,16 @@ export function loadText(resource: string | string[]): Task<string> | Task<strin
  * @param script a path to a script
  */
 export function loadScript(script: string | string[]) {
-	if (script == null) {
-		return Task.resolve();
-	}
-
 	if (Array.isArray(script)) {
-		return loadText(script).then(texts => {
-			texts.forEach(text => runInThisContext(text, { filename: script[0] }));
+		script.forEach(script => {
+			require(relative(__dirname, resolve(script)));
 		});
 	}
+	else if (script != null) {
+		require(relative(__dirname, resolve(script)));
+	}
 
-	return loadText(script).then((text: string) => {
-		runInThisContext(text, { filename: script });
-	});
+	return Task.resolve();
 }
 
 /**
@@ -53,15 +73,9 @@ export function normalizePath(path: string) {
 	return normalize(path).replace(/\\/g, '/');
 }
 
-function loadSingleText(path: string) {
-	return new Task<string>((resolve, reject) => {
-		readFile(path, { encoding: 'utf8' }, (error, data) => {
-			if (error) {
-				reject(error);
-			}
-			else {
-				resolve(data);
-			}
-		});
-	});
+/**
+ * Require a module relative to the project root (cwd)
+ */
+export function projectRequire(mod: string) {
+	require(resolve(mod));
 }

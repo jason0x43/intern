@@ -1,11 +1,10 @@
-import { Config as BaseConfig, Events, GenericExecutor, initialize } from './lib/executors/Executor';
+import { Config, Events, GenericExecutor, initialize } from './lib/executors/Executor';
 import Task from 'dojo-core/async/Task';
 import { instrument } from './lib/instrument';
-import { loadScript, loadText, normalizePath } from './lib/node/util';
+import { loadScript, normalizePath } from './lib/node/util';
 import Formatter from './lib/node/Formatter';
 import { resolve, sep } from 'path';
 import { hook } from 'istanbul';
-import Reporter from './lib/reporters/Reporter';
 import Pretty from './lib/reporters/Pretty';
 import Simple from './lib/reporters/Simple';
 
@@ -17,10 +16,11 @@ export default class Node extends GenericExecutor<Events, Config> {
 		return initialize<Events, Config, Node>(Node, config);
 	}
 
-	readonly config: Config;
-
 	constructor(config: Config) {
 		super(config);
+
+		this.registerReporter('pretty', Pretty);
+		this.registerReporter('simple', Simple);
 
 		if (this.config.excludeInstrumentation == null) {
 			this.config.excludeInstrumentation = /(?:node_modules|tests)\//;
@@ -42,17 +42,6 @@ export default class Node extends GenericExecutor<Events, Config> {
 		return loadScript(script);
 	}
 
-	/**
-	 * Load a text resource.
-	 *
-	 * @param resource a path to a text resource
-	 */
-	loadText(resource: string): Task<string>;
-	loadText(resource: string[]): Task<string[]>;
-	loadText(resource: string | string[]) {
-		return loadText(resource);
-	}
-
 	protected _beforeRun(): Task<void> {
 		return super._beforeRun().then(() => {
 			if (this._reporters.length === 0) {
@@ -60,20 +49,10 @@ export default class Node extends GenericExecutor<Events, Config> {
 			}
 
 			const suite = this._rootSuite;
-			suite.name = this.config.rootSuiteName || null;
 			suite.grep = this.config.grep;
 			suite.timeout = this.config.defaultTimeout;
 			suite.bail = this.config.bail;
 		});
-	}
-
-	protected _getReporter(name: string): typeof Reporter {
-		switch (name) {
-			case 'simple':
-				return Simple;
-			case 'pretty':
-				return Pretty;
-		}
 	}
 
 	/**
@@ -106,10 +85,4 @@ export default class Node extends GenericExecutor<Events, Config> {
 	}
 }
 
-export interface Config extends BaseConfig {
-	basePath?: string;
-	globalName?: string;
-	rootSuiteName?: string;
-}
-
-export { Events };
+export { Config, Events };

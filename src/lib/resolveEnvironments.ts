@@ -13,19 +13,19 @@ export type FlatEnvironment = { version?: string, [key: string]: any };
  * @param available a list of available environments
  * @returns a list of flattened service environments
  */
-export default function resolveEnvironments(capabilities: { [key: string]: any }, environments: Environment[], available?: NormalizedEnvironment[]) {
+export default function resolveEnvironments(capabilities: { [key: string]: any }, environments: (Environment | string)[], available?: NormalizedEnvironment[]) {
 	// flatEnviroments will have non-array versions
 	const flatEnvironments = createPermutations(capabilities, environments);
 
 	// Expand any version ranges or aliases in the environments.
-	environments = flatEnvironments.map(function (environment) {
+	const expandedEnvironments = flatEnvironments.map(function (environment) {
 		return mixin({}, environment, {
 			version: resolveVersions(environment, available)
 		});
 	});
 
 	// Perform a second round of permuting to handle any expanded version ranges
-	return createPermutations({}, environments).map(function (environment) {
+	return createPermutations({}, expandedEnvironments).map(function (environment) {
 		// After permuting, environment.version will be singular again
 		return new EnvironmentType(environment);
 	});
@@ -185,7 +185,7 @@ function resolveVersions(environment: FlatEnvironment, available: NormalizedEnvi
  * @param sources a list of sources to flatten
  * @return a flattened collection of sources
  */
-function createPermutations(base: { [key: string]: string }, sources?: Environment[]): FlatEnvironment[] {
+function createPermutations(base: { [key: string]: string }, sources?: (string | Environment)[]): FlatEnvironment[] {
 	// If no expansion sources were given, the set of permutations consists of just the base
 	if (!sources || sources.length === 0) {
 		return [ mixin({}, base) ];
@@ -193,11 +193,13 @@ function createPermutations(base: { [key: string]: string }, sources?: Environme
 
 	// Expand the permutation set for each source
 	return sources.map(function (source) {
-		return Object.keys(source).reduce(function (permutations: { [key: string]: any }[], key: string) {
-			if (Array.isArray(source[key])) {
+		const sourceObject = typeof source === 'string' ? { browserName: source } : source;
+
+		return Object.keys(sourceObject).reduce(function (permutations: { [key: string]: any }[], key: string) {
+			if (Array.isArray(sourceObject[key])) {
 				// For array values, create a copy of the permutation set for each array item, then use the
 				// combination of these copies as the new value of `permutations`
-				permutations = source[key].map(function (value: any) {
+				permutations = sourceObject[key].map(function (value: any) {
 					return permutations.map(function (permutation) {
 						let clone: { [key: string]: any } = mixin({}, permutation);
 						clone[key] = value;
@@ -210,7 +212,7 @@ function createPermutations(base: { [key: string]: string }, sources?: Environme
 			else {
 				// For simple values, add the value to all current permutations
 				permutations.forEach(function (permutation) {
-					permutation[key] = source[key];
+					permutation[key] = sourceObject[key];
 				});
 			}
 			return permutations;

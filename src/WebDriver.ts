@@ -18,8 +18,8 @@ import ProxiedSession from './lib/ProxiedSession';
 import resolveEnvironments from './lib/resolveEnvironments';
 import Suite from './lib/Suite';
 import RemoteSuite from './lib/RemoteSuite';
-import { pullFromArray, retry } from './lib/util';
-import { loadScript, loadText } from './lib/node/util';
+import { parseValue, pullFromArray, retry } from './lib/util';
+import { loadScript } from './lib/node/util';
 import global from 'dojo-core/global';
 import EnvironmentType from './lib/EnvironmentType';
 import Command from 'leadfoot/Command';
@@ -45,6 +45,8 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 	protected _rootSuites: Suite[];
 
+	protected _tunnels: { [name: string]: typeof Tunnel };
+
 	constructor(config: Config) {
 		const defaults: Partial<Config> = {
 			capabilities: { 'idle-timeout': 60 },
@@ -53,13 +55,20 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			environments: [],
 			maxConcurrency: Infinity,
 			reporters: ['runner'],
-			tunnel: NullTunnel,
+			tunnel: 'selenium',
 			tunnelOptions: { tunnelId: String(Date.now()) }
 		};
 
 		super(deepMixin(defaults, config));
 
 		this._formatter = new Formatter(config);
+
+		this.registerTunnel('null', NullTunnel);
+		this.registerTunnel('selenium', SeleniumTunnel);
+		this.registerTunnel('saucelabs', SauceLabsTunnel);
+		this.registerTunnel('browserstack', BrowserStackTunnel);
+		this.registerTunnel('testingbot', TestingBotTunnel);
+		this.registerTunnel('cbt', CrossBrowserTestingTunnel);
 	}
 
 	/**
@@ -72,15 +81,8 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		return loadScript(script);
 	}
 
-	/**
-	 * Load a text resource.
-	 *
-	 * @param resource a path to a text resource
-	 */
-	loadText(resource: string): Task<string>;
-	loadText(resource: string[]): Task<string[]>;
-	loadText(resource: string | string[]) {
-		return loadText(resource);
+	registerTunnel(name: string, Class: typeof Tunnel) {
+		this._tunnels[name] = Class;
 	}
 
 	protected _afterRun() {
@@ -102,6 +104,10 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 	protected _beforeRun() {
 		const config = this.config;
+
+		if (config.environments.length === 0) {
+			throw new Error('No environments specified');
+		}
 
 		if (!config.capabilities.name) {
 			config.capabilities.name = 'intern';
@@ -169,7 +175,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			.then(() => {
 				let TunnelConstructor: typeof Tunnel;
 				if (typeof config.tunnel === 'string') {
-					TunnelConstructor = Tunnels[config.tunnel];
+					TunnelConstructor = this._tunnels[config.tunnel];
 				}
 				else {
 					TunnelConstructor = config.tunnel;
@@ -236,7 +242,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 		// TODO: The Promise.resolve check is just to get around some Task-related typing issues with
 		// Tunnel#getEnvironments.
-		return Promise.resolve(tunnel.getEnvironments()).then(tunnelEnvironments => {
+		return tunnel.getEnvironments().then(tunnelEnvironments => {
 			const executor = this;
 
 			this._rootSuites = resolveEnvironments(
@@ -335,41 +341,30 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		}
 	}
 
+	protected _loadLoaders() {
+		const config = deepMixin({}, this.config, { suites: this.config.functionalSuites });
+		return this._loaders.reduce((previous, loader) => {
+			return previous.then(() => Task.resolve(loader(config)));
+		}, Task.resolve());
+	}
+
 	protected _processOption(name: keyof Config, value: any) {
 		switch (name) {
-			case 'basePath':
-			case 'config':
 			case 'runner':
 			case 'serverUrl':
-				if (typeof value !== 'string') {
-					throw new Error(`Non-string value "${value}" for ${name}`);
-				}
-				// Ensure basePath ends with a '/'
-				if (name === 'basePath' && value[value.length - 1] !== '/') {
-					value += '/';
-				}
-				this.config[name] = value;
+				this.config[name] = parseValue(name, value, 'string');
 				break;
 
 			case 'capabilities':
 			case 'environments':
 			case 'runnerConfig':
 			case 'tunnelOptions':
-				if (typeof value !== 'object') {
-					throw new Error(`Non-object value "${value}" for ${name}`);
-				}
-				this.config[name] = value;
+				this.config[name] = parseValue(name, value, 'object');
 				break;
 
 			case 'tunnel':
-				if (typeof value === 'string') {
-					value = Tunnels[<keyof typeof Tunnels>value];
-					if (!value) {
-						throw new Error(`Invalid tunnel name ${value}`);
-					}
-				}
-				if (typeof value !== 'function') {
-					throw new Error(`Non-constructor value "${value}" for ${name}`);
+				if (typeof value !== 'string' && typeof value !== 'function') {
+					throw new Error(`Invalid value "${value}" for ${name}`);
 				}
 				this.config[name] = value;
 				break;
@@ -377,20 +372,11 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			case 'leaveRemoteOpen':
 			case 'serveOnly':
 			case 'runInSync':
-				if (value === 'true') {
-					this.config[name] = true;
-				}
-				else if (typeof value !== 'boolean') {
-					throw new Error(`Non-boolean value "${value}" for ${name}`);
-				}
-				this.config[name] = value;
+				this.config[name] = parseValue(name, value, 'boolean');
 				break;
 
 			case 'suites':
-				if (!Array.isArray(value)) {
-					throw new Error(`Non-array value "${value}" for ${name}`);
-				}
-				this.config[name] = value;
+				this.config[name] = parseValue(name, value, 'string[]');
 				break;
 
 			case 'contactTimeout':
@@ -398,11 +384,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			case 'environmentRetries':
 			case 'serverPort':
 			case 'socketPort':
-				const numValue = Number(value);
-				if (isNaN(numValue)) {
-					throw new Error(`Non-numeric value "${value}" for ${name}`);
-				}
-				this.config[name] = numValue;
+				this.config[name] = parseValue(name, value, 'number');
 				break;
 
 			default:
@@ -435,27 +417,14 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 	}
 }
 
-export const Tunnels = {
-	'null': NullTunnel,
-	browserstack: BrowserStackTunnel,
-	crossbrowsertesting: CrossBrowserTestingTunnel,
-	saucelabs: SauceLabsTunnel,
-	selenium: SeleniumTunnel,
-	testingbot: TestingBotTunnel
-};
-
-export type TunnelNames = keyof typeof Tunnels;
-
 export interface Config extends BaseConfig {
-	basePath?: string;
 	capabilities?: {
 		name?: string;
 		build?: string;
 		[key: string]: any;
 	};
-	config?: string;
 	contactTimeout?: number;
-	environments: any[];
+	environments: (string | { [key: string]: any })[];
 	environmentRetries?: number;
 	leaveRemoteOpen?: boolean | 'fail';
 	runner?: string;
@@ -466,7 +435,7 @@ export interface Config extends BaseConfig {
 	serverUrl?: string;
 	runInSync?: boolean;
 	socketPort?: number;
-	tunnel?: TunnelNames | typeof Tunnel;
+	tunnel?: string | typeof Tunnel;
 	tunnelOptions?: TunnelOptions | BrowserStackOptions | SeleniumOptions;
 
 	/** A list of unit test suites that will be run in remote browsers */
