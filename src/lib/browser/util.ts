@@ -1,7 +1,7 @@
 import request from 'dojo-core/request/xhr';
 import Task from 'dojo-core/async/Task';
 import { deepMixin } from 'dojo-core/lang';
-import { parseArgs } from '../util';
+import { getLoaderScript, parseArgs } from '../util';
 
 /**
  * Given a script suffix, return the base path
@@ -52,23 +52,18 @@ export function getConfig() {
 /**
  * Load suites and start Intern
  */
-export function loadAndRun(config: { [key: string]: any }) {
+export function loadSuitesAndRun() {
 	intern.log('Intern base path:', intern.config.internBasePath);
-	let loaderTask: Task<any>;
 
-	if (config.loader) {
-		let loader = <string>config.loader;
-		switch (loader) {
-			case 'dojo':
-			case 'dojo2':
-				loader = `${intern.config.internBasePath}/browser/loader/${loader}.js`;
-				break;
-		}
+	let loaderTask: Task<any>;
+	const loader = getLoaderScript(intern.config);
+
+	if (loader) {
 		intern.log('Using loader script', loader);
 		loaderTask = intern.loadScript(loader);
 	}
 	else {
-		loaderTask = intern.loadScript(config.suites);
+		loaderTask = intern.loadScript(intern.config.suites);
 	}
 
 	return loaderTask.then(() => intern.run());

@@ -10,7 +10,7 @@ import Coverage, { CoverageProperties } from './Coverage';
 import { Writable } from 'stream';
 import Server from '../Server';
 import { CoverageMessage, DeprecationMessage } from '../executors/Executor';
-import WebDriver, { Events, TunnelMessage } from '../../WebDriver';
+import WebDriver, { Events, TunnelMessage } from '../executors/WebDriver';
 
 const LIGHT_RED = '\x1b[91m';
 const LIGHT_GREEN = '\x1b[92m';

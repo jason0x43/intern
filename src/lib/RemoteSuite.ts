@@ -4,7 +4,7 @@ import { Hash } from 'dojo-interfaces/core';
 import { parse } from 'url';
 import Task from 'dojo-core/async/Task';
 import { InternError } from './common';
-import WebDriver, { Events } from '../WebDriver';
+import WebDriver, { Events } from './executors/WebDriver';
 import { Config } from './executors/Remote';
 import Server from './Server';
 import { Handle } from 'dojo-interfaces/core';
@@ -21,9 +21,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 	/** The HTML page that will be used to host the tests */
 	harness: string;
 
-	runner: string;
-
-	runnerConfig: { [key: string]: any };
+	loader: { script: string, config?: { [key: string]: any } };
 
 	server: Server;
 
@@ -151,19 +149,15 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 					remote.setHeartbeatInterval((timeout - 1) * 1000);
 				}
 
-				const options: RemoteParams = {
+				const options: Config = {
 					basePath: serverUrlPath,
 					name: this.id,
 					sessionId: sessionId,
 					suites: this.suites
 				};
 
-				if (this.runnerConfig) {
-					options.runnerConfig = JSON.stringify(this.runnerConfig);
-				}
-
-				if (this.runner) {
-					options.runner = this.runner;
+				if (this.loader) {
+					options.loader = this.loader;
 				}
 
 				if (this.executor.config.debug) {
@@ -178,8 +172,19 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 					options.socketPort = server.socketPort;
 				}
 
-				const query = new UrlSearchParams(<Hash<any>>options);
-				const harness = this.harness || `${config.serverUrl}__intern/browser/remote.html`;
+				// Do some pre-serialization of the options
+				const queryOptions: Hash<any> = {};
+				Object.keys(options).forEach(key => {
+					if (typeof options[key] === 'object') {
+						queryOptions[key] = JSON.stringify(options[key]);
+					}
+					else {
+						queryOptions[key] = options[key];
+					}
+				});
+
+				const query = new UrlSearchParams(queryOptions);
+				const harness = `${config.serverUrl}__intern/browser/remote.html`;
 
 				remote
 					.get(`${harness}?${query}`)
@@ -208,24 +213,12 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 	}
 }
 
-export interface RemoteParams extends Config {
-	debug?: boolean;
-	runner?: string;
-	runnerConfig?: any;
-	name: string;
-	runInSync?: boolean;
-	sessionId: string;
-	socketPort?: number;
-	suites: string[];
-}
-
 export interface RemoteSuiteProperties extends SuiteProperties {
 	contactTimeout: number;
-	runner: string;
-	runnerConfig: { [key: string]: any };
-	server: Server;
-	harness: string;
+	debug?: boolean;
 	runInSync: boolean;
+	loader: { script: string, config?: { [key: string]: any } };
+	server: Server;
 	suites: string[];
 }
 

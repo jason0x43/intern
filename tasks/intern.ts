@@ -1,5 +1,5 @@
-import Node, { Config as NodeConfig } from 'intern/Node';
-import WebDriver, { Config as WdConfig } from 'intern/WebDriver';
+import Node, { Config as NodeConfig } from 'intern/lib/executors/Node';
+import WebDriver, { Config as WdConfig } from 'intern/lib/executors/WebDriver';
 import { join } from 'path';
 
 interface TaskOptions extends grunt.task.ITaskOptions {

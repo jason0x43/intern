@@ -18,7 +18,7 @@ export default class Remote extends GenericBrowser<Events, Config> {
 		super(config);
 
 		this.registerReporter('dom', Dom);
-		config.reporters.push('dom');
+		this.config.reporters.push('dom');
 	}
 
 	get scriptName() {

@@ -1,5 +1,5 @@
 // Import the proper executor for the current environment
-import WebDriver from '../src/WebDriver';
+import WebDriver from '../src/lib/executors/WebDriver';
 
 const browser = 'firefox';
 const debug = process.env['INTERN_DEBUG'] != null;

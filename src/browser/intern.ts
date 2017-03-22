@@ -4,7 +4,7 @@
 import Browser from '../lib/executors/Browser';
 import Html from '../lib/reporters/Html';
 import Console from '../lib/reporters/Console';
-import { getConfig, loadAndRun } from '../lib/browser/util';
+import { getConfig, loadSuitesAndRun } from '../lib/browser/util';
 
 getConfig().then(config => {
 	if (!config.reporters) {
@@ -19,5 +19,5 @@ getConfig().then(config => {
 	intern.registerReporter('html', Html);
 	intern.registerReporter('console', Console);
 
-	return loadAndRun(config);
+	return loadSuitesAndRun();
 }).catch(error => intern.emit('error', error));

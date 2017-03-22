@@ -1,5 +1,6 @@
 import * as diffUtil from 'diff';
 import { Message } from './Channel';
+import { Config } from './executors/Executor';
 
 export const hasFunctionName = function () {
 	function foo() {}
@@ -42,6 +43,22 @@ export function createDiff(actual: Object, expected: Object): string {
 	}
 
 	return diff;
+}
+
+/**
+ * Return the path to the loader script specified in a given config
+ */
+export function getLoaderScript(config: Config) {
+	let loader: string;
+	if (config.loader) {
+		loader = config.loader.script;
+		switch (loader) {
+			case 'dojo':
+			case 'dojo2':
+				loader = `${config.internBasePath}/browser/loader/${loader}.js`;
+		}
+	}
+	return loader;
 }
 
 /**
@@ -140,7 +157,12 @@ export function parseValue(name: string, value: any, parser: TypeName) {
 
 			case 'object':
 				if (typeof value === 'string') {
-					return JSON.parse(value);
+					try {
+						return JSON.parse(value);
+					}
+					catch (error) {
+						throw new Error(`Non-object value "${value}" for ${name}`);
+					}
 				}
 				if (typeof value === 'object') {
 					return value;
@@ -162,6 +184,22 @@ export function parseValue(name: string, value: any, parser: TypeName) {
 				}
 				throw new Error(`Non-string[] value "${value}" for ${name}`);
 
+			case 'object|string':
+				if (typeof value === 'string') {
+					if (value[0] === '{') {
+						try {
+							return JSON.parse(value);
+						}
+						catch (error) {
+							throw new Error(`Invalid object string "${value}" for ${name}`);
+						}
+					}
+					return value;
+				}
+				if (typeof value === 'object') {
+					return value;
+				}
+				throw new Error(`Non-string|object value "${value}" for ${name}`);
 		}
 	}
 	else if (typeof parser === 'function') {
@@ -172,7 +210,7 @@ export function parseValue(name: string, value: any, parser: TypeName) {
 	}
 }
 
-export type TypeName = 'string' | 'boolean' | 'number' | 'regexp' | 'object' | 'string[]';
+export type TypeName = 'string' | 'boolean' | 'number' | 'regexp' | 'object' | 'string[]' | 'object|string';
 
 /**
  * Remove all instances of of an item from any array and return the removed instances.

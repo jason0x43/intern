@@ -70,12 +70,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 
 	get formatter() {
 		if (!this._formatter) {
-			if (this.config.formatter) {
-				this._formatter = this.config.formatter;
-			}
-			else {
-				this._formatter = new Formatter(this.config);
-			}
+			this._formatter = new Formatter(this.config);
 		}
 		return this._formatter;
 	}
@@ -273,7 +268,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		// Only allow the executor to be started once
 		if (!this._runTask) {
 			try {
-				this._runTask = this._loadLoaders()
+				this._runTask = this._runLoaders()
 					.then(() => this._beforeRun())
 					.then(() => this.emit('runStart'))
 					.then(() => this._runTests())
@@ -377,15 +372,6 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	}
 
 	/**
-	 * Load any registered loader scripts
-	 */
-	protected _loadLoaders() {
-		return this._loaders.reduce((previous, loader) => {
-			return previous.then(() => Task.resolve(loader(this.config)));
-		}, Task.resolve());
-	}
-
-	/**
 	 * Process an arbitrary config value. Subclasses can override this method to pre-process arguments or handle them
 	 * instead of allowing Executor to.
 	 */
@@ -399,12 +385,20 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 				this.config[name] = parsed;
 				break;
 
+			case 'loader':
+				value = parseValue(name, value, 'object|string');
+				if (typeof value === 'string') {
+					value = { script: value };
+				}
+				this.config[name] = value;
+				break;
+
 			case 'bail':
 			case 'baseline':
 			case 'benchmark':
 			case 'debug':
 			case 'filterErrorStack':
-				this.config[name] = parseValue(name, value, 'string');
+				this.config[name] = parseValue(name, value, 'boolean');
 				break;
 
 			case 'defaultTimeout':
@@ -453,9 +447,23 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 				this.config[name] = parseValue(name, value, 'string');
 				break;
 
+			case 'suites':
+				this.config[name] = parseValue(name, value, 'string[]');
+				break;
+
 			default:
 				this.config[name] = value;
 		}
+	}
+
+	/**
+	 * Run any registered loader callbacks
+	 */
+	protected _runLoaders() {
+		return this._loaders.reduce((previous, loader) => {
+			this.log('Running loader with', this.config);
+			return previous.then(() => Task.resolve(loader(this.config)));
+		}, Task.resolve());
 	}
 
 	/**
@@ -493,9 +501,14 @@ export interface ExecutorConstructor<E extends Events, C extends Config, T exten
 export { Handle };
 
 export interface Config {
+	/** If true, Intern will exit as soon as any test fails. */
 	bail?: boolean;
+
 	baseline?: boolean;
+
+	/** This is the base path added to any relative paths. It defaults to `process.cwd()` or `/`. */
 	basePath?: string;
+
 	benchmark?: boolean;
 	benchmarkConfig?: {
 		id: string;
@@ -507,15 +520,38 @@ export interface Config {
 		};
 		verbosity: number;
 	};
+
+	/** If true, emit and display debug messages. */
 	debug?: boolean;
+
+	/** The default timeout for async tests, in ms. */
 	defaultTimeout?: number;
+
+	/** A regexp matching file names that shouldn't be instrumented, or `true` to disable instrumentation. */
 	excludeInstrumentation?: true | RegExp;
+
+	/** If true, filter external library calls and runtime calls out of error stacks. */
 	filterErrorStack?: boolean;
-	formatter?: Formatter;
+
+	/** A regexp matching tests that should be run. It defaults to `/./` (which matches everything). */
 	grep?: RegExp;
+
 	instrumenterOptions?: any;
+
+	/** A path to a loader script, or an object with a `script` property and an option `config` property. */
+	loader?: { script: string, config?: { [key: string]: any } };
+
+	/** A top-level name for this configuration. */
 	name?: string;
+
+	/**
+	 * A list of reporter names or descriptors. These reporters will be loaded and instantiated before testing begins.
+	 */
 	reporters?: (string | typeof Reporter | { reporter: string | typeof Reporter, options?: ReporterOptions })[];
+
+	/** A list of paths to suite scripts (or some other suite identifier usable by the suite loader). */
+	suites?: string[];
+
 	[key: string]: any;
 }
 

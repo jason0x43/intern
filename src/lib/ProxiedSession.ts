@@ -1,6 +1,6 @@
 import Session from 'leadfoot/Session';
 import Task from 'dojo-core/async/Task';
-import WebDriver from '../WebDriver';
+import WebDriver from './executors/WebDriver';
 
 /* istanbul ignore next: client-side code */
 function getCoverageData(coverageVariable: string) {

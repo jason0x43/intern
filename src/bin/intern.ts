@@ -1,27 +1,31 @@
 #!/usr/bin/env node
 
-import Node from '../Node';
-import WebDriver from '../WebDriver';
+import Node from '../lib/executors/Node';
+import WebDriver from '../lib/executors/WebDriver';
 import { getConfig, projectRequire } from '../lib/node/util';
+import { getLoaderScript } from '../lib/util';
 
-getConfig().then(config => {
-	if (config.webdriver) {
-		WebDriver.initialize(config);
+getConfig().then(rawConfig => {
+	const isWebDriver = rawConfig.webdriver;
+
+	if (isWebDriver) {
+		WebDriver.initialize(rawConfig);
 	}
 	else {
-		Node.initialize(config);
+		Node.initialize(rawConfig);
 	}
 
-	if (config.loader) {
-		projectRequire(config.loader);
+	const config = intern.config;
+	const loader = getLoaderScript(config);
+
+	if (loader) {
+		projectRequire(loader);
+	}
+	else if (isWebDriver) {
+		config.functionalSuites.forEach(projectRequire);
 	}
 	else {
-		if (config.webDriver) {
-			config.functionalSuites.forEach(projectRequire);
-		}
-		else {
-			config.suites.forEach(projectRequire);
-		}
+		config.suites.forEach(projectRequire);
 	}
 
 	return intern.run();

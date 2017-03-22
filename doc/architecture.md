@@ -1,6 +1,6 @@
 # Architecture
 
-Intern has several components:
+Intern has several major components:
 
 * Executors
 * Reporters
@@ -20,8 +20,7 @@ conveniences. Reporter also exports a decorator that handles some of the event r
 
 ## Runners
 
-Runners are convenience scripts provided by Intern for running unit and functional tests. A runner instantiates an
-executor, configures it, and starts the testing process.
+A runner is a script that instantiates an executor, configures it, and starts the testing process.
 
 Intern includes 2 runners:
 
@@ -30,10 +29,8 @@ Intern includes 2 runners:
 
 ## Loaders
 
-A loader is a script that sets up the environment for testing, including configuring a module loader (if necessary) and
-loading suites. If a loader isn't used, Intern's runner scripts will use an environment-specific default method for
-loading suites in a provided suites list. In a Node environment `require` will be used, while the browser runner will
-use script injection.
-
-Loaders are meant to be used with Intern's built-in runner scripts. If a user creates a fully custom runner script, a
-loader script may not be required.
+A loader is an optional script that is used by Intern's runner scripts to set up the environment for testing,
+including configuring a module loader (if necessary) and loading suites. If a loader isn't used, Intern's runner scripts
+will use an environment-specific default method for loading suites in a provided suites list. In a Node environment
+`require` will be used, while the browser runner will use script injection. If a user creates a fully custom runner
+script, a loader script will not be required.

@@ -3,7 +3,7 @@ import Deferred from './Deferred';
 import Executor from './executors/Executor';
 import Test, { isTest, SKIP } from './Test';
 import { InternError } from './common';
-import { Remote } from '../WebDriver';
+import { Remote } from './executors/WebDriver';
 
 export default class Suite implements SuiteProperties {
 	after: SuiteLifecycleFunction;

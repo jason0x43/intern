@@ -1,4 +1,4 @@
-import { Config as BaseConfig, Events as BaseEvents, GenericExecutor, initialize } from './lib/executors/Executor';
+import { Config as BaseConfig, Events as BaseEvents, GenericExecutor, initialize } from './Executor';
 import Tunnel, { TunnelOptions } from 'digdug/Tunnel';
 import BrowserStackTunnel, { BrowserStackOptions } from 'digdug/BrowserStackTunnel';
 import SeleniumTunnel, { SeleniumOptions } from 'digdug/SeleniumTunnel';
@@ -6,22 +6,22 @@ import SauceLabsTunnel from 'digdug/SauceLabsTunnel';
 import TestingBotTunnel from 'digdug/TestingBotTunnel';
 import CrossBrowserTestingTunnel from 'digdug/CrossBrowserTestingTunnel';
 import NullTunnel from 'digdug/NullTunnel';
-import Server from './lib/Server';
-import Formatter from './lib/node/Formatter';
+import Server from '../Server';
+import Formatter from '../node/Formatter';
 import { deepMixin } from 'dojo-core/lang';
-import Reporter from './lib/reporters/Reporter';
-import Runner from './lib/reporters/Runner';
-import Pretty from './lib/reporters/Pretty';
+import Reporter from '../reporters/Reporter';
+import Runner from '../reporters/Runner';
+import Pretty from '../reporters/Pretty';
 import Task from 'dojo-core/async/Task';
 import LeadfootServer from 'leadfoot/Server';
-import ProxiedSession from './lib/ProxiedSession';
-import resolveEnvironments from './lib/resolveEnvironments';
-import Suite from './lib/Suite';
-import RemoteSuite from './lib/RemoteSuite';
-import { parseValue, pullFromArray, retry } from './lib/util';
-import { loadScript } from './lib/node/util';
+import ProxiedSession from '../ProxiedSession';
+import resolveEnvironments from '../resolveEnvironments';
+import Suite from '../Suite';
+import RemoteSuite from '../RemoteSuite';
+import { parseValue, pullFromArray, retry } from '../util';
+import { loadScript } from '../node/util';
 import global from 'dojo-core/global';
-import EnvironmentType from './lib/EnvironmentType';
+import EnvironmentType from '../EnvironmentType';
 import Command from 'leadfoot/Command';
 
 /**
@@ -62,6 +62,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		super(deepMixin(defaults, config));
 
 		this._formatter = new Formatter(config);
+		this._tunnels = {};
 
 		this.registerTunnel('null', NullTunnel);
 		this.registerTunnel('selenium', SeleniumTunnel);
@@ -321,8 +322,8 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 						contactTimeout: config.contactTimeout,
 						name: 'unit tests',
 						suites: config.suites,
-						runner: config.runner,
-						runnerConfig: config.runnerConfig,
+						debug: config.debug,
+						loader: config.loader,
 						server
 					}));
 				}
@@ -341,25 +342,28 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		}
 	}
 
-	protected _loadLoaders() {
-		const config = deepMixin({}, this.config, { suites: this.config.functionalSuites });
-		return this._loaders.reduce((previous, loader) => {
-			return previous.then(() => Task.resolve(loader(config)));
-		}, Task.resolve());
-	}
-
 	protected _processOption(name: keyof Config, value: any) {
 		switch (name) {
-			case 'runner':
 			case 'serverUrl':
 				this.config[name] = parseValue(name, value, 'string');
 				break;
 
 			case 'capabilities':
-			case 'environments':
-			case 'runnerConfig':
 			case 'tunnelOptions':
 				this.config[name] = parseValue(name, value, 'object');
+				break;
+
+			// Must be a string, object, or array of (string | object)
+			case 'environments':
+				if (typeof value === 'string') {
+					this.config[name] = [parseValue(name, value, 'object|string')];
+				}
+				else if (Array.isArray(value) && value.every(v => typeof v === 'string' || typeof v === 'object')) {
+					this.config[name] = value;
+				}
+				else {
+					throw new Error(`Invalid value "${value}" for ${name}; must (string | object)[]`);
+				}
 				break;
 
 			case 'tunnel':
@@ -375,7 +379,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 				this.config[name] = parseValue(name, value, 'boolean');
 				break;
 
-			case 'suites':
+			case 'functionalSuites':
 				this.config[name] = parseValue(name, value, 'string[]');
 				break;
 
@@ -390,6 +394,13 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			default:
 				super._processOption(name, value);
 		}
+	}
+
+	protected _runLoaders() {
+		const config = deepMixin({}, this.config, { suites: this.config.functionalSuites });
+		return this._loaders.reduce((previous, loader) => {
+			return previous.then(() => Task.resolve(loader(config)));
+		}, Task.resolve());
 	}
 
 	/**
@@ -427,8 +438,6 @@ export interface Config extends BaseConfig {
 	environments: (string | { [key: string]: any })[];
 	environmentRetries?: number;
 	leaveRemoteOpen?: boolean | 'fail';
-	runner?: string;
-	runnerConfig?: { [key: string]: any };
 	maxConcurrency?: number;
 	serveOnly?: boolean;
 	serverPort?: number;

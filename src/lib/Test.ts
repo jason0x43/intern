@@ -2,7 +2,7 @@ import Executor from './executors/Executor';
 import Deferred from './Deferred';
 import Task, { isTask } from 'dojo-core/async/Task';
 import { InternError } from './common';
-import { Remote } from '../WebDriver';
+import { Remote } from './executors/WebDriver';
 import Suite from './Suite';
 import { mixin } from 'dojo-core/lang';
 

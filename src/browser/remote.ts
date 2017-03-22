@@ -1,16 +1,16 @@
 import Remote from '../lib/executors/Remote';
-import { getConfig, loadAndRun, parseQuery } from '../lib/browser/util';
+import { loadSuitesAndRun, parseQuery } from '../lib/browser/util';
 import { parseArgs } from '../lib/util';
 import Channel from '../lib/WebSocketChannel';
 
-const args = parseArgs(parseQuery());
+const config = parseArgs(parseQuery());
 const channel = new Channel({
-	url: args.basePath,
-	sessionId: args.sessionId,
-	port: args.socketPort
+	url: config.basePath,
+	sessionId: config.sessionId,
+	port: config.socketPort
 });
 
-getConfig().then(config => {
+try {
 	Remote.initialize(config);
 
 	// Forward all executor events back to the Intern host
@@ -21,5 +21,8 @@ getConfig().then(config => {
 		}
 	});
 
-	return loadAndRun(config);
-}).catch(error => channel.sendMessage('error', error));
+	loadSuitesAndRun().catch(error => channel.sendMessage('error', error));
+}
+catch (error) {
+	channel.sendMessage('error', error);
+}

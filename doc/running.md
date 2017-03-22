@@ -11,11 +11,19 @@ There are several ways to run Intern:
 
 The node runner is a built in script for runnnig Node-based unit tests and WebDriver tests. Usage us simple:
 
-    $ node node_modules/.bin/intern config=tests/intern.json
+    $ node_modules/.bin/intern
 
 or
 
-    $ node node_modules/.bin/intern webdriver config=tests/intern.json
+    $ node_modules/.bin/intern webdriver
+
+By default, the runner looks for an `intern.json` config file in the project root. This can be changed by providing a
+`config` property on the command line, like `config=tests/myconfig.json`. The runner will also accept any other config
+properties as command line arguments. For example,
+
+    $ node_modules/.bin/intern suites=tests/foo.js grep=feature1
+
+would only load the suite in `tests/foo.js`, and would only run tests containing the string 'feature1' in their IDs.
 
 ## Browser Runner
 
@@ -24,9 +32,14 @@ directory using a static webserver and browse to (assuming the server is running
 
     http://localhost:8080/node_modules/intern/
 
+Similar to the Node runner script, the browser runner will accept a config argument, or any other config properties, as
+query args.
+
+    http://localhost:8080/node_modules/intern/?suites=tests/foo.js&grep=feature1
+
 ## Custom Node Script
 
-You may create a custom script to load and run Intern. The basic steps this script must perform are:
+Intern may also be configured and run with a custom script. The basic steps this script must perform are:
 
 1. Load the Node or WebDriver executor module and any reporters that will be used
 2. Initialize the executor by calling `<Executor>.initialize`. Configuration information may be passed at this step.
@@ -36,7 +49,7 @@ You may create a custom script to load and run Intern. The basic steps this scri
 
 ## Custom HTML Page
 
-This is similar to the custom Node script. The basic steps are (in an HTML page):
+Intern may be configured and run in a browser with a custom HTML page. The basic steps are:
 
 1. Load the Browser executor (`node_modules/intern/browser/intern.js`)
 2. Configure the executor

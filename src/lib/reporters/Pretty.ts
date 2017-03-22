@@ -7,7 +7,7 @@ import Suite from '../Suite';
 import Test from '../Test';
 import Reporter, { createEventHandler, ReporterProperties } from './Reporter';
 import { CoverageMessage, DeprecationMessage } from '../executors/Executor';
-import { Events, TunnelMessage } from '../../WebDriver';
+import { Events, TunnelMessage } from '../executors/WebDriver';
 import { mixin } from 'dojo-core/lang';
 import { format } from 'util';
 import charm = require('charm');

@@ -1,5 +1,5 @@
 // Import the proper executor for the current environment
-import Node from '../src/Node';
+import Node from '../src/lib/executors/Node';
 import Suite from '../src/lib/Suite';
 import Test from '../src/lib/Test';
 import { assert } from 'chai';
