@@ -55,7 +55,7 @@ export function getLoaderScript(config: Config) {
 		switch (loader) {
 			case 'dojo':
 			case 'dojo2':
-				loader = `${config.internBasePath}/browser/loader/${loader}.js`;
+				loader = `${intern.internPath}loaders/${loader}.js`;
 		}
 	}
 	return loader;
