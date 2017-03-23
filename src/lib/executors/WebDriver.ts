@@ -401,9 +401,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 	protected _runLoaders() {
 		const config = deepMixin({}, this.config, { suites: this.config.functionalSuites });
-		return this._loaders.reduce((previous, loader) => {
-			return previous.then(() => Task.resolve(loader(config)));
-		}, Task.resolve());
+		return super._runLoaders(config);
 	}
 
 	/**

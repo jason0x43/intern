@@ -275,8 +275,8 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		// Only allow the executor to be started once
 		if (!this._runTask) {
 			try {
-				this._runTask = this._runLoaders()
-					.then(() => this._beforeRun())
+				this._runTask = this._beforeRun()
+					.then(() => this._runLoaders())
 					.then(() => this.emit('runStart'))
 					.then(() => this._runTests())
 					.finally(() => this.emit('runEnd'))
@@ -458,10 +458,21 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	/**
 	 * Run any registered loader callbacks
 	 */
-	protected _runLoaders() {
+	protected _runLoaders(config?: Config) {
+		config = config || this.config;
+		this.log('Running loaders', this._loaders);
 		return this._loaders.reduce((previous, loader) => {
 			this.log('Running loader with', this.config);
-			return previous.then(() => Task.resolve(loader(this.config)));
+			return previous.then(() => new Task<void>((resolve, reject) => {
+				loader(config || this.config, error => {
+					if (error) {
+						reject(error);
+					}
+					else {
+						resolve();
+					}
+				});
+			}));
 		}, Task.resolve());
 	}
 
