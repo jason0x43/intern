@@ -35,6 +35,7 @@
 	  "bin/*.js",
 	  "browser",
 	  "lib",
+	  "loaders",
 	  "tasks",
 	  "tests",
 	  "types"
@@ -85,7 +86,7 @@
     "browserify": "^14.1.0",
     "dojo-loader": "2.0.0-beta.7",
     "intern": "~3.4.2",
-    "intern-dev": "https://github.com/theintern/intern-dev/releases/download/0.1.7/intern-dev-0.1.7.tgz",
+    "intern-dev": "https://github.com/theintern/intern-dev/releases/download/0.1.9/intern-dev-0.1.9.tgz",
     "ts-node": "^2.0.0",
     "tslint": "^4.4.0",
     "typescript": "^2.2.0"
@@ -96,13 +97,7 @@
         "tests/example.intern.js"
       ],
       ".": [
-		"src/*.html",
-		"src/**/*.d.ts",
-		"src/browser/remote.html",
-		"src/**/*.css",
-        "tests/**/*.xml",
-        "tests/**/*.js",
-        "tests/**/*.html"
+        "tests/**/*.xml"
       ]
     },
 	"browserify": {
@@ -111,12 +106,6 @@
 	  ],
 	  "src/browser/remote.js": [
 		"src/browser/remote.js"
-	  ],
-	  "src/browser/loaders/dojo.js": [
-		"src/browser/loaders/dojo.js"
-	  ],
-	  "src/browser/loaders/dojo2.js": [
-		"src/browser/loaders/dojo2.js"
 	  ]
 	},
     "testConfig": "tests/selftest.intern.js"
