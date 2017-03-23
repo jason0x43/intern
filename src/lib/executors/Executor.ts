@@ -382,6 +382,9 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	 * Return a reporter constructor corresponding to the given name
 	 */
 	protected _getReporter(name: string): typeof Reporter {
+		if (!this._availableReporters[name]) {
+			throw new Error(`A reporter named "${name}" has not been registered`);
+		}
 		return this._availableReporters[name];
 	}
 
@@ -395,6 +398,9 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 				value = parseValue(name, value, 'object|string');
 				if (typeof value === 'string') {
 					value = { script: value };
+				}
+				else if (typeof value.script !== 'string') {
+					throw new Error('loader option must have a "script" property');
 				}
 				this.config[name] = value;
 				break;
