@@ -109,43 +109,25 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 	protected _beforeRun() {
 		const config = this.config;
 
-		if (config.environments.length === 0) {
-			throw new Error('No environments specified');
-		}
-
-		if (!config.capabilities.name) {
-			config.capabilities.name = 'intern';
-		}
-
-		const buildId = process.env.TRAVIS_COMMIT || process.env.BUILD_TAG;
-		if (buildId) {
-			config.capabilities.build = buildId;
-		}
-
-		if (!config.serverPort) {
-			config.serverPort = 9000;
-		}
-
-		if (!config.socketPort) {
-			config.socketPort = config.serverPort + 1;
-		}
-
-		if (!config.serverUrl) {
-			config.serverUrl = 'http://localhost:' + config.serverPort;
-		}
-
-		if (!config.basePath) {
-			config.basePath = process.cwd();
-		}
-
-		config.serverUrl = config.serverUrl.replace(/\/*$/, '/');
-
-		if (config.tunnel === BrowserStackTunnel || config.tunnel === 'browserstack') {
-			const options = <BrowserStackOptions>config.tunnelOptions;
-			options.servers = (options.servers || []).concat(config.serverUrl);
-		}
-
 		const promise = super._beforeRun().then(() => {
+			if (!config.serverPort) {
+				config.serverPort = 9000;
+			}
+
+			if (!config.socketPort) {
+				config.socketPort = config.serverPort + 1;
+			}
+
+			if (!config.serverUrl) {
+				config.serverUrl = 'http://localhost:' + config.serverPort;
+			}
+
+			if (!config.basePath) {
+				config.basePath = process.cwd();
+			}
+
+			config.serverUrl = config.serverUrl.replace(/\/*$/, '/');
+
 			const server = this._createServer();
 			return server.start().then(() => {
 				this.server = server;
@@ -171,12 +153,30 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			});
 		}
 
-		if (!config.suites) {
-			config.suites = [];
-		}
-
 		return promise
 			.then(() => {
+				if (config.environments.length === 0) {
+					throw new Error('No environments specified');
+				}
+
+				if (config.functionalSuites == null) {
+					config.functionalSuites = [];
+				}
+
+				if (!config.capabilities.name) {
+					config.capabilities.name = 'intern';
+				}
+
+				const buildId = process.env.TRAVIS_COMMIT || process.env.BUILD_TAG;
+				if (buildId) {
+					config.capabilities.build = buildId;
+				}
+
+				if (config.tunnel === BrowserStackTunnel || config.tunnel === 'browserstack') {
+					const options = <BrowserStackOptions>config.tunnelOptions;
+					options.servers = (options.servers || []).concat(config.serverUrl);
+				}
+
 				let TunnelConstructor: typeof Tunnel;
 				if (typeof config.tunnel === 'string') {
 					TunnelConstructor = this._tunnels[config.tunnel];

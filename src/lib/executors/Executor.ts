@@ -46,8 +46,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 				coverageVariable: '__internCoverage'
 			},
 			defaultTimeout: 30000,
-			excludeInstrumentation: /(?:node_modules|browser|tests)\//,
-			reporters: []
+			excludeInstrumentation: /(?:node_modules|browser|tests)\//
 		};
 
 		this._availableReporters = {};
@@ -326,6 +325,14 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 
 		if (config.grep == null) {
 			config.grep = new RegExp('');
+		}
+
+		if (config.suites == null) {
+			config.suites = [];
+		}
+
+		if (config.reporters == null) {
+			config.reporters = [];
 		}
 
 		if (config.reporters) {

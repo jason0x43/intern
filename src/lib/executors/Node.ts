@@ -3,7 +3,7 @@ import Task from 'dojo-core/async/Task';
 import { instrument } from '../instrument';
 import { loadScript, normalizePath } from '../node/util';
 import Formatter from '../node/Formatter';
-import { resolve, sep } from 'path';
+import { dirname, resolve, relative, sep } from 'path';
 import { hook } from 'istanbul';
 import Pretty from '../reporters/Pretty';
 import Simple from '../reporters/Simple';
@@ -46,15 +46,16 @@ export default class Node extends GenericExecutor<Events, Config> {
 	}
 
 	protected _beforeRun(): Task<void> {
-		return super._beforeRun().then(() => {
-			if (this._reporters.length === 0) {
-				this._reporters.push(new Simple(this));
-			}
+		const config = this.config;
+		if (config.reporters.length === 0) {
+			config.reporters.push('simple');
+		}
 
+		return super._beforeRun().then(() => {
 			const suite = this._rootSuite;
-			suite.grep = this.config.grep;
-			suite.timeout = this.config.defaultTimeout;
-			suite.bail = this.config.bail;
+			suite.grep = config.grep;
+			suite.timeout = config.defaultTimeout;
+			suite.bail = config.bail;
 		});
 	}
 
