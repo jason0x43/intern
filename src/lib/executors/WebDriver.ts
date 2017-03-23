@@ -167,6 +167,10 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 					config.functionalSuites = [];
 				}
 
+				if (config.functionalSuites.length + config.suites.length + config.benchmarkSuites.length === 0) {
+					throw new Error('No test suites to run');
+				}
+
 				if (!config.capabilities.name) {
 					config.capabilities.name = 'intern';
 				}

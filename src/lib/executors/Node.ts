@@ -52,6 +52,10 @@ export default class Node extends GenericExecutor<Events, Config> {
 		}
 
 		return super._beforeRun().then(() => {
+			if (config.suites.length + config.benchmarkSuites.length === 0) {
+				throw new Error('No test suites to run');
+			}
+
 			const suite = this._rootSuite;
 			suite.grep = config.grep;
 			suite.timeout = config.defaultTimeout;
