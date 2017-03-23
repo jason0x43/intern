@@ -9,9 +9,6 @@ import NullTunnel from 'digdug/NullTunnel';
 import Server from '../Server';
 import Formatter from '../node/Formatter';
 import { deepMixin } from 'dojo-core/lang';
-import Reporter from '../reporters/Reporter';
-import Runner from '../reporters/Runner';
-import Pretty from '../reporters/Pretty';
 import Task from 'dojo-core/async/Task';
 import LeadfootServer from 'leadfoot/Server';
 import ProxiedSession from '../ProxiedSession';
@@ -23,6 +20,9 @@ import { loadScript } from '../node/util';
 import global from 'dojo-core/global';
 import EnvironmentType from '../EnvironmentType';
 import Command from 'leadfoot/Command';
+import Pretty from '../reporters/Pretty';
+import Runner from '../reporters/Runner';
+import { dirname, resolve, relative } from 'path';
 
 /**
  * The WebDriver executor is used to run unit tests in a remote browser, and to run functional tests against a remote
@@ -73,6 +73,10 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		this.registerTunnel('browserstack', BrowserStackTunnel);
 		this.registerTunnel('testingbot', TestingBotTunnel);
 		this.registerTunnel('cbt', CrossBrowserTestingTunnel);
+
+		this.registerReporter('pretty', Pretty);
+		this.registerReporter('runner', Runner);
+
 	}
 
 	/**
@@ -334,15 +338,6 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 				return suite;
 			});
 		});
-	}
-
-	protected _getReporter(name: string): typeof Reporter {
-		switch (name) {
-			case 'runner':
-				return Runner;
-			case 'pretty':
-				return Pretty;
-		}
 	}
 
 	protected _processOption(name: keyof Config, value: any) {
