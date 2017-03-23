@@ -13,36 +13,48 @@ export interface TddInterface {
 }
 
 export default function getInterface(executor: Executor): TddInterface {
-	let currentSuite: Suite;
+	let suiteStack: Suite[] = [];
 
 	return {
 		suite(name: string, factory: () => void) {
+			const currentSuite = getCurrent(suiteStack);
+			const suite = new Suite({ name, tests: [], parent: currentSuite });
 			if (!currentSuite) {
 				// This is a new top-level suite, not a nested suite
-				currentSuite = new Suite({ name, tests: [] });
-				executor.addTest(currentSuite);
+				executor.addTest(suite);
 			}
-			factory.call(currentSuite);
+			suiteStack.push(suite);
+			factory.call(suite);
+			suiteStack.pop();
 		},
 
 		test(name: string, test: TestFunction) {
+			const currentSuite = getCurrent(suiteStack);
 			currentSuite.tests.push(new Test({ name, test, parent: currentSuite }));
 		},
 
 		before(fn: SuiteLifecycleFunction) {
+			const currentSuite = getCurrent(suiteStack);
 			on(currentSuite, 'before', fn);
 		},
 
 		after(fn: SuiteLifecycleFunction) {
+			const currentSuite = getCurrent(suiteStack);
 			on(currentSuite, 'after', fn);
 		},
 
 		beforeEach(fn: SuiteLifecycleFunction) {
+			const currentSuite = getCurrent(suiteStack);
 			on(currentSuite, 'beforeEach', fn);
 		},
 
 		afterEach(fn: SuiteLifecycleFunction) {
+			const currentSuite = getCurrent(suiteStack);
 			on(currentSuite, 'afterEach', fn);
 		}
 	};
+}
+
+function getCurrent(stack: Suite[]) {
+	return stack[stack.length - 1];
 }
