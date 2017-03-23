@@ -30,6 +30,8 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 
 	protected _interfaces: { [name: string]: any };
 
+	protected _internPath: string;
+
 	protected _loaders: Loader[];
 
 	protected _listeners: { [event: string]: Listener<any>[] };
@@ -53,6 +55,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		this._reporters = [];
 		this._interfaces = {};
 		this._loaders = [];
+		this._internPath = '';
 
 		if (config) {
 			this.configure(config);
@@ -73,6 +76,10 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			this._formatter = new Formatter(this.config);
 		}
 		return this._formatter;
+	}
+
+	get internPath() {
+		return this._internPath;
 	}
 
 	/**
@@ -377,14 +384,6 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	 */
 	protected _processOption(name: keyof Config, value: any) {
 		switch (name) {
-			case 'basePath':
-				let parsed = parseValue(name, value, 'string');
-				if (parsed[parsed.length - 1] !== '/') {
-					parsed += '/';
-				}
-				this.config[name] = parsed;
-				break;
-
 			case 'loader':
 				value = parseValue(name, value, 'object|string');
 				if (typeof value === 'string') {
@@ -505,10 +504,6 @@ export interface Config {
 	bail?: boolean;
 
 	baseline?: boolean;
-
-	/** This is the base path added to any relative paths. It defaults to `process.cwd()` or `/`. */
-	basePath?: string;
-
 	benchmark?: boolean;
 	benchmarkConfig?: {
 		id: string;

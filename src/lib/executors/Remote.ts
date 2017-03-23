@@ -21,10 +21,6 @@ export default class Remote extends GenericBrowser<Events, Config> {
 		this.config.reporters.push('dom');
 	}
 
-	get scriptName() {
-		return '/browser/remote.js';
-	}
-
 	/**
 	 * Override Executor#_emitCoverage to include the session ID
 	 */

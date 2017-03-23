@@ -31,6 +31,9 @@ export default class Node extends GenericExecutor<Events, Config> {
 		if (this.config.excludeInstrumentation !== true) {
 			this._setInstrumentationHooks(this.config.excludeInstrumentation);
 		}
+
+		const internPath = resolve(dirname(require.resolve('intern/package.json')));
+		this._internPath = `${relative(process.cwd(), internPath)}/`;
 	}
 
 	/**

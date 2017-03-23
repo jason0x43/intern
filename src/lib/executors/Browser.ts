@@ -10,10 +10,7 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 			this.config.basePath = '/';
 		}
 
-		if (!this.config.internBasePath) {
-			this.config.internBasePath = '/node_modules/intern/';
-		}
-
+		this._internPath = this.config.basePath + 'node_modules/intern/';
 		this._formatter = new Formatter(config);
 	}
 
@@ -40,7 +37,6 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 	protected _processOption(name: keyof Config, value: any) {
 		switch (name) {
 			case 'basePath':
-			case 'internBasePath':
 				if (typeof value !== 'string') {
 					throw new Error(`${name} must be a string`);
 				}
@@ -67,12 +63,12 @@ export default class Browser extends GenericBrowser<Events, Config> {
 	}
 }
 
-export { Events }
-
 export interface Config extends BaseConfig {
-	/** The absolute path to intern (will be auto-determined by default) */
-	internBasePath?: string;
+	/** The absolute path to the project base (defaults to '/') */
+	basePath?: string;
 }
+
+export { Events };
 
 function normalizePath(path: string, basePath: string) {
 	// If path isn't absolute, assume it's relative to basePath

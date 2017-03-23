@@ -53,7 +53,7 @@ export function getConfig() {
  * Load suites and start Intern
  */
 export function loadSuitesAndRun() {
-	intern.log('Intern base path:', intern.config.internBasePath);
+	intern.log('Intern path:', intern.internPath);
 
 	let loaderTask: Task<any>;
 	const loader = getLoaderScript(intern.config);

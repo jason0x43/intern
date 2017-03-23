@@ -64,6 +64,9 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		this._formatter = new Formatter(config);
 		this._tunnels = {};
 
+		const internPath = resolve(dirname(require.resolve('intern/package.json')));
+		this._internPath = `${relative(process.cwd(), internPath)}/`;
+
 		this.registerTunnel('null', NullTunnel);
 		this.registerTunnel('selenium', SeleniumTunnel);
 		this.registerTunnel('saucelabs', SauceLabsTunnel);
