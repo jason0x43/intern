@@ -35,7 +35,7 @@
     "insertSpaceAfterSemicolonInForStatements": true
   },
   "files": [
-    "src/index.d.ts"
+    "src/index.ts"
   ],
   "include": [
     "src/browser/**/*.ts",
