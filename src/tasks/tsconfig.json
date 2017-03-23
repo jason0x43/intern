@@ -1,19 +1,18 @@
 {
   "compilerOptions": {
-    "baseUrl": "..",
+    "baseUrl": "../..",
     "declaration": false,
     "module": "commonjs",
-    "outDir": "../_build/src",
     "paths": {
       "intern/*": [
 		  "./_build/src/*",
 		  "./src/*"
 	  ]
 	},
-    "rootDir": "..",
+    "rootDir": "../..",
     "sourceMap": false
   },
-  "extends": "../tsconfig.json",
+  "extends": "../../tsconfig.json",
   "include": [
     "./*.ts"
   ]
