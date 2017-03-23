@@ -3,6 +3,7 @@ import { initialize } from './Executor';
 import Task from 'dojo-core/async/Task';
 import { parseValue } from '../util';
 import Dom from '../reporters/Dom';
+import { deepMixin } from 'dojo-core/lang';
 
 /**
  * An executor for running suites in a remote browser.
@@ -15,10 +16,10 @@ export default class Remote extends GenericBrowser<Events, Config> {
 	protected _debug: boolean;
 
 	constructor(config: Config) {
-		super(config);
-
+		super(deepMixin(config, {
+			reporters: ['dom']
+		}));
 		this.registerReporter('dom', Dom);
-		this.config.reporters.push('dom');
 	}
 
 	/**

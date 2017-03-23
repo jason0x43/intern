@@ -47,8 +47,8 @@ export default class Node extends GenericExecutor<Events, Config> {
 
 	protected _beforeRun(): Task<void> {
 		const config = this.config;
-		if (config.reporters.length === 0) {
-			config.reporters.push('simple');
+		if (!config.reporters) {
+			config.reporters = ['simple'];
 		}
 
 		return super._beforeRun().then(() => {

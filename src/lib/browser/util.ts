@@ -1,52 +1,41 @@
 import request from 'dojo-core/request/xhr';
 import Task from 'dojo-core/async/Task';
 import { deepMixin } from 'dojo-core/lang';
-import { getLoaderScript, parseArgs } from '../util';
+import { getLoaderScript, parseArgs, parseJSON } from '../util';
 
 /**
- * Given a script suffix, return the base path
- */
-export function getBasePath(suffix: string) {
-	const host = /https?:\/\/[^\/]+(?:\/)/.exec(document.baseURI)[0];
-	const currentScript = <HTMLScriptElement>document.currentScript || (function() {
-		const scripts = document.getElementsByTagName('script');
-		return scripts[scripts.length - 1];
-	})();
-	const scriptPath = `/${currentScript.src.slice(host.length)}`;
-	if (suffix[0] !== '/') {
-		suffix = `/${suffix}`;
-	}
-
-	if (scriptPath.indexOf(suffix) !== scriptPath.length - suffix.length) {
-		throw new Error(`Current script doesn't end with suffix '${suffix}': ${scriptPath}`);
-	}
-
-	return `${scriptPath.slice(0, scriptPath.length - suffix.length)}/`;
-}
-
-/**
- * Get the user-supplied config data, which may include query args and a config file.
+ * Resolve the user-supplied config data, which may include query args and a config file.
  */
 export function getConfig() {
 	const args = parseArgs(parseQuery());
-	const basePath = args.basePath || '/';
 
 	if (args.config) {
 		// If a config parameter was provided, load it, mix in any other query params, then initialize the executor with
 		// that
-		let configPath = args.config;
-		if (configPath[0] !== '/') {
-			configPath = `${basePath}${args.config}`;
-		}
-		return loadJson(configPath).then(config => deepMixin(config, args));
+		const path = resolvePath(args.config, args.basePath);
+		return loadConfig(path).then(config => deepMixin(config, args));
 	}
 	else {
 		// If no config parameter was provided, try 'intern.json'. If that file doesn't exist, just return the args
-		return loadJson(`${basePath}intern.json`).then(
+		const path = resolvePath('intern.json', args.basePath);
+		return loadConfig(path).then(
 			config => deepMixin(config, args),
 			_error => args
 		);
 	}
+}
+
+/**
+ * Load a JSON resource
+ */
+export function loadJson(path: string, basePath?: string): Task<any> {
+	if (path[0] !== '/') {
+		basePath = basePath == null ? '/' : basePath;
+		path = `${basePath}${path}`;
+	}
+	return request(path).then(response => {
+		return parseJSON(<string>response.data);
+	});
 }
 
 /**
@@ -67,15 +56,6 @@ export function loadSuitesAndRun() {
 	}
 
 	return loaderTask.then(() => intern.run());
-}
-
-/**
- * Load a JSON resource
- */
-export function loadJson(path: string): Task<any> {
-	return request(path).then(response => {
-		return JSON.parse(<string>response.data);
-	});
 }
 
 /**
@@ -126,4 +106,27 @@ export function parseQuery(query?: string) {
 		}
 		return name;
 	});
+}
+
+function loadConfig(configPath: string): Promise<any> {
+	return loadJson(configPath).then(config => {
+		if (config.extends) {
+			const parts = configPath.split('/');
+			const extensionPath = parts.slice(0, parts.length - 1).concat(config.extends).join('/');
+			return loadConfig(extensionPath).then(extension => {
+				return deepMixin(extension, config);
+			});
+		}
+		else {
+			return config;
+		}
+	});
+}
+
+function resolvePath(path: string, basePath: string) {
+	if (path[0] !== '/') {
+		basePath = basePath == null ? '/' : basePath;
+		path = `${basePath}${path}`;
+	}
+	return path;
 }
