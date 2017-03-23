@@ -591,5 +591,5 @@ export interface Events {
  * returned.
  */
 export interface Loader {
-	(config: { [key: string]: any }): Promise<any> | any;
+	(config: { [key: string]: any }, done: (error?: Error) => void): void;
 }
