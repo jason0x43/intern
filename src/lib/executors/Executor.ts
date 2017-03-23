@@ -331,6 +331,10 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			config.suites = [];
 		}
 
+		if (config.benchmarkSuites == null) {
+			config.benchmarkSuites = [];
+		}
+
 		if (config.reporters == null) {
 			config.reporters = [];
 		}
@@ -459,6 +463,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 				this.config[name] = parseValue(name, value, 'string');
 				break;
 
+			case 'benchmarkSuites':
 			case 'suites':
 				this.config[name] = parseValue(name, value, 'string[]');
 				break;
