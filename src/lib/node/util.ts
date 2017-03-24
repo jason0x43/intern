@@ -1,4 +1,4 @@
-import { normalize, relative, resolve } from 'path';
+import { normalize, resolve } from 'path';
 import { readFile } from 'fs';
 import { parseArgs, parseJSON } from '../util';
 import { deepMixin } from 'dojo-core/lang';
@@ -29,16 +29,7 @@ export function getConfig() {
  * @param resource a path to a text resource
  */
 export function loadJson(resource: string): Task<any> {
-	return new Task<string>((resolve, reject) => {
-		readFile(resource, { encoding: 'utf8' }, (error, data) => {
-			if (error) {
-				reject(error);
-			}
-			else {
-				resolve(parseJSON(data));
-			}
-		});
-	});
+	return loadText(resource).then(data => parseJSON(data));
 }
 
 /**
@@ -47,14 +38,16 @@ export function loadJson(resource: string): Task<any> {
  * @param script a path to a script
  */
 export function loadScript(script: string | string[]) {
-	if (Array.isArray(script)) {
-		script.forEach(script => {
-			require(relative(__dirname, resolve(script)));
-		});
+	if (!Array.isArray(script)) {
+		script = [script];
 	}
-	else if (script != null) {
-		require(relative(__dirname, resolve(script)));
-	}
+
+	script.forEach(script => {
+		script = resolve(script);
+		// Delete the module cache entry for the script to ensure it will be loaded and executed again.
+		delete require.cache[script];
+		require(script);
+	});
 
 	return Task.resolve();
 }
@@ -85,5 +78,18 @@ function loadConfig(configPath: string): Promise<any> {
 		else {
 			return config;
 		}
+	});
+}
+
+function loadText(path: string) {
+	return new Task<string>((resolve, reject) => {
+		readFile(path, { encoding: 'utf8' }, (error, data) => {
+			if (error) {
+				reject(error);
+			}
+			else {
+				resolve(data);
+			}
+		});
 	});
 }
