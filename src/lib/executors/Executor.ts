@@ -9,6 +9,7 @@ import Reporter, { ReporterOptions } from '../reporters/Reporter';
 import getObjectInterface, { ObjectInterface } from '../interfaces/object';
 import getTddInterface, { TddInterface } from '../interfaces/tdd';
 import getBddInterface, { BddInterface } from '../interfaces/bdd';
+import Promise from 'dojo-shim/Promise';
 import * as chai from 'chai';
 import global from 'dojo-core/global';
 
@@ -38,6 +39,8 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 
 	protected _reporters: Reporter[];
 
+	protected _afterCallbacks: AsyncCallback[];
+
 	protected _beforeCallbacks: AsyncCallback[];
 
 	protected _runTask: Task<void>;
@@ -55,6 +58,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		this._listeners = {};
 		this._reporters = [];
 		this._interfaces = {};
+		this._afterCallbacks = [];
 		this._beforeCallbacks = [];
 		this._internPath = '';
 
@@ -67,6 +71,8 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			name: this.config.name
 		});
 	}
+
+	abstract get environmentType(): string;
 
 	get config() {
 		return this._config;
@@ -285,6 +291,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 					.then(() => this._runTests())
 					.finally(() => this.emit('runEnd'))
 					.finally(() => this._afterRun())
+					.then(() => this._runAfterCallbacks())
 					.then(() => {
 						if (this._hasSuiteErrors) {
 							throw new Error('One or more suite errors occurred during testing');
@@ -303,6 +310,10 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		}
 
 		return this._runTask;
+	}
+
+	runAfter(callback: AsyncCallback) {
+		this._afterCallbacks.push(callback);
 	}
 
 	runBefore(callback: AsyncCallback) {
@@ -528,21 +539,17 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	}
 
 	/**
+	 * Run any registerd 'after' callbacks.
+	 */
+	protected _runAfterCallbacks() {
+		return runCallbacks(this._afterCallbacks);
+	}
+
+	/**
 	 * Run any registerd 'before' callbacks.
 	 */
 	protected _runBeforeCallbacks() {
-		return this._beforeCallbacks.reduce((previous, callback) => {
-			return previous.then(() => new Task<void>((resolve, reject) => {
-				callback(error => {
-					if (error) {
-						reject(error);
-					}
-					else {
-						resolve();
-					}
-				});
-			}));
-		}, Task.resolve());
+		return runCallbacks(this._beforeCallbacks);
 	}
 
 	/**
@@ -622,7 +629,7 @@ export interface Config {
 	/**
 	 * A list of scripts to load before suites are loaded. These must be simple scripts, not modules, as a module loader
 	 * may not be available when these are loaded. Also, these scripts should be synchronous, or register an async
-	 * callback using intern.runBefore.
+	 * callback using intern.runBefore or intern.runAfter.
 	 */
 	preload?: string[];
 
@@ -685,4 +692,19 @@ export interface Loader {
  */
 export interface AsyncCallback {
 	(done: (error?: Error) => void): void;
+}
+
+export function runCallbacks(callbacks: AsyncCallback[]) {
+	return callbacks.reduce((previous, callback) => {
+		return previous.then(() => new Task<void>((resolve, reject) => {
+			callback(error => {
+				if (error) {
+					reject(error);
+				}
+				else {
+					resolve();
+				}
+			});
+		}));
+	}, Task.resolve());
 }

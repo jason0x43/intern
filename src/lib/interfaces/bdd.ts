@@ -4,7 +4,7 @@ import { TestFunction } from '../Test';
 import getTddInterface from './tdd';
 
 export interface BddInterface {
-	describe(name: string, factory: TestFunction): void;
+	describe(name: string, factory: SuiteLifecycleFunction): void;
 	it(name: string, test: TestFunction): void;
 	before(fn: SuiteLifecycleFunction): void;
 	after(fn: SuiteLifecycleFunction): void;

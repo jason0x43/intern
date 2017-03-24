@@ -3,6 +3,33 @@ import { readFile } from 'fs';
 import { parseArgs, parseJSON } from '../util';
 import { deepMixin } from 'dojo-core/lang';
 import Task from 'dojo-core/async/Task';
+import Promise from 'dojo-shim/Promise';
+import glob = require('glob');
+
+/**
+ * Expand a list of glob patterns into a flat file list
+ */
+export function expandFiles(patterns?: string[]) {
+	if (!Array.isArray(patterns)) {
+		patterns = [patterns];
+	}
+	return Promise.all(patterns.map(pattern => {
+		return new Promise<string[]>((resolve, reject) => {
+			glob(pattern, (error, files) => {
+				if (error) {
+					reject(error);
+				}
+				else {
+					resolve(files);
+				}
+			});
+		});
+	})).then(fileSets => {
+		return fileSets.reduce((allFiles, files) => {
+			return allFiles.concat(files);
+		}, []);
+	});
+}
 
 /**
  * Get the user-supplied config data, which may include query args and a config file.

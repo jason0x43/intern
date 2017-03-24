@@ -1,4 +1,4 @@
-import Task from 'dojo-core/async/Task';
+import Task, { isThenable } from 'dojo-core/async/Task';
 import Deferred from './Deferred';
 import Executor from './executors/Executor';
 import Test, { isTest, SKIP } from './Test';
@@ -280,7 +280,7 @@ export default class Suite implements SuiteProperties {
 				};
 
 				const suiteFunc: () => Promise<any> = (<any>suite)[name];
-				let returnValue = suiteFunc && suiteFunc.apply(suite, args);
+				let returnValue = suiteFunc && suiteFunc.call(suite, suite, ...args);
 
 				if (dfd) {
 					// If a timeout was set, async was called, so we should use the dfd created by the call to
@@ -294,15 +294,8 @@ export default class Suite implements SuiteProperties {
 					}
 
 					// If the return value looks like a promise, resolve the dfd if the return value resolves
-					if (returnValue && returnValue.then) {
-						returnValue.then(
-							function (value: any) {
-								dfd.resolve(value);
-							},
-							function (error: Error) {
-								dfd.reject(error);
-							}
-						);
+					if (isThenable(returnValue)) {
+						returnValue.then((value: any) => dfd.resolve(value), error => dfd.reject(error));
 					}
 
 					returnValue = dfd.promise;
@@ -426,7 +419,7 @@ export default class Suite implements SuiteProperties {
 							function runWithCatch() {
 								// Errors raised when running child tests should be reported but should not cause
 								// this suite’s run to reject, since this suite itself has not failed.
-								return new Task((resolve, reject) => {
+								return new Task<void>((resolve, reject) => {
 									test.run().then(resolve, reject);
 								}).catch(handleError);
 							}
@@ -454,10 +447,8 @@ export default class Suite implements SuiteProperties {
 
 								current = runTestLifecycle('beforeEach', <Test>test)
 									.then(runWithCatch)
-									.finally(function () {
-										return runTestLifecycle('afterEach', <Test>test);
-									})
-									.catch(function (error: InternError) {
+									.finally(() => runTestLifecycle('afterEach', <Test>test))
+									.catch((error: InternError) => {
 										firstError = firstError || error;
 										return handleError(error);
 									});
@@ -549,11 +540,11 @@ export function isSuiteOptions(value: any): value is SuiteOptions {
 }
 
 export interface SuiteLifecycleFunction {
-	(this: Suite): void | Promise<any>;
+	(this: Suite, suite: Suite): void | Promise<any>;
 }
 
 export interface TestLifecycleFunction {
-	(this: Test): void | Promise<any>;
+	(this: Test, test: Test): void | Promise<any>;
 }
 
 // Properties that define a Suite. Note that 'tests' isn't included so that other interfaces, such as the object

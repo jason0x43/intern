@@ -180,7 +180,7 @@ export default class Test implements TestProperties {
 				startTime = Date.now();
 			})
 			.then(() => {
-				let result = this.test();
+				let result = this.test(this);
 
 				// Someone called `this.async`, so this test is async; we have to prefer one or the other, so
 				// prefer the promise returned from the test function if it exists, otherwise get the one that was
@@ -299,7 +299,7 @@ export function isTestOptions(value: any): value is TestOptions {
 }
 
 export interface TestFunction {
-	(this: Test): void | Promise<any>;
+	(test: Test): void | Promise<any>;
 }
 
 export interface TestProperties {

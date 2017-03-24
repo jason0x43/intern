@@ -13,9 +13,6 @@ import { Handle } from 'dojo-interfaces/core';
  * RemoteSuite is a class that acts as a local server for one or more unit test suites being run in a remote browser.
  */
 export default class RemoteSuite extends Suite implements RemoteSuiteProperties {
-	/** Time to wait for contact from remote server */
-	contactTimeout: number;
-
 	executor: WebDriver;
 
 	/** The HTML page that will be used to host the tests */
@@ -34,10 +31,6 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 
 		if (this.timeout == null) {
 			this.timeout = Infinity;
-		}
-
-		if (this.contactTimeout == null) {
-			this.contactTimeout = 5000;
 		}
 
 		this.tests = [];
@@ -198,7 +191,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 						if (contactTimer !== false) {
 							contactTimer = setTimeout(() => {
 								handleError(new Error('No contact from remote browser'));
-							}, this.contactTimeout);
+							}, this.executor.config.contactTimeout);
 						}
 					})
 					// If there's an error loading the page, kill the heartbeat and fail
@@ -216,7 +209,6 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 }
 
 export interface RemoteSuiteProperties extends SuiteProperties {
-	contactTimeout: number;
 	server: Server;
 }
 

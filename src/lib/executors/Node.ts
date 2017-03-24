@@ -1,7 +1,7 @@
 import { Config, Events, GenericExecutor, initialize } from './Executor';
 import Task from 'dojo-core/async/Task';
 import { instrument } from '../instrument';
-import { loadScript, normalizePath } from '../node/util';
+import { expandFiles, loadScript, normalizePath } from '../node/util';
 import Formatter from '../node/Formatter';
 import { dirname, resolve, relative, sep } from 'path';
 import { hook } from 'istanbul';
@@ -36,6 +36,10 @@ export default class Node extends GenericExecutor<Events, Config> {
 		this._internPath = `${relative(process.cwd(), internPath)}/`;
 	}
 
+	get environmentType() {
+		return 'node';
+	}
+
 	/**
 	 * Load a script or scripts using Node's require.
 	 *
@@ -60,6 +64,13 @@ export default class Node extends GenericExecutor<Events, Config> {
 			suite.grep = config.grep;
 			suite.timeout = config.defaultTimeout;
 			suite.bail = config.bail;
+		}).then(() => {
+			return Promise.all(['suites', 'benchmarkSuites'].map(property => {
+				return expandFiles(config[property]).then(expanded => {
+					config[property] = expanded;
+				});
+			// return void
+			})).then(() => null);
 		});
 	}
 

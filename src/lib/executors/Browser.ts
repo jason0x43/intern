@@ -14,6 +14,10 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 		this._formatter = new Formatter(config);
 	}
 
+	get environmentType() {
+		return 'browser';
+	}
+
 	/**
 	 * Load a script or scripts via script injection.
 	 *

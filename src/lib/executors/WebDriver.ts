@@ -16,13 +16,14 @@ import resolveEnvironments from '../resolveEnvironments';
 import Suite from '../Suite';
 import RemoteSuite from '../RemoteSuite';
 import { parseValue, pullFromArray, retry } from '../util';
-import { loadScript } from '../node/util';
+import { expandFiles, loadScript } from '../node/util';
 import global from 'dojo-core/global';
-import EnvironmentType from '../EnvironmentType';
+import Environment from '../Environment';
 import Command from 'leadfoot/Command';
 import Pretty from '../reporters/Pretty';
 import Runner from '../reporters/Runner';
 import { dirname, resolve, relative } from 'path';
+import Promise from 'dojo-shim/Promise';
 
 /**
  * The WebDriver executor is used to run unit tests in a remote browser, and to run functional tests against a remote
@@ -77,6 +78,10 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		this.registerReporter('pretty', Pretty);
 		this.registerReporter('runner', Runner);
 
+	}
+
+	get environmentType() {
+		return 'webdriver';
 	}
 
 	/**
@@ -194,6 +199,14 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 				}
 				this.tunnel = new TunnelConstructor(this.config.tunnelOptions);
 			})
+			.then(() => {
+				return Promise.all(['suites', 'functionalSuites', 'benchmarkSuites'].map(property => {
+					return expandFiles(config[property]).then(expanded => {
+						config[property] = expanded;
+					});
+				// return void
+				})).then(() => null);
+			})
 			.then(() => this._createSessionSuites())
 			.then(() => {
 				const tunnel = this.tunnel;
@@ -286,7 +299,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 							// TODO: Find a better way to handle the fact that session is mixed into the new Command
 							// instance (better than just casting to Remote)
 							let command: Remote = <Remote>new Command(session);
-							command.environmentType = new EnvironmentType(session.capabilities);
+							command.environmentType = new Environment(session.capabilities);
 
 							suite.remote = command;
 							// TODO: Document or remove sessionStart/sessionEnd.
@@ -430,7 +443,10 @@ export interface Config extends BaseConfig {
 		build?: string;
 		[key: string]: any;
 	};
+
+	/** Time to wait for contact from a remote server */
 	contactTimeout?: number;
+
 	environments: (string | { [key: string]: any })[];
 	environmentRetries?: number;
 	leaveRemoteOpen?: boolean | 'fail';
@@ -448,7 +464,7 @@ export interface Config extends BaseConfig {
 }
 
 export interface Remote extends Command<any> {
-	environmentType?: EnvironmentType;
+	environmentType?: Environment;
 	setHeartbeatInterval(delay: number): Command<any>;
 }
 

@@ -1,8 +1,8 @@
 import { mixin } from 'dojo-core/lang';
-import EnvironmentType from './EnvironmentType';
+import Environment from './Environment';
 import { NormalizedEnvironment } from 'digdug/Tunnel';
 
-export type Environment = { version?: (string|string[]|number|number[]), [key: string]: any };
+export type EnvironmentOptions = { version?: (string|string[]|number|number[]), [key: string]: any };
 export type FlatEnvironment = { version?: string, [key: string]: any };
 
 /**
@@ -13,7 +13,7 @@ export type FlatEnvironment = { version?: string, [key: string]: any };
  * @param available a list of available environments
  * @returns a list of flattened service environments
  */
-export default function resolveEnvironments(capabilities: { [key: string]: any }, environments: (Environment | string)[], available?: NormalizedEnvironment[]) {
+export default function resolveEnvironments(capabilities: { [key: string]: any }, environments: (EnvironmentOptions | string)[], available?: NormalizedEnvironment[]) {
 	// flatEnviroments will have non-array versions
 	const flatEnvironments = createPermutations(capabilities, environments);
 
@@ -27,7 +27,7 @@ export default function resolveEnvironments(capabilities: { [key: string]: any }
 	// Perform a second round of permuting to handle any expanded version ranges
 	return createPermutations({}, expandedEnvironments).map(function (environment) {
 		// After permuting, environment.version will be singular again
-		return new EnvironmentType(environment);
+		return new Environment(environment);
 	});
 }
 
@@ -126,7 +126,7 @@ function splitVersions(versionSpec: string) {
  * @param available a list of available environments
  * @returns a list of version numbers from available filtered by the current environment
  */
-function getVersions(environment: Environment, available: NormalizedEnvironment[]): string[] {
+function getVersions(environment: EnvironmentOptions, available: NormalizedEnvironment[]): string[] {
 	let versions: { [key: string]: boolean } = {};
 
 	available.filter(function (availableEnvironment) {
@@ -185,7 +185,7 @@ function resolveVersions(environment: FlatEnvironment, available: NormalizedEnvi
  * @param sources a list of sources to flatten
  * @return a flattened collection of sources
  */
-function createPermutations(base: { [key: string]: string }, sources?: (string | Environment)[]): FlatEnvironment[] {
+function createPermutations(base: { [key: string]: string }, sources?: (string | EnvironmentOptions)[]): FlatEnvironment[] {
 	// If no expansion sources were given, the set of permutations consists of just the base
 	if (!sources || sources.length === 0) {
 		return [ mixin({}, base) ];
