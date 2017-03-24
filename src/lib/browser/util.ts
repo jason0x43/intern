@@ -1,7 +1,7 @@
 import request from 'dojo-core/request/xhr';
 import Task from 'dojo-core/async/Task';
 import { deepMixin } from 'dojo-core/lang';
-import { getLoaderScript, parseArgs, parseJSON } from '../util';
+import { parseArgs, parseJSON } from '../util';
 
 /**
  * Resolve the user-supplied config data, which may include query args and a config file.
@@ -36,26 +36,6 @@ export function loadJson(path: string, basePath?: string): Task<any> {
 	return request(path).then(response => {
 		return parseJSON(<string>response.data);
 	});
-}
-
-/**
- * Load suites and start Intern
- */
-export function loadSuitesAndRun() {
-	intern.log('Intern path:', intern.internPath);
-
-	let loaderTask: Task<any>;
-	const loader = getLoaderScript(intern.config);
-
-	if (loader) {
-		intern.log('Using loader script', loader);
-		loaderTask = intern.loadScript(loader);
-	}
-	else {
-		loaderTask = intern.loadScript(intern.config.suites);
-	}
-
-	return loaderTask.then(() => intern.run());
 }
 
 /**

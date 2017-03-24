@@ -1,6 +1,5 @@
 import * as diffUtil from 'diff';
 import { Message } from './Channel';
-import { Config } from './executors/Executor';
 
 export const hasFunctionName = function () {
 	function foo() {}
@@ -48,15 +47,12 @@ export function createDiff(actual: Object, expected: Object): string {
 /**
  * Return the path to the loader script specified in a given config
  */
-export function getLoaderScript(config: Config) {
-	let loader: string;
-	if (config.loader) {
-		loader = config.loader.script;
-		switch (loader) {
-			case 'dojo':
-			case 'dojo2':
-				loader = `${intern.internPath}loaders/${loader}.js`;
-		}
+export function getLoaderScript(loader: string) {
+	switch (loader) {
+		case 'default':
+		case 'dojo':
+		case 'dojo2':
+			loader = `${intern.internPath}loaders/${loader}.js`;
 	}
 	return loader;
 }

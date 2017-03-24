@@ -1,5 +1,5 @@
 import Remote from '../lib/executors/Remote';
-import { loadSuitesAndRun, parseQuery } from '../lib/browser/util';
+import { parseQuery } from '../lib/browser/util';
 import { parseArgs } from '../lib/util';
 import Channel from '../lib/WebSocketChannel';
 
@@ -21,7 +21,7 @@ try {
 		}
 	});
 
-	loadSuitesAndRun().catch(error => channel.sendMessage('error', error));
+	intern.run().catch(error => channel.sendMessage('error', error));
 }
 catch (error) {
 	channel.sendMessage('error', error);

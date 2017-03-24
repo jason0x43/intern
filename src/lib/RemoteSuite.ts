@@ -21,8 +21,6 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 	/** The HTML page that will be used to host the tests */
 	harness: string;
 
-	loader: { script: string, config?: { [key: string]: any } };
-
 	server: Server;
 
 	/** The pathnames of suite modules that will be managed by this remote suite. */
@@ -153,18 +151,22 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 					basePath: serverUrlPath,
 					name: this.id,
 					sessionId: sessionId,
-					suites: this.suites
+					suites: this.executor.config.suites
 				};
 
-				if (this.loader) {
-					options.loader = this.loader;
+				if (this.executor.config.preload) {
+					options.preload = this.executor.config.preload;
+				}
+
+				if (this.executor.config.loader) {
+					options.loader = this.executor.config.loader;
 				}
 
 				if (this.executor.config.debug) {
 					options.debug = true;
 				}
 
-				if (this.runInSync) {
+				if (this.executor.config.runInSync) {
 					options.runInSync = true;
 				}
 
@@ -215,11 +217,7 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 
 export interface RemoteSuiteProperties extends SuiteProperties {
 	contactTimeout: number;
-	debug?: boolean;
-	runInSync: boolean;
-	loader: { script: string, config?: { [key: string]: any } };
 	server: Server;
-	suites: string[];
 }
 
 export type RemoteSuiteOptions = Partial<RemoteSuiteProperties> & { name: string };

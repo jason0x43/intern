@@ -4,7 +4,7 @@ import { deepMixin } from 'dojo-core/lang';
 import { Handle } from 'dojo-interfaces/core';
 import Task from 'dojo-core/async/Task';
 import Formatter from '../Formatter';
-import { parseValue, pullFromArray } from '../util';
+import { getLoaderScript, parseValue, pullFromArray } from '../util';
 import Reporter, { ReporterOptions } from '../reporters/Reporter';
 import getObjectInterface, { ObjectInterface } from '../interfaces/object';
 import getTddInterface, { TddInterface } from '../interfaces/tdd';
@@ -32,11 +32,13 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 
 	protected _internPath: string;
 
-	protected _loaders: Loader[];
+	protected _loader: Loader;
 
 	protected _listeners: { [event: string]: Listener<any>[] };
 
 	protected _reporters: Reporter[];
+
+	protected _beforeCallbacks: AsyncCallback[];
 
 	protected _runTask: Task<void>;
 
@@ -53,7 +55,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		this._listeners = {};
 		this._reporters = [];
 		this._interfaces = {};
-		this._loaders = [];
+		this._beforeCallbacks = [];
 		this._internPath = '';
 
 		if (config) {
@@ -253,10 +255,11 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	}
 
 	/**
-	 * Register a loader script that will be loaded at the beginning of the testing process
+	 * Register a loader script that will be loaded at the beginning of the testing process. Intern assumes this script
+	 * will handle the loading of test suites.
 	 */
 	registerLoader(loader: Loader) {
-		this._loaders.push(loader);
+		this._loader = loader;
 	}
 
 	/**
@@ -274,8 +277,10 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		// Only allow the executor to be started once
 		if (!this._runTask) {
 			try {
-				this._runTask = this._beforeRun()
-					.then(() => this._runLoaders())
+				this._runTask = this._preloadScripts()
+					.then(() => this._beforeRun())
+					.then(() => this._runBeforeCallbacks())
+					.then(() => this._loadSuites())
 					.then(() => this.emit('runStart'))
 					.then(() => this._runTests())
 					.finally(() => this.emit('runEnd'))
@@ -298,6 +303,10 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		}
 
 		return this._runTask;
+	}
+
+	runBefore(callback: AsyncCallback) {
+		this._beforeCallbacks.push(callback);
 	}
 
 	/**
@@ -337,6 +346,10 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 
 		if (config.reporters == null) {
 			config.reporters = [];
+		}
+
+		if (config.loader == null) {
+			config.loader = { script: getLoaderScript('default') };
 		}
 
 		if (config.reporters) {
@@ -393,19 +406,59 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	}
 
 	/**
+	 * Load suites
+	 */
+	protected _loadSuites(config?: Config) {
+		config = config || this.config;
+		return this.loadScript(config.loader.script).then(() => {
+			if (!this._loader) {
+				throw new Error(`Loader script ${config.loader.script} did not register a loader callback`);
+			}
+
+			return new Task<void>((resolve, reject) => {
+				this._loader(config || this.config, error => {
+					if (error) {
+						reject(error);
+					}
+					else {
+						resolve();
+					}
+				});
+			});
+		});
+	}
+
+	protected _preloadScripts() {
+		if (this.config.preload) {
+			return this.loadScript(this.config.preload);
+		}
+		return Task.resolve();
+	}
+
+	/**
 	 * Process an arbitrary config value. Subclasses can override this method to pre-process arguments or handle them
 	 * instead of allowing Executor to.
 	 */
 	protected _processOption(name: keyof Config, value: any) {
 		switch (name) {
 			case 'loader':
-				value = parseValue(name, value, 'object|string');
 				if (typeof value === 'string') {
-					value = { script: value };
+					try {
+						value = JSON.parse(value);
+					}
+					catch (error) {
+						value = { script: value };
+					}
 				}
-				else if (typeof value.script !== 'string') {
-					throw new Error('loader option must have a "script" property');
+
+				if (!value.script) {
+					throw new Error(`Invalid value "${value}" for ${name}`);
 				}
+
+				if (!(/\.js$/i).test(value.script)) {
+					value.script = getLoaderScript(value.script);
+				}
+
 				this.config[name] = value;
 				break;
 
@@ -464,6 +517,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 				break;
 
 			case 'benchmarkSuites':
+			case 'preload':
 			case 'suites':
 				this.config[name] = parseValue(name, value, 'string[]');
 				break;
@@ -474,15 +528,12 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	}
 
 	/**
-	 * Run any registered loader callbacks
+	 * Run any registerd 'before' callbacks.
 	 */
-	protected _runLoaders(config?: Config) {
-		config = config || this.config;
-		this.log('Running loaders', this._loaders);
-		return this._loaders.reduce((previous, loader) => {
-			this.log('Running loader with', this.config);
+	protected _runBeforeCallbacks() {
+		return this._beforeCallbacks.reduce((previous, callback) => {
 			return previous.then(() => new Task<void>((resolve, reject) => {
-				loader(config || this.config, error => {
+				callback(error => {
 					if (error) {
 						reject(error);
 					}
@@ -519,7 +570,7 @@ export function initialize<E extends Events, C extends Config, T extends Generic
 	return executor;
 }
 
-export abstract class Executor extends GenericExecutor<Events, Config> {}
+export abstract class Executor extends GenericExecutor<Events, Config> { }
 export default Executor;
 
 export interface ExecutorConstructor<E extends Events, C extends Config, T extends GenericExecutor<E, C>> {
@@ -562,11 +613,18 @@ export interface Config {
 
 	instrumenterOptions?: any;
 
-	/** A path to a loader script, or an object with a `script` property and an option `config` property. */
+	/** A loader to run before testing. */
 	loader?: { script: string, config?: { [key: string]: any } };
 
 	/** A top-level name for this configuration. */
 	name?: string;
+
+	/**
+	 * A list of scripts to load before suites are loaded. These must be simple scripts, not modules, as a module loader
+	 * may not be available when these are loaded. Also, these scripts should be synchronous, or register an async
+	 * callback using intern.runBefore.
+	 */
+	preload?: string[];
 
 	/**
 	 * A list of reporter names or descriptors. These reporters will be loaded and instantiated before testing begins.
@@ -616,9 +674,15 @@ export interface Events {
 };
 
 /**
- * A loader callback. Intern doesn't care what the method returns, but it will wait for it to resolve if a Promise is
- * returned.
+ * An async loader callback. Intern will wait for the done callback to be called before proceeding.
  */
 export interface Loader {
 	(config: { [key: string]: any }, done: (error?: Error) => void): void;
+}
+
+/**
+ * An async callback. Inern will wait for the done callback to be called before proceeding.
+ */
+export interface AsyncCallback {
+	(done: (error?: Error) => void): void;
 }

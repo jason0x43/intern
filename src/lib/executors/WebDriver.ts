@@ -330,11 +330,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 				// suite.
 				if (config.suites.length > 0) {
 					suite.add(new RemoteSuite({
-						contactTimeout: config.contactTimeout,
 						name: 'unit tests',
-						suites: config.suites,
-						debug: config.debug,
-						loader: config.loader,
 						server
 					}));
 				}
@@ -398,9 +394,9 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		}
 	}
 
-	protected _runLoaders() {
+	protected _loadSuites() {
 		const config = deepMixin({}, this.config, { suites: this.config.functionalSuites });
-		return super._runLoaders(config);
+		return super._loadSuites(config);
 	}
 
 	/**
