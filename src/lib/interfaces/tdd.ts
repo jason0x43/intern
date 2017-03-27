@@ -13,48 +13,57 @@ export interface TddInterface {
 }
 
 export default function getInterface(executor: Executor): TddInterface {
-	let suiteStack: Suite[] = [];
+	let currentSuite: Suite;
 
 	return {
 		suite(name: string, factory: (suite: Suite) => void) {
-			const currentSuite = getCurrent(suiteStack);
-			const suite = new Suite({ name, tests: [], parent: currentSuite });
-			if (!currentSuite) {
+			const parent = currentSuite;
+			const suite = new Suite({ name });
+			if (!parent) {
 				// This is a new top-level suite, not a nested suite
 				executor.addTest(suite);
 			}
-			suiteStack.push(suite);
+			else {
+				parent.add(suite);
+			}
+			currentSuite = suite;
 			factory.call(suite, suite);
-			suiteStack.pop();
+			currentSuite = parent;
 		},
 
 		test(name: string, test: TestFunction) {
-			const currentSuite = getCurrent(suiteStack);
-			currentSuite.tests.push(new Test({ name, test, parent: currentSuite }));
+			if (!currentSuite) {
+				throw new Error('A test must be declared within a suite');
+			}
+			currentSuite.add(new Test({ name, test, parent: currentSuite }));
 		},
 
 		before(fn: SuiteLifecycleFunction) {
-			const currentSuite = getCurrent(suiteStack);
+			if (!currentSuite) {
+				throw new Error(`A suite lifecycle method must be declared within a suite`);
+			}
 			on(currentSuite, 'before', fn);
 		},
 
 		after(fn: SuiteLifecycleFunction) {
-			const currentSuite = getCurrent(suiteStack);
+			if (!currentSuite) {
+				throw new Error(`A suite lifecycle method must be declared within a suite`);
+			}
 			on(currentSuite, 'after', fn);
 		},
 
 		beforeEach(fn: SuiteLifecycleFunction) {
-			const currentSuite = getCurrent(suiteStack);
+			if (!currentSuite) {
+				throw new Error(`A suite lifecycle method must be declared within a suite`);
+			}
 			on(currentSuite, 'beforeEach', fn);
 		},
 
 		afterEach(fn: SuiteLifecycleFunction) {
-			const currentSuite = getCurrent(suiteStack);
+			if (!currentSuite) {
+				throw new Error(`A suite lifecycle method must be declared within a suite`);
+			}
 			on(currentSuite, 'afterEach', fn);
 		}
 	};
-}
-
-function getCurrent(stack: Suite[]) {
-	return stack[stack.length - 1];
 }
