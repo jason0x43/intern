@@ -287,11 +287,13 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 					.then(() => this._beforeRun())
 					.then(() => this._runBeforeCallbacks())
 					.then(() => this._loadSuites())
-					.then(() => this.emit('runStart'))
-					.then(() => this._runTests())
-					.finally(() => this.emit('runEnd'))
+					.then(() => {
+						return this.emit('runStart')
+							.then(() => this._runTests())
+							.finally(() => this.emit('runEnd'));
+					})
 					.finally(() => this._afterRun())
-					.then(() => this._runAfterCallbacks())
+					.finally(() => this._runAfterCallbacks())
 					.then(() => {
 						if (this._hasSuiteErrors) {
 							throw new Error('One or more suite errors occurred during testing');
