@@ -54,7 +54,7 @@ export default class Suite implements SuiteProperties {
 		Object.keys(options).filter(key => {
 			return key !== 'tests';
 		}).forEach((key: keyof SuiteOptions) => {
-			(<any>this)[key] = options[key];
+			this[key] = options[key];
 		});
 
 		this.tests = [];
@@ -335,155 +335,160 @@ export default class Suite implements SuiteProperties {
 		this.error = null;
 		this.timeElapsed = null;
 
-		let task: Task<any> = this.publishAfterSetup ? before().then(start) : start().then(before);
+		let task: Task<any>;
 
-		return task
-			.then(() => {
-				let i = 0;
-				let tests = this.tests;
+		try {
+			task = this.publishAfterSetup ? before().then(start) : start().then(before);
+		}
+		catch (error) {
+			return Task.reject(error);
+		}
+
+		return task.then(() => {
+			let i = 0;
+			let tests = this.tests;
+			let current: Task<any>;
+
+			const runTestLifecycle = (name: string, test: Test) => {
+				// beforeEach executes in order parent -> child;
+				// afterEach executes in order child -> parent
+				const orderMethod: ('push' | 'unshift') = name === 'beforeEach' ? 'push' : 'unshift';
+
+				// LIFO queue
+				let suiteQueue: Suite[] = [];
+				let suite: Suite = this;
+
+				do {
+					(<any>suiteQueue)[orderMethod](suite);
+				}
+				while ((suite = suite.parent));
+
 				let current: Task<any>;
-
-				const runTestLifecycle = (name: string, test: Test) => {
-					// beforeEach executes in order parent -> child;
-					// afterEach executes in order child -> parent
-					const orderMethod: ('push' | 'unshift') = name === 'beforeEach' ? 'push' : 'unshift';
-
-					// LIFO queue
-					let suiteQueue: Suite[] = [];
-					let suite: Suite = this;
-
-					do {
-						(<any>suiteQueue)[orderMethod](suite);
-					}
-					while ((suite = suite.parent));
-
-					let current: Task<any>;
-
-					return new Task(
-						(resolve, reject) => {
-							let firstError: Error;
-
-							function handleError(error: Error) {
-								if (name === 'afterEach') {
-									firstError = firstError || error;
-									next();
-								}
-								else {
-									reject(error);
-								}
-							}
-
-							function next() {
-								const suite = suiteQueue.pop();
-
-								if (!suite) {
-									firstError ? reject(firstError) : resolve();
-									return;
-								}
-
-								current = runLifecycleMethod(suite, name, test).then(next, handleError);
-							}
-
-							next();
-						},
-						() => {
-							suiteQueue.splice(0, suiteQueue.length);
-							if (current) {
-								current.cancel();
-							}
-						}
-					);
-				};
 
 				return new Task(
 					(resolve, reject) => {
 						let firstError: Error;
 
-						const next = () => {
-							const test = tests[i++];
+						function handleError(error: Error) {
+							if (name === 'afterEach') {
+								firstError = firstError || error;
+								next();
+							}
+							else {
+								reject(error);
+							}
+						}
 
-							if (!test) {
+						function next() {
+							const suite = suiteQueue.pop();
+
+							if (!suite) {
 								firstError ? reject(firstError) : resolve();
 								return;
 							}
 
-							const handleError = (error: InternError) => {
-								// An error may be associated with a deeper test already, in which case we do not
-								// want to reassociate it with a more generic parent
-								if (!error.relatedTest) {
-									error.relatedTest = <Test>test;
-								}
-								return Promise.resolve();
-							};
-
-							function runWithCatch() {
-								// Errors raised when running child tests should be reported but should not cause
-								// this suite’s run to reject, since this suite itself has not failed.
-								return new Task<void>((resolve, reject) => {
-									test.run().then(resolve, reject);
-								}).catch(handleError);
-							}
-
-							// If the suite will be skipped, mark the current test as skipped. This will skip both
-							// individual tests and nested suites.
-							if (this.skipped != null) {
-								test.skipped = this.skipped;
-							}
-
-							// test is a suite
-							if ((<Suite>test).tests) {
-								current = runWithCatch();
-							}
-							// test is a single test
-							else {
-								if (!this.grep.test(test.id)) {
-									test.skipped = 'grep';
-								}
-
-								if (test.skipped != null) {
-									this.executor.emit('testEnd', <Test>test).then(next);
-									return;
-								}
-
-								current = runTestLifecycle('beforeEach', <Test>test)
-									.then(runWithCatch)
-									.finally(() => runTestLifecycle('afterEach', <Test>test))
-									.catch((error: InternError) => {
-										firstError = firstError || error;
-										return handleError(error);
-									});
-							}
-
-							current.then(() => {
-								const skipRestOfSuite = () => {
-									this.skipped = this.skipped != null ? this.skipped : BAIL_REASON;
-								};
-
-								// If the test was a suite and the suite was skipped due to bailing, skip the rest of this
-								// suite
-								if ((<Suite>test).tests && test.skipped === BAIL_REASON) {
-									skipRestOfSuite();
-								}
-								// If the test errored and bail mode is enabled, skip the rest of this suite
-								else if (test.error && this.bail) {
-									skipRestOfSuite();
-								}
-
-								next();
-							});
-						};
+							current = runLifecycleMethod(suite, name, test).then(next, handleError);
+						}
 
 						next();
 					},
 					() => {
-						i = Infinity;
+						suiteQueue.splice(0, suiteQueue.length);
 						if (current) {
 							current.cancel();
 						}
 					}
 				);
-			})
-			.finally(() => this.publishAfterSetup ? end().then(after) : after().then(end));
+			};
+
+			return new Task(
+				(resolve, reject) => {
+					let firstError: Error;
+
+					const next = () => {
+						const test = tests[i++];
+
+						if (!test) {
+							firstError ? reject(firstError) : resolve();
+							return;
+						}
+
+						const handleError = (error: InternError) => {
+							// An error may be associated with a deeper test already, in which case we do not
+							// want to reassociate it with a more generic parent
+							if (!error.relatedTest) {
+								error.relatedTest = <Test>test;
+							}
+							return Promise.resolve();
+						};
+
+						function runWithCatch() {
+							// Errors raised when running child tests should be reported but should not cause
+							// this suite’s run to reject, since this suite itself has not failed.
+							return new Task<void>((resolve, reject) => {
+								test.run().then(resolve, reject);
+							}).catch(handleError);
+						}
+
+						// If the suite will be skipped, mark the current test as skipped. This will skip both
+						// individual tests and nested suites.
+						if (this.skipped != null) {
+							test.skipped = this.skipped;
+						}
+
+						// test is a suite
+						if (isSuite(test)) {
+							current = runWithCatch();
+						}
+						// test is a single test
+						else {
+							if (!this.grep.test(test.id)) {
+								test.skipped = 'grep';
+							}
+
+							if (test.skipped != null) {
+								this.executor.emit('testEnd', <Test>test).then(next);
+								return;
+							}
+
+							current = runTestLifecycle('beforeEach', <Test>test)
+								.then(runWithCatch)
+								.finally(() => runTestLifecycle('afterEach', <Test>test))
+								.catch((error: InternError) => {
+									firstError = firstError || error;
+									return handleError(error);
+								});
+						}
+
+						current.then(() => {
+							const skipRestOfSuite = () => {
+								this.skipped = this.skipped != null ? this.skipped : BAIL_REASON;
+							};
+
+							// If the test was a suite and the suite was skipped due to bailing, skip the rest of this
+							// suite
+							if ((<Suite>test).tests && test.skipped === BAIL_REASON) {
+								skipRestOfSuite();
+							}
+							// If the test errored and bail mode is enabled, skip the rest of this suite
+							else if (test.error && this.bail) {
+								skipRestOfSuite();
+							}
+
+							next();
+						});
+					};
+
+					next();
+				},
+				() => {
+					i = Infinity;
+					if (current) {
+						current.cancel();
+					}
+				}
+			);
+		}).finally(() => this.publishAfterSetup ? end().then(after) : after().then(end));
 	}
 
 	/**
