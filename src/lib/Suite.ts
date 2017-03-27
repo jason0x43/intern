@@ -79,7 +79,7 @@ export default class Suite implements SuiteProperties {
 	 * The executor used to run this Suite.
 	 */
 	get executor(): Executor {
-		return this._executor || (this.parent && this.parent._executor);
+		return this._executor || (this.parent && this.parent.executor);
 	}
 
 	set executor(value: Executor) {
