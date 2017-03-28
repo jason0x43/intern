@@ -144,9 +144,7 @@ export default class ProxiedSession extends Session {
 					if (!cancelled) {
 						timeoutId = setTimeout(sendHeartbeat, delay - (Date.now() - startTime));
 					}
-				}).catch(error => {
-					self.executor.emit('error', error);
-				});
+				}).catch(error => self.executor.emit('error', error));
 			})();
 		}
 

@@ -71,9 +71,8 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 							suite = data;
 							if (!suite.hasParent) {
 								// This suite from the browser is a root suite; add its tests to the local suite
-								suite.tests.forEach(test => {
-									this.tests.push(test);
-								});
+								this.tests.push(...suite.tests);
+
 								// Tell the executor that the local suite has started
 								this.executor.emit('suiteStart', this);
 							}

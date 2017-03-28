@@ -408,6 +408,7 @@ export default class Suite implements SuiteProperties {
 					const next = () => {
 						const test = tests[i++];
 
+						// The task is over when there are no more tests to run
 						if (!test) {
 							firstError ? reject(firstError) : resolve();
 							return;
