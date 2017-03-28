@@ -94,6 +94,7 @@ describe('Component', () => {
 
 #### Qunit
 
+```ts
 QUnit.module('Component');
 QUnit.test('create', () => {
     // ...
@@ -101,6 +102,7 @@ QUnit.test('create', () => {
 QUnit.test('update', () => {
     // ...
 });
+```
 
 ### Assertions
 
@@ -125,6 +127,8 @@ Several components can be extended by registering new implementations:
 In each case, Intern has a `registerX` method (e.g., `registerInterface`) that takes a name and some type-specific
 item. For example, reporter classes can be registered using the reporter constructor:
 
-    intern.registerReporter('custom', Custom);
+```ts
+intern.registerReporter('custom', Custom);
+```
 
 Intern configs may then use the 'custom' reporter.

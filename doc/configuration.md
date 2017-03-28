@@ -12,7 +12,7 @@ The executor will validate and normalize any supplied config properties. This me
 For example, several properties such as `suites` and `environments` may be specified as a single string for convenience,
 but they will always be arrays on the normalized executor config object.
 
-## Loader
+## Loader script
 
 A loader is a script that sets up the environment, loads suites, and runs Intern. See the loader section in the
 architecture doc for more details.
@@ -21,9 +21,24 @@ The `loader` property can be a string with a loader ID or the path to a loader s
 `id` and `config` properties. Intern provides built-in loader scripts for Dojo and Dojo2, which can be specified with
 the IDs 'dojo' and 'dojo2'.
 
-    loader: 'dojo2'
-    loader: 'tests/loader.js'
-    loader: { id: 'dojo', config: { packages: [ { name: 'app', location: './js' } ] } }
+```ts
+loader: 'dojo2'
+loader: 'tests/loader.js'
+loader: { id: 'dojo', config: { packages: [ { name: 'app', location: './js' } ] } }
+```
+
+## Preload script
+
+A preload script is similar to loader script. The key differences is that more than one preload script may be specified,
+and preload scripts run before the loader scripts. These are a good place to load global scripts for browser tests, or
+to register `runBefore` or `runAfter` handlers.
+
+```ts
+// tests/pre.js
+if (intern.environmentType === 'browser') {
+    intern.runBefore(function (done) {
+    });
+}
 
 ## Suites
 
