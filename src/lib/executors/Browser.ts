@@ -38,6 +38,17 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 		}, Task.resolve());
 	}
 
+	protected _beforeRun(): Task<any> {
+		return super._beforeRun().then(() => {
+			const config = this.config;
+			for (let suite of config.suites) {
+				if (/[*?]/.test(suite)) {
+					throw new Error(`Globs may not be used for browser suites: "${suite}"`);
+				}
+			}
+		});
+	}
+
 	protected _processOption(name: keyof Config, value: any) {
 		switch (name) {
 			case 'basePath':

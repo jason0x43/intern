@@ -1,4 +1,4 @@
-import Suite, { SuiteProperties } from './Suite';
+import Suite, { SuiteOptions } from './Suite';
 import UrlSearchParams from 'dojo-core/UrlSearchParams';
 import { Hash } from 'dojo-interfaces/core';
 import { parse } from 'url';
@@ -6,27 +6,21 @@ import Task from 'dojo-core/async/Task';
 import { InternError } from './common';
 import WebDriver, { Events } from './executors/WebDriver';
 import { Config } from './executors/Remote';
-import Server from './Server';
 import { Handle } from 'dojo-interfaces/core';
 
 /**
  * RemoteSuite is a class that acts as a local server for one or more unit test suites being run in a remote browser.
  */
-export default class RemoteSuite extends Suite implements RemoteSuiteProperties {
+export default class RemoteSuite extends Suite {
 	executor: WebDriver;
 
 	/** The HTML page that will be used to host the tests */
 	harness: string;
 
-	server: Server;
-
-	/** The pathnames of suite modules that will be managed by this remote suite. */
-	suites: string[];
-
 	/** If true, the remote suite will wait for ackowledgements from the host for runtime events. */
 	runInSync: boolean;
 
-	constructor(config: RemoteSuiteOptions) {
+	constructor(config: SuiteOptions) {
 		super(config);
 
 		if (this.timeout == null) {
@@ -56,10 +50,9 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 					reject(error);
 				};
 
-				// Subscribe to events on the server so we'll know the status of the remote suite.
+				// Subscribe to messages received by the server for a particular remote session ID.
 				listenerHandle = server.subscribe(sessionId, (name: keyof Events, data: any) => {
 					let suite: Suite;
-					const forward = () => this.executor.emit(name, data);
 
 					if (contactTimer) {
 						clearTimeout(contactTimer);
@@ -74,38 +67,43 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 								this.tests.push(...suite.tests);
 
 								// Tell the executor that the local suite has started
-								this.executor.emit('suiteStart', this);
+								return this.executor.emit('suiteStart', this);
 							}
 							else {
-								forward();
+								// If suite from the browser isn't a root (i.e., it's a nested suite), just forward the
+								// start event
+								return this.executor.emit(name, data);
 							}
-							break;
 
 						case 'suiteEnd':
 							suite = data;
 							this.skipped = suite.skipped;
 
 							if (!suite.hasParent) {
+								// When the remote root suite has finished, replace the local test objects with the
+								// incoming test data since it will include final results.
 								suite.tests.forEach((test, index) => {
 									this.tests[index] = test;
 								});
 
-								// This suite from the browser is a root suite; update the existing test objects with
-								// the new ones from the server that reflect the test results
 								if (suite.error) {
 									handleError(suite.error);
 								}
 							}
 							else {
-								forward();
+								// If suite from the browser isn't a root, just forward the end event
+								return this.executor.emit(name, data);
 							}
 							break;
 
+						case 'beforeRun':
+						case 'afterRun':
 						case 'runStart':
-							// Consume this event
+							// Consume these events -- they shouldn't be forwarded to any local listeners
 							break;
 
 						case 'runEnd':
+							// Consume this event, and do some post-processing
 							let promise = remote.setHeartbeatInterval(0);
 							if (config.excludeInstrumentation !== true) {
 								// get about:blank to always collect code coverage data from the page in case it is
@@ -113,17 +111,14 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 								// Leadfoot library takes over
 								promise = promise.get('about:blank');
 							}
-
-							promise.then(resolve, reject);
-							break;
+							return promise.then(resolve, reject);
 
 						case 'error':
 							handleError(data);
 							break;
 
 						default:
-							forward();
-							break;
+							return this.executor.emit(name, data);
 					}
 				});
 
@@ -206,9 +201,3 @@ export default class RemoteSuite extends Suite implements RemoteSuiteProperties 
 		return task;
 	}
 }
-
-export interface RemoteSuiteProperties extends SuiteProperties {
-	server: Server;
-}
-
-export type RemoteSuiteOptions = Partial<RemoteSuiteProperties> & { name: string };

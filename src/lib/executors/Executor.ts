@@ -12,6 +12,7 @@ import getBddInterface, { BddInterface } from '../interfaces/bdd';
 import Promise from 'dojo-shim/Promise';
 import * as chai from 'chai';
 import global from 'dojo-core/global';
+import Deferred from '../Deferred';
 
 export abstract class GenericExecutor<E extends Events, C extends Config> {
 	protected _availableReporters: { [name: string]: typeof Reporter };
@@ -39,10 +40,6 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 
 	protected _reporters: Reporter[];
 
-	protected _afterCallbacks: AsyncCallback[];
-
-	protected _beforeCallbacks: AsyncCallback[];
-
 	protected _runTask: Task<void>;
 
 	constructor(config: C) {
@@ -58,8 +55,6 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		this._listeners = {};
 		this._reporters = [];
 		this._interfaces = {};
-		this._afterCallbacks = [];
-		this._beforeCallbacks = [];
 		this._internPath = '';
 
 		if (config) {
@@ -129,10 +124,20 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	}
 
 	/**
+	 * Create a Deferred object that can be used in enviroments without native Promises
+	 */
+	createDeferred<T>() {
+		return new Deferred<T>();
+	}
+
+	/**
 	 * Emit an event to all registered listeners.
 	 *
-	 * This method handles async listeners. Note that this method will always resolve (never reject).
+	 * Event listeners may execute async code, and a failing handler (one that rejects or throws an error) will cause the
+	 * emit to fail.
 	 */
+	emit(eventName: 'afterRun'): Task<any>;
+	emit(eventName: 'beforeRun'): Task<any>;
 	emit(eventName: 'runStart'): Task<any>;
 	emit(eventName: 'runEnd'): Task<any>;
 	emit<T extends keyof E>(eventName: T, data: E[T]): Task<any>;
@@ -161,7 +166,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 				console.error('ERROR:', this.formatter.format(<any>data));
 			}
 
-			return Task.resolve();
+			return resolvedTask;
 		}
 
 		return Task.all(notifications).catch(error => {
@@ -233,7 +238,10 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 				}
 				return JSON.stringify(arg);
 			}).join(' ');
-			this.emit('log', message);
+			return this.emit('log', message);
+		}
+		else {
+			return resolvedTask;
 		}
 	}
 
@@ -285,7 +293,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			try {
 				this._runTask = this._preloadScripts()
 					.then(() => this._beforeRun())
-					.then(() => this._runBeforeCallbacks())
+					.then(() => this.emit('beforeRun'))
 					.then(() => this._loadSuites())
 					.then(() => {
 						return this.emit('runStart')
@@ -293,7 +301,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 							.finally(() => this.emit('runEnd'));
 					})
 					.finally(() => this._afterRun())
-					.finally(() => this._runAfterCallbacks())
+					.finally(() => this.emit('afterRun'))
 					.then(() => {
 						if (this._hasSuiteErrors) {
 							throw new Error('One or more suite errors occurred during testing');
@@ -314,14 +322,6 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		return this._runTask;
 	}
 
-	runAfter(callback: AsyncCallback) {
-		this._afterCallbacks.push(callback);
-	}
-
-	runBefore(callback: AsyncCallback) {
-		this._beforeCallbacks.push(callback);
-	}
-
 	/**
 	 * Register a testing interface on this executor. A testing interface can be anything that will allow a test to
 	 * register tests on the executor. For example, the 'object' interface is a single method, `registerSuite`, that a
@@ -335,7 +335,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	 * Code to execute after the main test run has finished to shut down the test system.
 	 */
 	protected _afterRun() {
-		return Task.resolve();
+		return resolvedTask;
 	}
 
 	/**
@@ -401,11 +401,14 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			}, config.benchmarkConfig);
 		}
 
-		return Task.resolve();
+		return resolvedTask;
 	}
 
-	protected _emitCoverage(coverage: any) {
-		return this.emit('coverage', { coverage });
+	protected _emitCoverage() {
+		const coverage = global[this.config.instrumenterOptions.coverageVariable];
+		if (coverage) {
+			return this.emit('coverage', { coverage, sessionId: this.config.sessionId });
+		}
 	}
 
 	/**
@@ -427,17 +430,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			if (!this._loader) {
 				throw new Error(`Loader script ${config.loader.script} did not register a loader callback`);
 			}
-
-			return new Task<void>((resolve, reject) => {
-				this._loader(config || this.config, error => {
-					if (error) {
-						reject(error);
-					}
-					else {
-						resolve();
-					}
-				});
-			});
+			return Task.resolve(this._loader(config || this.config));
 		});
 	}
 
@@ -445,7 +438,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		if (this.config.preload) {
 			return this.loadScript(this.config.preload);
 		}
-		return Task.resolve();
+		return resolvedTask;
 	}
 
 	/**
@@ -541,29 +534,10 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	}
 
 	/**
-	 * Run any registerd 'after' callbacks.
-	 */
-	protected _runAfterCallbacks() {
-		return runCallbacks(this._afterCallbacks);
-	}
-
-	/**
-	 * Run any registerd 'before' callbacks.
-	 */
-	protected _runBeforeCallbacks() {
-		return runCallbacks(this._beforeCallbacks);
-	}
-
-	/**
 	 * Runs each of the root suites, limited to a certain number of suites at the same time by `maxConcurrency`.
 	 */
 	protected _runTests() {
-		return this._rootSuite.run().finally(() => {
-			const coverage = global[this.config.instrumenterOptions.coverageVariable];
-			if (coverage) {
-				return this._emitCoverage(coverage);
-			}
-		});
+		return this._rootSuite.run().finally(() => this._emitCoverage());
 	}
 }
 
@@ -579,6 +553,9 @@ export function initialize<E extends Events, C extends Config, T extends Generic
 	return executor;
 }
 
+/**
+ * This is the default executor class.
+ */
 export abstract class Executor extends GenericExecutor<Events, Config> { }
 export default Executor;
 
@@ -668,17 +645,41 @@ export interface ExecutorEvent {
 
 export interface Events {
 	'*': ExecutorEvent;
+
+	/** Emitted after the local executor has finished running suites */
+	afterRun: never;
+
+	/** Emitted before the local executor loads suites */
+	beforeRun: never;
+
+	/** Coverage info has been gathered */
 	coverage: CoverageMessage;
+
+	/** A deprecated method was called */
 	deprecated: DeprecationMessage;
+
+	/** An unhandled error occurs */
 	error: Error;
+
+	/** A debug log event */
 	log: string;
-	newSuite: Suite;
-	newTest: Test;
+
+	/** All tests have finished running */
 	runEnd: never;
+
+	/** Emitted just before tests start running  */
 	runStart: never;
+
+	/** A suite has fininshed running */
 	suiteEnd: Suite;
+
+	/** A suite has started running */
 	suiteStart: Suite;
+
+	/** A test has finished */
 	testEnd: Test;
+
+	/** A test has started */
 	testStart: Test;
 };
 
@@ -686,27 +687,7 @@ export interface Events {
  * An async loader callback. Intern will wait for the done callback to be called before proceeding.
  */
 export interface Loader {
-	(config: { [key: string]: any }, done: (error?: Error) => void): void;
+	(config: { [key: string]: any }): Task<void> | void;
 }
 
-/**
- * An async callback. Inern will wait for the done callback to be called before proceeding.
- */
-export interface AsyncCallback {
-	(done: (error?: Error) => void): void;
-}
-
-export function runCallbacks(callbacks: AsyncCallback[]) {
-	return callbacks.reduce((previous, callback) => {
-		return previous.then(() => new Task<void>((resolve, reject) => {
-			callback(error => {
-				if (error) {
-					reject(error);
-				}
-				else {
-					resolve();
-				}
-			});
-		}));
-	}, Task.resolve());
-}
+const resolvedTask = Task.resolve();

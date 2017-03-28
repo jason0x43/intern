@@ -7,6 +7,7 @@ import { dirname, resolve, relative, sep } from 'path';
 import { hook } from 'istanbul';
 import Pretty from '../reporters/Pretty';
 import Simple from '../reporters/Simple';
+import Promise from 'dojo-shim/Promise';
 
 /**
  * The Node executor is used to run unit tests in a Node environment.
@@ -21,10 +22,6 @@ export default class Node extends GenericExecutor<Events, Config> {
 
 		this.registerReporter('pretty', Pretty);
 		this.registerReporter('simple', Simple);
-
-		if (this.config.excludeInstrumentation == null) {
-			this.config.excludeInstrumentation = /(?:node_modules|tests)\//;
-		}
 
 		this._formatter = new Formatter(config);
 

@@ -1,5 +1,6 @@
 import ProxiedSession from '../../../src/lib/ProxiedSession';
 import Server from 'leadfoot/Server';
+import Promise from 'dojo-shim/Promise';
 
 const { registerSuite } = intern.getInterface('object');
 const assert = intern.getAssertions('assert');

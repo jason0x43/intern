@@ -4,6 +4,7 @@ import Executor from './executors/Executor';
 import Test, { isTest, SKIP } from './Test';
 import { InternError } from './common';
 import { Remote } from './executors/WebDriver';
+import Promise from 'dojo-shim/Promise';
 
 export default class Suite implements SuiteProperties {
 	after: SuiteLifecycleFunction;
@@ -290,7 +291,7 @@ export default class Suite implements SuiteProperties {
 							dfd.reject(new Error('Timeout reached on ' + suite.id + '#' + name));
 						}, timeout);
 
-						dfd.promise.catch().then(() => timer && clearTimeout(timer));
+						dfd.promise.catch(_error => {}).then(() => timer && clearTimeout(timer));
 					}
 
 					// If the return value looks like a promise, resolve the dfd if the return value resolves

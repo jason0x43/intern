@@ -1,12 +1,12 @@
 import { Config as BaseConfig, Events, GenericBrowser } from './Browser';
 import { initialize } from './Executor';
-import Task from 'dojo-core/async/Task';
 import { parseValue } from '../util';
 import Dom from '../reporters/Dom';
 import { deepMixin } from 'dojo-core/lang';
 
 /**
- * An executor for running suites in a remote browser.
+ * An executor for running suites in a remote browser. This executor is intended to be started and managed by Intern
+ * itself rather than by end-user runner scripts.
  */
 export default class Remote extends GenericBrowser<Events, Config> {
 	static initialize(config?: Config) {
@@ -20,13 +20,6 @@ export default class Remote extends GenericBrowser<Events, Config> {
 			reporters: ['dom']
 		}));
 		this.registerReporter('dom', Dom);
-	}
-
-	/**
-	 * Override Executor#_emitCoverage to include the session ID
-	 */
-	protected _emitCoverage(coverage: any): Task<any> {
-		return this.emit('coverage', { sessionId: this.config.sessionId, coverage });
 	}
 
 	protected _processOption(name: keyof Config, value: any) {

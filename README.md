@@ -19,22 +19,23 @@ Learn more about Intern at https://theintern.github.io.
 
 1. Install from npm
 
-   ```
-   cd /my/project/root
-   npm install intern --save-dev
+   ```sh
+   $ cd /my/project/root
+   $ npm install intern --save-dev
    ```
 
-2. Create a copy of the [example configuration file](https://github.com/theintern/intern/blob/master/tests/example.intern.js) in your package’s test directory and edit appropriately. See the
-[configuration documentation](https://theintern.github.io/intern/#common-config) for a list of all available options.
+2. Create an `intern.json` file in your project root.
 
-   ```
-   mkdir tests ; cp node_modules/intern/tests/example.intern.js tests/intern.js
+   ```js
+   {
+     "suites": "tests/unit/**/*.js"
+   }
    ```
 
 3. Verify your configuration works by running the Node.js client and seeing that no errors are output.
 
-   ```
-   node_modules/.bin/intern-client config=tests/intern
+   ```sh
+   node_modules/.bin/intern
    ```
 
 4. Start writing tests! Read [writing tests](https://theintern.github.io/intern/#writing-unit-test) in the user guide

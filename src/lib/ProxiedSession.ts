@@ -12,12 +12,6 @@ function getCoverageData(coverageVariable: string) {
  * A ProxiedSession object represents a WebDriver session that interacts with the Intern instrumenting server. It
  * collects code instrumentation data from pages and converts local filesystem paths into URLs for use with
  * {@link module:leadfoot/Session#get}.
- *
- * @constructor module:intern/lib/ProxiedSession
- * @extends module:leadfoot/Session
- * @param {string} sessionId The ID of the session, as provided by the remote.
- * @param {module:leadfoot/Server} server The server that the session belongs to.
- * @param {Object} capabilities A map of bugs and features that the remote environment exposes.
  */
 export default class ProxiedSession extends Session {
 	/**

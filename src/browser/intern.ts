@@ -19,5 +19,6 @@ getConfig().then(config => {
 	intern.registerReporter('html', Html);
 	intern.registerReporter('console', Console);
 
-	return intern.run();
+	// Intern automatically reports run errors, so discard one if we get it
+	return intern.run().catch(_error => {});
 }).catch(error => intern.emit('error', error));

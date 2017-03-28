@@ -17,7 +17,6 @@ import Suite from '../Suite';
 import RemoteSuite from '../RemoteSuite';
 import { parseValue, pullFromArray, retry } from '../util';
 import { expandFiles, loadScript } from '../node/util';
-import global from 'dojo-core/global';
 import Environment from '../Environment';
 import Command from 'leadfoot/Command';
 import Pretty from '../reporters/Pretty';
@@ -77,7 +76,6 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 		this.registerReporter('pretty', Pretty);
 		this.registerReporter('runner', Runner);
-
 	}
 
 	get environmentType() {
@@ -257,7 +255,6 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			return;
 		}
 
-		const server = this.server;
 		const tunnel = this.tunnel;
 		const leadfootServer = new LeadfootServer(tunnel.clientUrl, {
 			proxy: tunnel.proxy
@@ -296,29 +293,26 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 							session.serverUrl = config.serverUrl;
 							session.serverBasePathLength = config.basePath.length;
 
-							// TODO: Find a better way to handle the fact that session is mixed into the new Command
-							// instance (better than just casting to Remote)
-							let command: Remote = <Remote>new Command(session);
-							command.environmentType = new Environment(session.capabilities);
+							let remote: Remote = <Remote>new Command(session);
+							remote.environmentType = new Environment(session.capabilities);
+							this.remote = remote;
 
-							suite.remote = command;
-							// TODO: Document or remove sessionStart/sessionEnd.
-							return executor.emit('sessionStart', command);
+							return executor.emit('sessionStart', remote);
 						});
 					},
 
 					after() {
 						const remote = this.remote;
 
-						const endSession = () => {
-							return executor.emit('sessionEnd', remote).then(() => {
-								return tunnel.sendJobState(remote.session.sessionId, {
-									success: this.numFailedTests === 0 && !this.error
-								});
-							});
-						};
-
 						if (remote) {
+							const endSession = () => {
+								return executor.emit('sessionEnd', remote).then(() => {
+									return tunnel.sendJobState(remote.session.sessionId, {
+										success: this.numFailedTests === 0 && !this.error
+									});
+								});
+							};
+
 							if (
 								config.leaveRemoteOpen === true ||
 								(config.leaveRemoteOpen === 'fail' && this.numFailedTests > 0)
@@ -332,20 +326,17 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 					}
 				});
 
-				// If functional tests were added to this executor, they will be in the root suite; add them to the
-				// session suite.
+				// If functional tests were added to this executor, they will be in the executor's _rootSuite property.
+				// The functional tests should be run for each remote session, so add _rootSuite to the session suite.
 				if (this._rootSuite) {
 					this._rootSuite.name = 'functional tests';
 					suite.add(this._rootSuite);
 				}
 
-				// If unit tests were added to this executor, wrap them in a RemoteSuite and add that to the session
-				// suite.
+				// If unit tests were added to this executor, add a RemoteSuite to the session suite. The RemoteSuite
+				// will run the suites listed in executor.config.suites.
 				if (config.suites.length > 0) {
-					suite.add(new RemoteSuite({
-						name: 'unit tests',
-						server
-					}));
+					suite.add(new RemoteSuite({ name: 'unit tests' }));
 				}
 
 				return suite;
@@ -407,6 +398,9 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		}
 	}
 
+	/**
+	 * Override Executor#_loadSuites to pass config.functionalSuites as config.suites to the loader.
+	 */
 	protected _loadSuites() {
 		const config = deepMixin({}, this.config, { suites: this.config.functionalSuites });
 		return super._loadSuites(config);
@@ -426,10 +420,8 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 				return suite.run().finally(() => {
 					numSuitesCompleted++;
 					if (numSuitesCompleted === numSuitesToRun) {
-						const coverage = global[this.config.instrumenterOptions.coverageVariable];
-						if (coverage) {
-							return this.emit('coverage', { coverage });
-						}
+						// All suites have finished running, so emit coverage
+						return this._emitCoverage();
 					}
 				});
 			});
@@ -475,14 +467,28 @@ export interface TunnelMessage {
 }
 
 export interface Events extends BaseEvents {
-	debug: any;
+	/** A test server has stopped */
 	serverEnd: Server;
+
+	/** A test server was started */
 	serverStart: Server;
+
+	/** A remote session has been opened */
 	sessionStart: Remote;
+
+	/** A remote session has ended */
 	sessionEnd: Remote;
+
+	/** Emitted as a Tunnel executable download is in process */
 	tunnelDownloadProgress: TunnelMessage;
+
+	/** A WebDriver tunnel has been opened */
 	tunnelStart: TunnelMessage;
+
+	/** A status update from a WebDriver tunnel */
 	tunnelStatus: TunnelMessage;
+
+	/** A WebDriver tunnel has been stopped */
 	tunnelStop: TunnelMessage;
 };
 
