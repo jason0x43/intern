@@ -21,7 +21,7 @@ try {
 		}
 	});
 
-	intern.run().catch(error => channel.sendMessage('error', error));
+	// Intern will be further configured and started via an execute command from RemoteSuite
 }
 catch (error) {
 	channel.sendMessage('error', error);

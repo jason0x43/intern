@@ -134,49 +134,47 @@ export default class RemoteSuite extends Suite {
 					remote.setHeartbeatInterval((timeout - 1) * 1000);
 				}
 
-				const options: Config = {
+				// These are options that will be passed as query params to the test harness page
+				const queryOptions: Config = {
 					basePath: serverUrlPath,
-					name: this.id,
+					debug: config.debug,
 					sessionId: sessionId,
-					suites: this.executor.config.suites
+					socketPort: server.socketPort
 				};
 
-				if (this.executor.config.preload) {
-					options.preload = this.executor.config.preload;
-				}
-
-				if (this.executor.config.loader) {
-					options.loader = this.executor.config.loader;
-				}
-
-				if (this.executor.config.debug) {
-					options.debug = true;
-				}
-
-				if (this.executor.config.runInSync) {
-					options.runInSync = true;
-				}
-
-				if (server.socketPort) {
-					options.socketPort = server.socketPort;
-				}
-
 				// Do some pre-serialization of the options
-				const queryOptions: Hash<any> = {};
-				Object.keys(options).forEach(key => {
-					if (typeof options[key] === 'object') {
-						queryOptions[key] = JSON.stringify(options[key]);
+				const queryParams: Hash<any> = {};
+				Object.keys(queryOptions).filter(key => {
+					return queryOptions[key] != null;
+				}).forEach(key => {
+					let value = queryOptions[key];
+					if (typeof value === 'object') {
+						value = JSON.stringify(value);
 					}
-					else {
-						queryOptions[key] = options[key];
-					}
+					queryParams[key] = value;
 				});
 
-				const query = new UrlSearchParams(queryOptions);
+				const query = new UrlSearchParams(queryParams);
 				const harness = `${config.serverUrl}__intern/browser/remote.html`;
+
+				// These are options that will be POSTed to the remote page and used to configure intern
+				const remoteConfig: Config = {
+					basePath: serverUrlPath,
+					name: this.id,
+					sessionId: sessionId
+				};
+
+				[ 'suites', 'debug', 'runInSync', 'preload', 'loader' ].forEach(key => {
+					remoteConfig[key] = config[key];
+				});
 
 				remote
 					.get(`${harness}?${query}`)
+					// Send the config data in an execute block to avoid sending very large query strings
+					.execute(function (options: any) {
+						intern.configure(options);
+						intern.run().catch(_error => {});
+					}, [remoteConfig])
 					.then(() => {
 						// If the task hasn't been resolved yet, start a timer that will cancel this suite if no contact
 						// is received from the remote in a given time. The task could be resolved if, for example, the
