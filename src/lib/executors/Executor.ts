@@ -599,7 +599,18 @@ export interface Config {
 
 	instrumenterOptions?: any;
 
-	/** A loader to run before testing. */
+	/**
+	 * A loader to run before testing.
+	 * The `loader` property can be a string with a loader name or the path to a loader script. It may also be an object
+	 * with `script` and `config` properties. Intern provides built-in loader scripts for Dojo and Dojo2, which can be
+	 * specified with the IDs 'dojo' and 'dojo2'.
+	 *
+	 * ```ts
+	 * loader: 'dojo2'
+	 * loader: 'tests/loader.js'
+	 * loader: { script: 'dojo', config: { packages: [ { name: 'app', location: './js' } ] } }
+	 * ```
+	 */
 	loader?: { script: string, config?: { [key: string]: any } };
 
 	/** A top-level name for this configuration. */
@@ -607,8 +618,8 @@ export interface Config {
 
 	/**
 	 * A list of scripts to load before suites are loaded. These must be simple scripts, not modules, as a module loader
-	 * may not be available when these are loaded. Also, these scripts should be synchronous, or register an async
-	 * callback using intern.runBefore or intern.runAfter.
+	 * may not be available when these are loaded. Also, these scripts should be synchronous. If they need to run async
+	 * actions, they can register listeners for the 'runBefore' or 'runAfter' executor events.
 	 */
 	preload?: string[];
 

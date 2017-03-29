@@ -9,7 +9,7 @@ There are several ways to run Intern:
 
 ## Node Runner
 
-The node runner is a built in script for runnnig Node-based unit tests and WebDriver tests. Usage us simple:
+The node runner is a built in script for runnnig Node-based unit tests and WebDriver tests. Usage can be very simple:
 
     $ node_modules/.bin/intern
 
@@ -36,6 +36,8 @@ Similar to the Node runner script, the browser runner will accept a config argum
 query args.
 
     http://localhost:8080/node_modules/intern/?suites=tests/foo.js&grep=feature1
+
+Note that the browser runner can only be used to run unit tests, not functional (i.e., WebDriver) tests.
 
 ## Custom Node Script
 
