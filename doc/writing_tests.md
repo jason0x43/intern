@@ -1,11 +1,20 @@
 # Writing Tests
 
 At the most basic level, a test is a function that either runs to completion or throws an error. Intern groups tests
-into suites, and runs the suites when `intern.run()` is called.
+into suites, and runs the suites when `intern.run()` is called. The first few sections in this document cover the basics
+of writing and organizing tests.
 
 * [Assertions](#assertions)
 * [Interfaces](#interfaces)
 * [Organization](#organization)
+
+At a higher level, there are two general classes of test: unit and functional tests. Unit tests load application code,
+execute various parts of it, and check that it's behaving properly. Functional tests load pages in browsers and
+simulate user interaction, then verify that the page is behaving as expected (buttons work, elements show and hide,
+etc.).
+
+* [Unit tests](#unit-tests)
+* [Functional tests](#functional-tests)
 
 ## Assertions
 
@@ -147,6 +156,8 @@ define([ 'app/Component' ], function (Component) {
 On the other hand, if the loader is using SystemJS + Babel to load suites, suite file could be an ESM module:
 
 ```ts
+import Component from '../app/Component';
+
 const assert = intern.getAssertions('assert');
 const { registerSuite } = intern.getInterface('object');
 
@@ -159,3 +170,101 @@ registerSuite({
     }
 });
 ```
+
+## Unit tests
+
+Unit tests are probably the most common type of test. All of the example tests on this page have been unit tests. These
+work by directly loading a part of the application, exercising it, and verifying that it works as expected. For example,
+the following test checks that an `update` method on some Component class does what it’s supposed to:
+
+```ts
+'update values'() {
+    const component = new Component();
+    component.update({ value: 20 });
+    assert.equal(component.children[0].value, 20);
+}
+```
+
+This test instantiates an object, calls a method on it, and makes an assertion about the resulting state of the object
+(in this case, that a `value` property on a child has a particular value).
+
+### Asynchronous Tests
+
+The examples on this page have all involved synchronous code, but tests may also execute asynchronous code. When a test
+is async, Intern will wait for a notification that the test is finished before starting the next test. There are two
+ways to let Intern know a test is async:
+
+1. Call `this.async` to get a Deferred object, and then resolve or reject that Deferred when the test is finished, or
+2. Return a Promise
+
+Internally both cases are handled in the same way; Intern will wait for the Deferred object created by the call to
+`async`, or for a Promise returned by the test, to resolve before continuing. If the Deferred or Promise is rejected,
+the test fails, otherwise it passes.
+
+If the Deferred or Promise takes too long to resolve, the test will timeout (which is considered a failure). The timeout
+can be adjusted by passing a new timeout value to `async` or by setting the test’s `timeout` property. Both are values
+in milliseconds.
+
+```ts
+const dfd = this.async(5000);
+```
+
+or
+
+```ts
+this.timeout = 5000;
+```
+
+### Testing Environment
+
+Since unit tests involve running application code directly, they will typically run in the same environment as the
+application. If the application runs in a browser, the tests will likely also need to run in the browser. Similarly if
+the application runs in Node, so will the tests.
+
+This is not a hard-and-fast rule, though. In many cases the code being tested may run in both environments, or mocks
+and/or shims may be employed to allow it to run in a non-native environment. For example, mock DOMs are often employed
+to allow browser code to be tested in Node.
+
+## Functional tests
+
+Functional tests operate fundamentally differently than unit tests. While a unit test directly loads and executes
+application code, functional tests load a page in a browser and interact with it in the same way a user would: by
+examining the content of the page, clicking buttons, typing into text inputs, etc. This interaction is managed through a
+`remote` property that is available on functional test suites. Note that _functional tests may only be run using the
+WebDriver executor.
+
+Consider the following functional test:
+
+```ts
+`login works`() {
+    return this.remote
+        .get('index.html')
+        .findById('username')
+        .type('scroob')
+        .end()
+        .findById('password')
+        .type('12345')
+        .end()
+        .findById('login')
+        .click()
+        .end()
+        .sleep(5000)
+        .findByTagName('h1')
+        .getVisibleText()
+        .then(text => {
+            assert.equal(text, 'Welcome!');
+        });
+}
+```
+
+This test first loads the page 'index.html' in the browser associated with the current test session (Intern can drive
+multiple browsers at a time). Once the page has loaded, Intern finds an element on the page with DOM ID ‘username’ and
+types ‘scroob’ into it, then finds the element with ID ‘password’ and types ‘12345’ into it, then finds the element with
+ID ‘login’ and clicks it. After clicking the login element, Intern waits a few seconds and looks for an H1 element, then
+verifies that it contains the text ‘Welcome!’.
+
+One key point to keep in mind is that interaction with a browser is async, so all functional tests must be async. This
+is actually pretty simple to deal with. The API provided by `this.remote` is the Leadfoot [Command
+API](https://theintern.github.io/leadfoot/module-leadfoot_Command.html), which is fluid and async, and the
+result of a bunch of fluid Command method calls will be something that looks like a Promise. A functional test just
+needs to return the result of this Command chain, and Intern will treat it as async.

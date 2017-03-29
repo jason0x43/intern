@@ -35,11 +35,11 @@ Learn more about Intern at https://theintern.github.io.
 3. Verify your configuration works by running the Node.js client and seeing that no errors are output.
 
    ```sh
-   node_modules/.bin/intern
+   $ node_modules/.bin/intern
    ```
 
-4. Start writing tests! Read [writing tests](https://theintern.github.io/intern/#writing-unit-test) in the user guide
-and the [Intern tutorial](https://github.com/theintern/intern-tutorial) to learn more!
+4. Start writing tests! Read [writing tests](doc/writing_tests.md) in the user guide and the [Intern
+   tutorial](https://github.com/theintern/intern-tutorial) to learn more!
 
 ## More information
 
