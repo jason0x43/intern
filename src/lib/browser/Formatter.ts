@@ -1,4 +1,4 @@
-import BaseFormatter from '../Formatter';
+import BaseFormatter from '../common/Formatter';
 
 export default class Formatter extends BaseFormatter {
 	/**

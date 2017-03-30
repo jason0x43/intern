@@ -2,7 +2,7 @@ import Task, { isThenable } from 'dojo-core/async/Task';
 import Deferred from './Deferred';
 import Executor from './executors/Executor';
 import Test, { isTest, SKIP } from './Test';
-import { InternError } from './common';
+import { InternError } from './types';
 import { Remote } from './executors/WebDriver';
 import Promise from 'dojo-shim/Promise';
 

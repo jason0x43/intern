@@ -1,6 +1,6 @@
-import BaseFormatter from '../Formatter';
-import * as fs from 'fs';
-import pathUtil = require('path');
+import BaseFormatter from '../common/Formatter';
+import { readFileSync } from 'fs';
+import { dirname, join, relative, resolve } from 'path';
 import { MappingItem, RawSourceMap, SourceMapConsumer } from 'source-map';
 
 export default class Formatter extends BaseFormatter {
@@ -34,10 +34,10 @@ export default class Formatter extends BaseFormatter {
 
 		if ((match = /^\w+:\/\/[^\/]+\/(.*)$/.exec(tracepath))) {
 			// resolve the URL path to a filesystem path
-			tracepath = pathUtil ? pathUtil.resolve(match[1]) : match[1];
+			tracepath = resolve(match[1]);
 		}
 
-		source = pathUtil.relative('.', tracepath);
+		source = relative('.', tracepath);
 
 		// first, check for an instrumentation source map
 		if (tracepath in instrumentationSourceMap) {
@@ -56,7 +56,7 @@ export default class Formatter extends BaseFormatter {
 			line = originalPos.line;
 			col = originalPos.column;
 			if (originalPos.source) {
-				source = pathUtil.join(pathUtil.dirname(source), originalPos.source);
+				source = join(dirname(source), originalPos.source);
 			}
 		}
 
@@ -147,7 +147,7 @@ function getSourceMap(filepath: string) {
 			data = fileSources[filepath];
 		}
 		else {
-			data = fs.readFileSync(filepath).toString('utf-8');
+			data = readFileSync(filepath).toString('utf-8');
 			fileSources[filepath] = data;
 		}
 
@@ -161,8 +161,8 @@ function getSourceMap(filepath: string) {
 			}
 			else {
 				// treat map file path as relative to the source file
-				const mapFile = pathUtil.join(pathUtil.dirname(filepath), match[2]);
-				rawMap = JSON.parse(fs.readFileSync(mapFile, { encoding: 'utf8' }));
+				const mapFile = join(dirname(filepath), match[2]);
+				rawMap = JSON.parse(readFileSync(mapFile, { encoding: 'utf8' }));
 				fileSourceMaps[filepath] = new SourceMapConsumer(rawMap);
 			}
 			return fileSourceMaps[filepath];

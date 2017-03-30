@@ -1,12 +1,12 @@
-import { getShouldWait, pullFromArray } from './util';
+import { getShouldWait, pullFromArray } from './common/util';
 import { normalizePath } from './node/util';
 import { instrument } from './instrument';
-import * as aspect from 'dojo-core/aspect';
-import * as http from 'http';
+import { after } from 'dojo-core/aspect';
+import { createServer, IncomingMessage, Server as HttpServer, ServerResponse } from 'http';
 import { basename, dirname, join, resolve } from 'path';
-import * as fs from 'fs';
+import { createReadStream, stat, readFile } from 'fs';
 import { lookup } from 'mime-types';
-import * as net from 'net';
+import { Socket } from 'net';
 import { mixin } from 'dojo-core/lang';
 import { Handle } from 'dojo-interfaces/core';
 import Executor from './executors/Executor';
@@ -29,7 +29,7 @@ export default class Server implements ServerProperties {
 
 	runInSync: boolean;
 
-	server: http.Server;
+	server: HttpServer;
 
 	socketPort: number;
 
@@ -45,17 +45,17 @@ export default class Server implements ServerProperties {
 
 	start() {
 		return new Promise((resolve) => {
-			const server = this.server = http.createServer((request: http.IncomingMessage, response: http.ServerResponse) => {
+			const server = this.server = createServer((request: IncomingMessage, response: ServerResponse) => {
 				return this._handler(request, response);
 			});
 			this._sessions = {};
 			this._codeCache = {};
 
-			const sockets: net.Socket[] = [];
+			const sockets: Socket[] = [];
 
 			// If sockets are not manually destroyed then Node.js will keep itself running until they all expire
-			aspect.after(server, 'close', function () {
-				let socket: net.Socket;
+			after(server, 'close', function () {
+				let socket: Socket;
 				while ((socket = sockets.pop())) {
 					socket.destroy();
 				}
@@ -132,7 +132,7 @@ export default class Server implements ServerProperties {
 		return session;
 	}
 
-	private _handler(request: http.IncomingMessage, response: http.ServerResponse) {
+	private _handler(request: IncomingMessage, response: ServerResponse) {
 		if (request.method === 'GET') {
 			if (/\.js(?:$|\?)/.test(request.url)) {
 				this._handleFile(request, response, this.instrument);
@@ -188,8 +188,8 @@ export default class Server implements ServerProperties {
 	}
 
 	private _handleFile(
-		request: http.IncomingMessage,
-		response: http.ServerResponse,
+		request: IncomingMessage,
+		response: ServerResponse,
 		shouldInstrument?: boolean,
 		omitContent?: boolean
 	) {
@@ -231,7 +231,7 @@ export default class Server implements ServerProperties {
 		}
 
 		const contentType = lookup(basename(wholePath)) || 'application/octet-stream';
-		fs.stat(wholePath, (error, stats) => {
+		stat(wholePath, (error, stats) => {
 			// The server was stopped before this file was served
 			if (!this.server) {
 				return;
@@ -251,7 +251,7 @@ export default class Server implements ServerProperties {
 					send(contentType, this._codeCache[wholePath].data);
 				}
 				else {
-					fs.readFile(wholePath, 'utf8', (error, data) => {
+					readFile(wholePath, 'utf8', (error, data) => {
 						// The server was stopped in the middle of the file read
 						if (!this.server) {
 							return;
@@ -288,7 +288,7 @@ export default class Server implements ServerProperties {
 					response.end();
 				}
 				else {
-					fs.createReadStream(wholePath).pipe(response);
+					createReadStream(wholePath).pipe(response);
 				}
 			}
 		});
@@ -321,7 +321,7 @@ export default class Server implements ServerProperties {
 		return Promise.all(listeners.map(listener => listener(message.name, message.data)));
 	}
 
-	private _send404(response: http.ServerResponse) {
+	private _send404(response: ServerResponse) {
 		response.writeHead(404, {
 			'Content-Type': 'text/html;charset=utf-8'
 		});

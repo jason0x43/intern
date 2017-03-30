@@ -1,7 +1,7 @@
 import request from 'dojo-core/request/xhr';
 import Task from 'dojo-core/async/Task';
 import { deepMixin } from 'dojo-core/lang';
-import { parseArgs, parseJSON } from '../util';
+import { parseArgs, parseJSON } from '../common/util';
 
 /**
  * Resolve the user-supplied config data, which may include query args and a config file.

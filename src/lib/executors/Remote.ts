@@ -1,6 +1,6 @@
 import { Config as BaseConfig, Events, GenericBrowser } from './Browser';
 import { initialize } from './Executor';
-import { parseValue } from '../util';
+import { parseValue } from '../common/util';
 import Dom from '../reporters/Dom';
 import { deepMixin } from 'dojo-core/lang';
 

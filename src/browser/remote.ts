@@ -1,6 +1,6 @@
 import Remote from '../lib/executors/Remote';
 import { parseQuery } from '../lib/browser/util';
-import { parseArgs } from '../lib/util';
+import { parseArgs } from '../lib/common/util';
 import Channel from '../lib/WebSocketChannel';
 
 const config = parseArgs(parseQuery());

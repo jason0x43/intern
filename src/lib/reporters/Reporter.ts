@@ -1,4 +1,4 @@
-import Formatter from '../Formatter';
+import Formatter from '../common/Formatter';
 import { mixin } from 'dojo-core/lang';
 import Executor, { Events, Handle } from '../executors/Executor';
 

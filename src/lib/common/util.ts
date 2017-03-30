@@ -1,5 +1,5 @@
-import * as diffUtil from 'diff';
-import { Message } from './Channel';
+import { Message } from '../Channel';
+import diffUtil = require('diff');
 
 export const hasFunctionName = function () {
 	function foo() {}

@@ -15,7 +15,7 @@ import ProxiedSession from '../ProxiedSession';
 import resolveEnvironments from '../resolveEnvironments';
 import Suite from '../Suite';
 import RemoteSuite from '../RemoteSuite';
-import { parseValue, pullFromArray, retry } from '../util';
+import { parseValue, pullFromArray, retry } from '../common/util';
 import { expandFiles, loadScript } from '../node/util';
 import Environment from '../Environment';
 import Command from 'leadfoot/Command';

@@ -1,6 +1,6 @@
 import { normalize, resolve } from 'path';
 import { readFile } from 'fs';
-import { parseArgs, parseJSON } from '../util';
+import { parseArgs, parseJSON } from '../common/util';
 import { deepMixin } from 'dojo-core/lang';
 import Task from 'dojo-core/async/Task';
 import Promise from 'dojo-shim/Promise';

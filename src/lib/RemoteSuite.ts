@@ -3,7 +3,7 @@ import UrlSearchParams from 'dojo-core/UrlSearchParams';
 import { Hash } from 'dojo-interfaces/core';
 import { parse } from 'url';
 import Task from 'dojo-core/async/Task';
-import { InternError } from './common';
+import { InternError } from './types';
 import WebDriver, { Events } from './executors/WebDriver';
 import { Config } from './executors/Remote';
 import { Handle } from 'dojo-interfaces/core';
