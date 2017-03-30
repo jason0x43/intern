@@ -16,7 +16,7 @@ import resolveEnvironments from '../resolveEnvironments';
 import Suite from '../Suite';
 import RemoteSuite from '../RemoteSuite';
 import { parseValue, pullFromArray, retry } from '../common/util';
-import { expandFiles, loadScript } from '../node/util';
+import { expandFiles, loadScript, reportUnhandledRejections } from '../node/util';
 import Environment from '../Environment';
 import Command from 'leadfoot/Command';
 import Pretty from '../reporters/Pretty';
@@ -76,6 +76,8 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 		this.registerReporter('pretty', Pretty);
 		this.registerReporter('runner', Runner);
+
+		reportUnhandledRejections(this);
 	}
 
 	get environmentType() {
@@ -117,24 +119,6 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		const config = this.config;
 
 		const promise = super._beforeRun().then(() => {
-			if (!config.serverPort) {
-				config.serverPort = 9000;
-			}
-
-			if (!config.socketPort) {
-				config.socketPort = config.serverPort + 1;
-			}
-
-			if (!config.serverUrl) {
-				config.serverUrl = 'http://localhost:' + config.serverPort;
-			}
-
-			if (!config.basePath) {
-				config.basePath = process.cwd();
-			}
-
-			config.serverUrl = config.serverUrl.replace(/\/*$/, '/');
-
 			const server = this._createServer();
 			return server.start().then(() => {
 				this.server = server;
@@ -146,17 +130,8 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		if (config.serveOnly) {
 			return promise.then(() => {
 				// This is normally handled in Executor#run, but in serveOnly mode we short circuit the normal sequence
-				return Task.resolve(config.setup && config.setup.call(config, this))
-					.then(function () {
-						// Pause indefinitely until canceled
-						return new Promise(function () { });
-					})
-					.finally(() => {
-						return Task.resolve(config.teardown && config.teardown.call(config, this));
-					})
-					.finally(() => {
-						return this.server && this.server.stop();
-					});
+				// Pause indefinitely until canceled
+				return new Task(() => {}).finally(() => this.server && this.server.stop());
 			});
 		}
 
@@ -166,35 +141,16 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 					throw new Error('No environments specified');
 				}
 
-				if (config.functionalSuites == null) {
-					config.functionalSuites = [];
-				}
-
 				if (config.functionalSuites.length + config.suites.length + config.benchmarkSuites.length === 0) {
 					throw new Error('No test suites to run');
 				}
 
-				if (!config.capabilities.name) {
-					config.capabilities.name = 'intern';
-				}
-
-				const buildId = process.env.TRAVIS_COMMIT || process.env.BUILD_TAG;
-				if (buildId) {
-					config.capabilities.build = buildId;
-				}
-
-				if (config.tunnel === BrowserStackTunnel || config.tunnel === 'browserstack') {
+				if (config.tunnel === 'browserstack') {
 					const options = <BrowserStackOptions>config.tunnelOptions;
 					options.servers = (options.servers || []).concat(config.serverUrl);
 				}
 
-				let TunnelConstructor: typeof Tunnel;
-				if (typeof config.tunnel === 'string') {
-					TunnelConstructor = this._tunnels[config.tunnel];
-				}
-				else {
-					TunnelConstructor = config.tunnel;
-				}
+				let TunnelConstructor = this._tunnels[config.tunnel];
 				this.tunnel = new TunnelConstructor(this.config.tunnelOptions);
 			})
 			.then(() => {
@@ -428,6 +384,49 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		return super._loadSuites(config);
 	}
 
+	protected _resolveConfig() {
+		const config = this.config;
+
+		return super._resolveConfig().then(() => {
+			if (!config.serverPort) {
+				config.serverPort = 9000;
+			}
+
+			if (!config.socketPort) {
+				config.socketPort = config.serverPort + 1;
+			}
+
+			if (!config.serverUrl) {
+				config.serverUrl = 'http://localhost:' + config.serverPort;
+			}
+
+			if (!config.basePath) {
+				config.basePath = process.cwd();
+			}
+
+			config.serverUrl = config.serverUrl.replace(/\/*$/, '/');
+
+			if (config.functionalSuites == null) {
+				config.functionalSuites = [];
+			}
+
+			if (!config.capabilities.name) {
+				config.capabilities.name = 'intern';
+			}
+
+			const buildId = process.env.TRAVIS_COMMIT || process.env.BUILD_TAG;
+			if (buildId) {
+				config.capabilities.build = buildId;
+			}
+
+			return Promise.all(['suites', 'functionalSuites', 'benchmarkSuites'].map(property => {
+				return expandFiles(config[property]).then(expanded => {
+					config[property] = expanded;
+				});
+			})).then(() => null);
+		});
+	}
+
 	/**
 	 * Runs each of the root suites, limited to a certain number of suites at the same time by `maxConcurrency`.
 	 */
@@ -472,7 +471,7 @@ export interface Config extends BaseConfig {
 	serverUrl?: string;
 	runInSync?: boolean;
 	socketPort?: number;
-	tunnel?: string | typeof Tunnel;
+	tunnel?: string;
 	tunnelOptions?: TunnelOptions | BrowserStackOptions | SeleniumOptions;
 
 	/** A list of unit test suites that will be run in remote browsers */

@@ -1,7 +1,7 @@
 import { Config, Events, GenericExecutor, initialize } from './Executor';
 import Task from 'dojo-core/async/Task';
 import { instrument } from '../instrument';
-import { expandFiles, loadScript, normalizePath } from '../node/util';
+import { expandFiles, loadScript, normalizePath, reportUnhandledRejections } from '../node/util';
 import Formatter from '../node/Formatter';
 import { dirname, resolve, relative, sep } from 'path';
 import { hook } from 'istanbul';
@@ -31,6 +31,8 @@ export default class Node extends GenericExecutor<Events, Config> {
 
 		const internPath = resolve(dirname(require.resolve('intern/package.json')));
 		this._internPath = `${relative(process.cwd(), internPath)}/`;
+
+		reportUnhandledRejections(this);
 	}
 
 	get environmentType() {
@@ -47,12 +49,9 @@ export default class Node extends GenericExecutor<Events, Config> {
 	}
 
 	protected _beforeRun(): Task<void> {
-		const config = this.config;
-		if (!config.reporters) {
-			config.reporters = ['simple'];
-		}
-
 		return super._beforeRun().then(() => {
+			const config = this.config;
+
 			if (config.suites.length + config.benchmarkSuites.length === 0) {
 				throw new Error('No test suites to run');
 			}
@@ -61,7 +60,17 @@ export default class Node extends GenericExecutor<Events, Config> {
 			suite.grep = config.grep;
 			suite.timeout = config.defaultTimeout;
 			suite.bail = config.bail;
-		}).then(() => {
+		});
+	}
+
+	protected _resolveConfig() {
+		return super._resolveConfig().then(() => {
+			const config = this.config;
+
+			if (config.reporters.length === 0) {
+				config.reporters = ['simple'];
+			}
+
 			return Promise.all(['suites', 'benchmarkSuites'].map(property => {
 				return expandFiles(config[property]).then(expanded => {
 					config[property] = expanded;

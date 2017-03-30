@@ -292,8 +292,9 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		if (!this._runTask) {
 			try {
 				this._runTask = this._preloadScripts()
-					.then(() => this._beforeRun())
+					.then(() => this._resolveConfig())
 					.then(() => this.emit('beforeRun'))
+					.then(() => this._beforeRun())
 					.then(() => this._loadSuites())
 					.then(() => {
 						return this.emit('runStart')
@@ -343,63 +344,16 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	 * any last-minute configuration before the testing process begins.
 	 */
 	protected _beforeRun(): Task<any> {
-		const config = this.config;
-
-		if (config.grep == null) {
-			config.grep = new RegExp('');
-		}
-
-		if (config.suites == null) {
-			config.suites = [];
-		}
-
-		if (config.benchmarkSuites == null) {
-			config.benchmarkSuites = [];
-		}
-
-		if (config.reporters == null) {
-			config.reporters = [];
-		}
-
-		if (config.loader == null) {
-			config.loader = { script: getLoaderScript('default') };
-		}
-
-		if (config.reporters) {
-			config.reporters.forEach(reporter => {
-				if (typeof reporter === 'string') {
-					const ReporterClass = this._getReporter(reporter);
-					this._reporters.push(new ReporterClass(this));
-				}
-				else if (typeof reporter === 'function') {
-					this._reporters.push(new reporter(this));
-				}
-				else {
-					let ReporterClass: typeof Reporter;
-					if (typeof reporter.reporter === 'string') {
-						ReporterClass = this._getReporter(reporter.reporter);
-					}
-					else {
-						ReporterClass = reporter.reporter;
-					}
-
-					this._reporters.push(new ReporterClass(this, reporter.options));
-				}
-			});
-		}
-
-		if (config.benchmark) {
-			config.benchmarkConfig = deepMixin({
-				id: 'Benchmark',
-				filename: 'baseline.json',
-				mode: 'test',
-				thresholds: {
-					warn: { rme: 3, mean: 5 },
-					fail: { rme: 6, mean: 10 }
-				},
-				verbosity: 0
-			}, config.benchmarkConfig);
-		}
+		this.config.reporters.forEach(reporter => {
+			if (typeof reporter === 'string') {
+				const ReporterClass = this._getReporter(reporter);
+				this._reporters.push(new ReporterClass(this));
+			}
+			else {
+				const ReporterClass = this._getReporter(reporter.reporter);
+				this._reporters.push(new ReporterClass(this, reporter.options));
+			}
+		});
 
 		return resolvedTask;
 	}
@@ -534,6 +488,52 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	}
 
 	/**
+	 * Resolve the config object
+	 */
+	protected _resolveConfig() {
+		const config = this.config;
+
+		if (config.grep == null) {
+			config.grep = new RegExp('');
+		}
+
+		if (config.suites == null) {
+			config.suites = [];
+		}
+
+		if (config.benchmarkSuites == null) {
+			config.benchmarkSuites = [];
+		}
+
+		if (config.reporters == null) {
+			config.reporters = [];
+		}
+
+		if (config.loader == null) {
+			config.loader = { script: getLoaderScript('default') };
+		}
+
+		if (config.benchmark) {
+			config.benchmarkConfig = deepMixin({
+				id: 'Benchmark',
+				filename: 'baseline.json',
+				mode: 'test',
+				thresholds: {
+					warn: { rme: 3, mean: 5 },
+					fail: { rme: 6, mean: 10 }
+				},
+				verbosity: 0
+			}, config.benchmarkConfig);
+		}
+
+		if (!config.reporters) {
+			config.reporters = [];
+		}
+
+		return resolvedTask;
+	}
+
+	/**
 	 * Runs each of the root suites, limited to a certain number of suites at the same time by `maxConcurrency`.
 	 */
 	protected _runTests() {
@@ -626,7 +626,7 @@ export interface Config {
 	/**
 	 * A list of reporter names or descriptors. These reporters will be loaded and instantiated before testing begins.
 	 */
-	reporters?: (string | typeof Reporter | { reporter: string | typeof Reporter, options?: ReporterOptions })[];
+	reporters?: (string | { reporter: string, options?: ReporterOptions })[];
 
 	/** A list of paths to suite scripts (or some other suite identifier usable by the suite loader). */
 	suites?: string[];
