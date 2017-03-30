@@ -2,8 +2,16 @@ import { mixin } from 'dojo-core/lang';
 import Environment from './Environment';
 import { NormalizedEnvironment } from 'digdug/Tunnel';
 
-export type EnvironmentOptions = { version?: (string|string[]|number|number[]), [key: string]: any };
-export type FlatEnvironment = { version?: string, [key: string]: any };
+export interface EnvironmentOptions {
+	browserName: string;
+	version?: (string | string[] | number | number[]);
+	[key: string]: any;
+};
+export interface FlatEnvironment {
+	browserName: string;
+	version?: string;
+	[key: string]: any;
+};
 
 /**
  * Resolves a collection of Intern test environments to a list of service environments
@@ -13,7 +21,13 @@ export type FlatEnvironment = { version?: string, [key: string]: any };
  * @param available a list of available environments
  * @returns a list of flattened service environments
  */
-export default function resolveEnvironments(capabilities: { [key: string]: any }, environments: (EnvironmentOptions | string)[], available?: NormalizedEnvironment[]) {
+export default function resolveEnvironments(capabilities: { [key: string]: any }, environments: EnvironmentOptions[], available?: NormalizedEnvironment[]) {
+	// Pre-process the environments list to resolve any uses of {pwd} and do any top-level substitutions
+	environments = environments.map(environment => {
+		const serialized = JSON.stringify(environment);
+		return JSON.parse(serialized.replace(/{pwd}/g, process.cwd()));
+	});
+
 	// flatEnviroments will have non-array versions
 	const flatEnvironments = createPermutations(capabilities, environments);
 
@@ -151,7 +165,7 @@ function getVersions(environment: EnvironmentOptions, available: NormalizedEnvir
  * @param available a list of environment available on the target service
  * @returns the environment with resolved version aliases
  */
-function resolveVersions(environment: FlatEnvironment, available: NormalizedEnvironment[]): string|string[] {
+function resolveVersions(environment: FlatEnvironment, available: NormalizedEnvironment[]): string | string[] {
 	let versionSpec = environment.version;
 	let versions: string[];
 	available = available || [];
@@ -185,39 +199,31 @@ function resolveVersions(environment: FlatEnvironment, available: NormalizedEnvi
  * @param sources a list of sources to flatten
  * @return a flattened collection of sources
  */
-function createPermutations(base: { [key: string]: string }, sources?: (string | EnvironmentOptions)[]): FlatEnvironment[] {
+function createPermutations(base: { [key: string]: string }, sources?: EnvironmentOptions[]): FlatEnvironment[] {
 	// If no expansion sources were given, the set of permutations consists of just the base
 	if (!sources || sources.length === 0) {
-		return [ mixin({}, base) ];
+		return [<FlatEnvironment>mixin({}, base)];
 	}
 
 	// Expand the permutation set for each source
 	return sources.map(function (source) {
-		const sourceObject = typeof source === 'string' ? { browserName: source } : source;
-
-		return Object.keys(sourceObject).reduce(function (permutations: { [key: string]: any }[], key: string) {
-			if (Array.isArray(sourceObject[key])) {
+		return Object.keys(source).reduce((permutations: FlatEnvironment[], key: string) => {
+			if (Array.isArray(source[key])) {
 				// For array values, create a copy of the permutation set for each array item, then use the
 				// combination of these copies as the new value of `permutations`
-				permutations = sourceObject[key].map(function (value: any) {
-					return permutations.map(function (permutation) {
-						let clone: { [key: string]: any } = mixin({}, permutation);
-						clone[key] = value;
-						return clone;
-					});
-				}).reduce(function (newPermutations: Object[], keyPermutations: Object[]) {
+				permutations = source[key].map((value: any) => {
+					return permutations.map(permutation => mixin({}, permutation, { [key]: value }));
+				}).reduce((newPermutations: object[], keyPermutations: object[]) => {
 					return newPermutations.concat(keyPermutations);
 				}, []);
 			}
 			else {
 				// For simple values, add the value to all current permutations
-				permutations.forEach(function (permutation) {
-					permutation[key] = sourceObject[key];
+				permutations.forEach(permutation => {
+					permutation[key] = source[key];
 				});
 			}
 			return permutations;
-		}, [ mixin({}, base) ]);
-	}).reduce(function (newPermutations, sourcePermutations) {
-		return newPermutations.concat(sourcePermutations);
-	}, []);
+		}, [<FlatEnvironment>mixin({}, base)]);
+	}).reduce((newPermutations, sourcePermutations) => newPermutations.concat(sourcePermutations), []);
 }

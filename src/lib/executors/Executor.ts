@@ -450,7 +450,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			case 'loader':
 				if (typeof value === 'string') {
 					try {
-						value = JSON.parse(value);
+						value = parseValue(name, value, 'object');
 					}
 					catch (error) {
 						value = { script: value };

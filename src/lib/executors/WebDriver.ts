@@ -358,14 +358,36 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			// Must be a string, object, or array of (string | object)
 			case 'environments':
 				if (typeof value === 'string') {
-					this.config[name] = [parseValue(name, value, 'object|string')];
+					try {
+						value = parseValue(name, value, 'object');
+					}
+					catch (error) {
+						value = { browserName: value };
+					}
 				}
-				else if (Array.isArray(value) && value.every(v => typeof v === 'string' || typeof v === 'object')) {
-					this.config[name] = value;
+
+				if (!Array.isArray(value)) {
+					value = [value];
 				}
-				else {
-					throw new Error(`Invalid value "${value}" for ${name}; must (string | object)[]`);
-				}
+
+				this.config[name] = value.map((val: any) => {
+					if (typeof val === 'string') {
+						try {
+							val = parseValue(name, val, 'object');
+						}
+						catch (error) {
+							val = { browserName: val };
+						}
+					}
+					if (typeof val !== 'object') {
+						throw new Error(`Invalid value "${value}" for ${name}; must (string | object)[]`);
+					}
+					// Do some very basic normalization
+					if (val.browser && !val.browserName) {
+						val.browserName = val.browser;
+					}
+					return val;
+				});
 				break;
 
 			case 'tunnel':
@@ -439,7 +461,9 @@ export interface Config extends BaseConfig {
 	/** Time to wait for contact from a remote server */
 	contactTimeout?: number;
 
-	environments: (string | { [key: string]: any })[];
+	/** A list of remote environments */
+	environments: { browserName: string, [key: string]: any }[];
+
 	environmentRetries?: number;
 	leaveRemoteOpen?: boolean | 'fail';
 	maxConcurrency?: number;
