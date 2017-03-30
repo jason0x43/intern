@@ -7,6 +7,10 @@
 import runner from '../lib/node/runner';
 import { getConfig } from '../lib/node/util';
 
-getConfig().then(runner).catch(_error => {
+getConfig().then(runner).catch(error => {
+	// If intern wasn't initialized, then this error won't have been reported
+	if (typeof intern === 'undefined') {
+		console.error(error);
+	}
 	process.exitCode = 1;
 });

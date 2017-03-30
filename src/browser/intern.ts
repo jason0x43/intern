@@ -21,4 +21,11 @@ getConfig().then(config => {
 
 	// Intern automatically reports run errors, so discard one if we get it
 	return intern.run().catch(_error => {});
-}).catch(error => intern.emit('error', error));
+}).catch(error => {
+	if (typeof intern === 'undefined') {
+		console.error('Error initializing Intern:', error);
+	}
+	else {
+		return intern.emit('error', error);
+	}
+});
