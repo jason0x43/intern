@@ -236,7 +236,7 @@ WebDriver executor.
 Consider the following functional test:
 
 ```ts
-`login works`() {
+'login works'() {
     return this.remote
         .get('index.html')
         .findById('username')

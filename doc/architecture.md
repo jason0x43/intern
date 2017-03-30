@@ -28,7 +28,7 @@ configuration data provided by the user, configure the executor, and start the t
 
 A runner is a script that instantiates an executor, configures it, and starts the testing process. Intern provides
 runners for both Node and the browser. Runners are the easiest way to get started running Intern tests, and should be
-sufficient in many/most cases. More information about runners is available in the [runners doc](running.md).
+sufficient in many/most cases. More information about runners is available in [Running Intern](running.md).
 
 ### Loaders
 
