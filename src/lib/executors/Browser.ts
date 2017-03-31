@@ -1,4 +1,5 @@
 import { Config as BaseConfig, Events, GenericExecutor, initialize } from './Executor';
+import { normalizePath, parseValue } from '../common/util';
 import Formatter from '../browser/Formatter';
 import Task from 'dojo-core/async/Task';
 
@@ -6,15 +7,10 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 	constructor(config: C) {
 		super(config);
 
-		if (!this.config.basePath) {
-			this.config.basePath = '/';
-		}
-
-		this._internPath = this.config.basePath + 'node_modules/intern/';
 		this._formatter = new Formatter(config);
 	}
 
-	get environmentType() {
+	get environment() {
 		return 'browser';
 	}
 
@@ -33,7 +29,9 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 		}
 
 		return script.reduce((previous, script) => {
-			script = normalizePath(script, this.config.basePath);
+			if (script[0] !== '/') {
+				script = `${this.config.basePath}${script}`;
+			}
 			return previous.then(() => injectScript(script));
 		}, Task.resolve());
 	}
@@ -52,20 +50,30 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 	protected _processOption(name: keyof Config, value: any) {
 		switch (name) {
 			case 'basePath':
-				if (typeof value !== 'string') {
-					throw new Error(`${name} must be a string`);
-				}
-				// Ensure paths end with a '/'
-				if (value[value.length - 1] !== '/') {
-					value += '/';
-				}
-				this.config[name] = value;
+				this.config[name] = parseValue(name, value, 'string');
 				break;
 
 			default:
 				super._processOption(name, value);
 				break;
 		}
+	}
+
+	protected _resolveConfig() {
+		return super._resolveConfig().then(() => {
+			const config = this.config;
+			if (!config.basePath) {
+				config.basePath = '/';
+			}
+
+			if (!config.internPath) {
+				config.internPath = config.basePath + 'node_modules/intern/';
+			}
+
+			[ 'basePath', 'internPath' ].forEach(key => {
+				config[key] = normalizePath(config[key]);
+			});
+		});
 	}
 }
 
@@ -84,11 +92,6 @@ export interface Config extends BaseConfig {
 }
 
 export { Events };
-
-function normalizePath(path: string, basePath: string) {
-	// If path isn't absolute, assume it's relative to basePath
-	return path[0] !== '/' ? basePath + path : path;
-}
 
 function injectScript(path: string) {
 	return new Task<void>((resolve, reject) => {

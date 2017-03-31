@@ -45,19 +45,6 @@ export function createDiff(actual: Object, expected: Object): string {
 }
 
 /**
- * Return the path to the loader script specified in a given config
- */
-export function getLoaderScript(loader: string) {
-	switch (loader) {
-		case 'default':
-		case 'dojo':
-		case 'dojo2':
-			loader = `${intern.internPath}loaders/${loader}.js`;
-	}
-	return loader;
-}
-
-/**
  * Indicate whether Server or WebDriver should wait for an event to process before continuing.
  */
 export function getShouldWait(waitMode: (string|boolean), message: Message) {
@@ -81,6 +68,16 @@ export function getShouldWait(waitMode: (string|boolean), message: Message) {
 	}
 
 	return shouldWait;
+}
+
+/**
+ * Normalize a path such that it ends in '/'
+ */
+export function normalizePath(path: string) {
+	if (path && path.length > 0 && path[path.length - 1] !== '/') {
+		return `${path}/`;
+	}
+	return path;
 }
 
 /**

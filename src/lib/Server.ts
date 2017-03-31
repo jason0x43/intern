@@ -3,7 +3,7 @@ import { normalizePath } from './node/util';
 import { instrument } from './instrument';
 import { after } from 'dojo-core/aspect';
 import { createServer, IncomingMessage, Server as HttpServer, ServerResponse } from 'http';
-import { basename, dirname, join, resolve } from 'path';
+import { basename, join, resolve } from 'path';
 import { createReadStream, stat, readFile } from 'fs';
 import { lookup } from 'mime-types';
 import { Socket } from 'net';
@@ -207,8 +207,7 @@ export default class Server implements ServerProperties {
 		this.executor.log('Request for', file);
 
 		if (/^__intern\//.test(file)) {
-			const basePath = dirname(__dirname);
-			wholePath = join(basePath, file.replace(/^__intern\//, ''));
+			wholePath = join(this.executor.config.internPath, file.replace(/^__intern\//, ''));
 			shouldInstrument = false;
 		}
 		else {

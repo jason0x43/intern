@@ -21,7 +21,7 @@ import Environment from '../Environment';
 import Command from 'leadfoot/Command';
 import Pretty from '../reporters/Pretty';
 import Runner from '../reporters/Runner';
-import { dirname, resolve, relative } from 'path';
+import { dirname, relative } from 'path';
 import Promise from 'dojo-shim/Promise';
 
 /**
@@ -64,9 +64,6 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		this._formatter = new Formatter(config);
 		this._tunnels = {};
 
-		const internPath = resolve(dirname(require.resolve('intern/package.json')));
-		this._internPath = `${relative(process.cwd(), internPath)}/`;
-
 		this.registerTunnel('null', NullTunnel);
 		this.registerTunnel('selenium', SeleniumTunnel);
 		this.registerTunnel('saucelabs', SauceLabsTunnel);
@@ -80,7 +77,7 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		reportUnhandledRejections(this);
 	}
 
-	get environmentType() {
+	get environment() {
 		return 'webdriver';
 	}
 
@@ -388,6 +385,11 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		const config = this.config;
 
 		return super._resolveConfig().then(() => {
+			if (!config.internPath) {
+				config.internPath = dirname(require.resolve('intern/package.json'));
+			};
+			config.internPath = `${relative(process.cwd(), config.internPath)}/`;
+
 			if (!config.serverPort) {
 				config.serverPort = 9000;
 			}

@@ -4,7 +4,7 @@ import { deepMixin } from 'dojo-core/lang';
 import { Handle } from 'dojo-interfaces/core';
 import Task from 'dojo-core/async/Task';
 import Formatter from '../common/Formatter';
-import { getLoaderScript, parseValue, pullFromArray } from '../common/util';
+import { normalizePath, parseValue, pullFromArray } from '../common/util';
 import Reporter, { ReporterOptions } from '../reporters/Reporter';
 import getObjectInterface, { ObjectInterface } from '../interfaces/object';
 import getTddInterface, { TddInterface } from '../interfaces/tdd';
@@ -32,8 +32,6 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 
 	protected _interfaces: { [name: string]: any };
 
-	protected _internPath: string;
-
 	protected _loader: Loader;
 
 	protected _listeners: { [event: string]: Listener<any>[] };
@@ -55,7 +53,6 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		this._listeners = {};
 		this._reporters = [];
 		this._interfaces = {};
-		this._internPath = '';
 
 		if (config) {
 			this.configure(config);
@@ -67,7 +64,7 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		});
 	}
 
-	abstract get environmentType(): string;
+	abstract get environment(): string;
 
 	get config() {
 		return this._config;
@@ -78,10 +75,6 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			this._formatter = new Formatter(this.config);
 		}
 		return this._formatter;
-	}
-
-	get internPath() {
-		return this._internPath;
 	}
 
 	/**
@@ -380,6 +373,16 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	 */
 	protected _loadSuites(config?: Config) {
 		config = config || this.config;
+
+		const loader = config.loader.script;
+		switch (loader) {
+			case 'default':
+			case 'dojo':
+			case 'dojo2':
+			case 'systemjs':
+				config.loader.script = `${this.config.internPath}loaders/${loader}.js`;
+		}
+
 		return this.loadScript(config.loader.script).then(() => {
 			if (!this._loader) {
 				throw new Error(`Loader script ${config.loader.script} did not register a loader callback`);
@@ -415,10 +418,6 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 					throw new Error(`Invalid value "${value}" for ${name}`);
 				}
 
-				if (!(/\.js$/i).test(value.script)) {
-					value.script = getLoaderScript(value.script);
-				}
-
 				this.config[name] = value;
 				break;
 
@@ -428,6 +427,10 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			case 'debug':
 			case 'filterErrorStack':
 				this.config[name] = parseValue(name, value, 'boolean');
+				break;
+
+			case 'internPath':
+				this.config[name] = parseValue(name, value, 'string');
 				break;
 
 			case 'defaultTimeout':
@@ -493,6 +496,14 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	protected _resolveConfig() {
 		const config = this.config;
 
+		if (config.internPath != null) {
+			config.internPath = normalizePath(config.internPath);
+		}
+
+		if (!config.loader) {
+			config.loader = { script: 'default' };
+		}
+
 		if (config.grep == null) {
 			config.grep = new RegExp('');
 		}
@@ -507,10 +518,6 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 
 		if (config.reporters == null) {
 			config.reporters = [];
-		}
-
-		if (config.loader == null) {
-			config.loader = { script: getLoaderScript('default') };
 		}
 
 		if (config.benchmark) {
@@ -672,6 +679,9 @@ export interface Events {
 	/** An unhandled error occurs */
 	error: Error;
 
+	/** The path to Intern */
+	internPath: string;
+
 	/** A debug log event */
 	log: string;
 
@@ -698,7 +708,7 @@ export interface Events {
  * An async loader callback. Intern will wait for the done callback to be called before proceeding.
  */
 export interface Loader {
-	(config: { [key: string]: any }): Task<void> | void;
+	(config: Config): Promise<void> | void;
 }
 
 const resolvedTask = Task.resolve();

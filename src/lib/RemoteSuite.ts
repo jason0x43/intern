@@ -160,6 +160,7 @@ export default class RemoteSuite extends Suite {
 				// These are options that will be POSTed to the remote page and used to configure intern
 				const remoteConfig: Config = {
 					basePath: serverUrlPath,
+					internPath: `${serverUrlPath}${this.executor.config.internPath}`,
 					name: this.id,
 					sessionId: sessionId
 				};

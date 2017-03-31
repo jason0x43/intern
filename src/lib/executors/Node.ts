@@ -3,7 +3,7 @@ import Task from 'dojo-core/async/Task';
 import { instrument } from '../instrument';
 import { expandFiles, loadScript, normalizePath, reportUnhandledRejections } from '../node/util';
 import Formatter from '../node/Formatter';
-import { dirname, resolve, relative, sep } from 'path';
+import { dirname, relative, resolve, sep } from 'path';
 import { hook } from 'istanbul';
 import Pretty from '../reporters/Pretty';
 import Simple from '../reporters/Simple';
@@ -29,13 +29,10 @@ export default class Node extends GenericExecutor<Events, Config> {
 			this._setInstrumentationHooks(this.config.excludeInstrumentation);
 		}
 
-		const internPath = resolve(dirname(require.resolve('intern/package.json')));
-		this._internPath = `${relative(process.cwd(), internPath)}/`;
-
 		reportUnhandledRejections(this);
 	}
 
-	get environmentType() {
+	get environment() {
 		return 'node';
 	}
 
@@ -66,6 +63,11 @@ export default class Node extends GenericExecutor<Events, Config> {
 	protected _resolveConfig() {
 		return super._resolveConfig().then(() => {
 			const config = this.config;
+
+			if (!config.internPath) {
+				config.internPath = dirname(require.resolve('intern/package.json'));
+			};
+			config.internPath = `${relative(process.cwd(), config.internPath)}/`;
 
 			if (config.reporters.length === 0) {
 				config.reporters = ['simple'];
