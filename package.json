@@ -28,16 +28,16 @@
     "url": "https://github.com/theintern/intern.git"
   },
   "files": [
-	  "Node.*",
-	  "WebDriver.*",
-	  "index.*",
-	  "bin/*.js",
-	  "browser",
-	  "lib",
-	  "loaders",
-	  "tasks",
-	  "tests",
-	  "types"
+    "Node.*",
+    "WebDriver.*",
+    "index.*",
+    "bin/*.js",
+    "browser",
+    "lib",
+    "loaders",
+    "tasks",
+    "tests",
+    "types"
   ],
   "bin": {
     "intern": "./bin/intern.js"
@@ -49,7 +49,7 @@
     "clean": "intern-dev-clean",
     "lint": "intern-dev-lint",
     "release": "intern-dev-release",
-    "test": "intern-dev-build && NODE_PATH=_build node _build/tests/example.node.js",
+    "test": "intern-dev-build && node _tests/src/bin/intern.js",
     "watch": "ts-node support/watch.ts"
   },
   "dependencies": {
@@ -82,31 +82,44 @@
     "@types/grunt": "^0.4.20",
     "@types/node": "^6.0.0",
     "@types/shelljs": "^0.3.32",
+    "@types/systemjs": "^0.20.2",
     "browserify": "^14.1.0",
     "dojo-loader": "2.0.0-beta.7",
-    "intern": "~3.4.2",
-    "intern-dev": "https://github.com/theintern/intern-dev/releases/download/0.1.9/intern-dev-0.1.9.tgz",
-    "ts-node": "^2.0.0",
+    "dojo-has": "2.0.0-alpha.6",
+    "dojo-shim": "2.0.0-beta.7",
+    "intern-dev": "../intern-dev/_build/src",
+    "systemjs": "0.20.11",
     "tslint": "^4.4.0",
     "typescript": "^2.2.0"
   },
   "internDev": {
     "resources": {
-      "src": [
-        "tests/example.intern.js"
+      "_build": [
+        "src/**/*.{css,d.ts,html,js}",
+        "src/**/!(tsconfig).json"
       ],
-      ".": [
-        "tests/**/*.xml"
+      "_build/src": [
+        "types/**",
+        "bin/**"
+      ],
+      "_tests": [
+        "tests/**/*.xml",
+        "src/**/*.{css,d.ts,html,js}"
       ]
     },
-	"browserify": {
-	  "src/browser/intern.js": [
-	    "src/browser/intern.js"
-	  ],
-	  "src/browser/remote.js": [
-		"src/browser/remote.js"
-	  ]
-	},
-    "testConfig": "tests/selftest.intern.js"
+    "browserify": {
+      "_build/src/browser/intern.js": [
+        "_build/src/browser/intern.js"
+      ],
+      "_build/src/browser/remote.js": [
+        "_build/src/browser/remote.js"
+      ],
+      "_tests/src/browser/intern.js": [
+        "_tests/src/browser/intern.js"
+      ],
+      "_tests/src/browser/remote.js": [
+        "_tests/src/browser/remote.js"
+      ]
+    }
   }
 }

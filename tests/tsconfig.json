@@ -2,18 +2,19 @@
   "compilerOptions": {
     "baseUrl": "..",
     "declaration": false,
+    "outDir": "../_tests",
     "paths": {
-      "src/*": [
-		  "./_build/src/*",
-		  "./src/*"
-	  ]
+      "src/*": [ "_build/src/*" ]
     }
   },
   "extends": "../tsconfig.json",
   "include": [
-    "./example.node.ts",
-    "./example.webdriver.ts",
-    "./functional/lib/ProxiedSession.ts",
-    "./unit/all.ts"
+    "./node.ts",
+	"./loader.ts",
+	"./pre.ts",
+	"./unit/lib/Environment.ts",
+	"../src/loaders/*.ts",
+    "../src/browser/*.ts",
+    "../src/bin/*.ts"
   ]
 }

@@ -1,0 +1,19 @@
+{
+  "suites": "_tests/tests/unit/**/*.js",
+  "functionalSuites": "_tests/tests/functional/**/*.js",
+  "loader": {
+	"script": "systemjs",
+	"config": {
+	  "map": {
+		"src": "_build/src"
+	  },
+	  "packages": {
+		"src": {
+		  "defaultExtension": "js"
+		}
+	  }
+	}
+  },
+  "internPath": "_tests/src",
+  "preload": "_tests/tests/pre.js"
+}
