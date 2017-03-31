@@ -36,17 +36,17 @@ Zenput, Alfresco, Esri, HSBC, ING, Intuit, and more. It’s also the testing fra
    $ node_modules/.bin/intern
    ```
 
-4. Start writing tests! Read [writing tests](docs/writing_tests.md) in the user guide and the [Intern
+4. Start writing tests! Read [writing tests](docs/writing_tests.md) in the user guide and see the [Intern
    tutorial](https://github.com/theintern/intern-tutorial) to learn more!
 
 ## More information
 
 * [Architecture](docs/architecture.md)
-* [Configuration](docs/configuration.md)
-* [Running Intern](docs/running.md)
 * [Writing Tests](docs/writing_tests.md)
+* [Configuration](docs/configuration.md)
+* [Running](docs/running.md)
 * [Web site](https://theintern.github.io)
-* [Contributing/support](https://github.com/theintern/intern/blob/master/CONTRIBUTING.md)
+* [Contributing](https://github.com/theintern/intern/blob/master/CONTRIBUTING.md)
 
 ## Do you hate kittens and love old IE?
 

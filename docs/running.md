@@ -2,10 +2,10 @@
 
 There are several ways to run Intern:
 
-* Node runner
-* Browser runner
-* Custom node script
-* Custom HTML page
+* [Node runner](#node-runner)
+* [Browser runner](#browser-runner)
+* [Custom node script](#custom-node-script)
+* [Custom HTML page](#custom-html-page)
 
 ## Node Runner
 
@@ -47,13 +47,14 @@ Intern may also be configured and run with a custom script. The basic steps this
 2. Initialize the executor by calling `<Executor>.initialize`. Configuration information may be passed at this step.
 3. Register any reporter classes with `intern.registerReporter`
 4. Load suites
-5. Call `intern.run`
+5. Call `intern.run()`
 
 ## Custom HTML Page
 
 Intern may be configured and run in a browser with a custom HTML page. The basic steps are:
 
-1. Load the Browser executor (`node_modules/intern/browser/intern.js`)
+1. Load the Browser executor (`<script src="node_modules/intern/browser/intern.js"></script>`). The `intern.js` script
+   will automatically initialize a Browser executor.
 2. Configure the executor
 3. Load suites
-4. Call `intern.run`
+4. Call `intern.run()`

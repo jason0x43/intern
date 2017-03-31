@@ -7,6 +7,7 @@ of writing and organizing tests.
 * [Assertions](#assertions)
 * [Interfaces](#interfaces)
 * [Organization](#organization)
+* [Sync vs Async](#sync-vs-async)
 
 At a higher level, there are two general classes of test: unit and functional tests. Unit tests load application code,
 execute various parts of it, and check that it's behaving properly. Functional tests load pages in browsers and
@@ -171,24 +172,7 @@ registerSuite({
 });
 ```
 
-## Unit tests
-
-Unit tests are probably the most common type of test. All of the example tests on this page have been unit tests. These
-work by directly loading a part of the application, exercising it, and verifying that it works as expected. For example,
-the following test checks that an `update` method on some Component class does what it’s supposed to:
-
-```ts
-'update values'() {
-    const component = new Component();
-    component.update({ value: 20 });
-    assert.equal(component.children[0].value, 20);
-}
-```
-
-This test instantiates an object, calls a method on it, and makes an assertion about the resulting state of the object
-(in this case, that a `value` property on a child has a particular value).
-
-### Asynchronous Tests
+## Sync vs Async
 
 The examples on this page have all involved synchronous code, but tests may also execute asynchronous code. When a test
 is async, Intern will wait for a notification that the test is finished before starting the next test. There are two
@@ -215,7 +199,44 @@ or
 this.timeout = 5000;
 ```
 
-### Testing Environment
+## Unit tests
+
+Unit tests are probably the most common type of test. All of the example tests on this page have been unit tests. These
+work by directly loading a part of the application, exercising it, and verifying that it works as expected. For example,
+the following test checks that an `update` method on some Component class does what it’s supposed to:
+
+```ts
+'update values'() {
+    const component = new Component();
+    component.update({ value: 20 });
+    assert.equal(component.children[0].value, 20);
+}
+```
+
+This test instantiates an object, calls a method on it, and makes an assertion about the resulting state of the object
+(in this case, that a `value` property on a child has a particular value). This test assumes the `update` method on
+component is synchronous; it would be very similar if the update method were asynchronous using Promises:
+
+```ts
+'update values'() {
+    const component = new Component();
+    return component.update({ value: 20 }).then(() => {
+        assert.equal(component.children[0].value, 20);
+    });
+}
+```
+
+or using callbacks:
+
+```ts
+'update values'() {
+    const dfd = this.async();
+    const component = new Component();
+    component.update({ value: 20 }, dfd.callback(error => {
+        assert.equal(component.children[0].value, 20);
+    }));
+}
+```
 
 Since unit tests involve running application code directly, they will typically run in the same environment as the
 application. If the application runs in a browser, the tests will likely also need to run in the browser. Similarly if
