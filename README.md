@@ -39,6 +39,12 @@ Zenput, Alfresco, Esri, HSBC, ING, Intuit, and more. It’s also the testing fra
 4. Start writing tests! Read [writing tests](docs/writing_tests.md) in the user guide and see the [Intern
    tutorial](https://github.com/theintern/intern-tutorial) to learn more!
 
+## Get help
+
+The best place to ask questions and get answers about Intern is Stack Overflow. Just tag your question with `intern`.
+If you have more immediate questions, or just want to chat with other people interested in Intern, there’s an `#intern`
+IRC channel on freenode, and a Gitter room at `theintern/intern`.
+
 ## More information
 
 * [Architecture](docs/architecture.md)
@@ -47,11 +53,6 @@ Zenput, Alfresco, Esri, HSBC, ING, Intuit, and more. It’s also the testing fra
 * [Running](docs/running.md)
 * [Web site](https://theintern.github.io)
 * [Contributing](https://github.com/theintern/intern/blob/master/CONTRIBUTING.md)
-
-## Do you hate kittens and love old IE?
-
-If you need to support IE 6–8, there is also a
-[version of Intern for legacy browsers](https://github.com/theintern/intern/tree/geezer "geezer branch").
 
 ## License
 
