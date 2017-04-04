@@ -18,16 +18,6 @@ import { Watermarks } from 'istanbul';
 
 const eventHandler = createEventHandler<Events>();
 
-export interface PrettyProperties extends ReporterProperties {
-	colorReplacement: { [key: string]: string };
-	dimensions: any;
-	maxProgressBarWidth: number;
-	titleWidth: number;
-	watermarks: Watermarks;
-}
-
-export type PrettyOptions = Partial<PrettyProperties>;
-
 export default class Pretty extends Reporter implements PrettyProperties {
 	colorReplacement: { [key: string]: string };
 
@@ -86,8 +76,8 @@ export default class Pretty extends Reporter implements PrettyProperties {
 		this._charm = this._charm || this._newCharm();
 
 		const resize = () => {
-			this.dimensions.width = (<any> process.stdout).columns || 80;
-			this.dimensions.height = (<any> process.stdout).rows || 24;
+			this.dimensions.width = (<any>process.stdout).columns || 80;
+			this.dimensions.height = (<any>process.stdout).rows || 24;
 		};
 
 		resize();
@@ -111,8 +101,8 @@ export default class Pretty extends Reporter implements PrettyProperties {
 		// Sort logs: pass < deprecated < skip < errors < fail
 		const ERROR_LOG_WEIGHT = { '!': 4, '×': 3, '~': 2, '⚠': 1, '✓': 0 };
 		const logs = this._log.sort((a: any, b: any) => {
-			a = (<{ [key: string]: any }> ERROR_LOG_WEIGHT)[a.charAt(0)] || 0;
-			b = (<{ [key: string]: any }> ERROR_LOG_WEIGHT)[b.charAt(0)] || 0;
+			a = (<{ [key: string]: any }>ERROR_LOG_WEIGHT)[a.charAt(0)] || 0;
+			b = (<{ [key: string]: any }>ERROR_LOG_WEIGHT)[b.charAt(0)] || 0;
 			return a - b;
 		}).map(line => this._getColor(line) + line).join('\n');
 		charm.write(logs);
@@ -286,7 +276,7 @@ export default class Pretty extends Reporter implements PrettyProperties {
 	 * @returns {string} abbreviated environment information
 	 */
 	private _abbreviateEnvironment(env: any): string {
-		const browser = (<{ [key: string]: any }> BROWSERS)[env.browserName.toLowerCase()] || env.browserName.slice(0, 4);
+		const browser = (<{ [key: string]: any }>BROWSERS)[env.browserName.toLowerCase()] || env.browserName.slice(0, 4);
 		const result = [browser];
 
 		if (env.version) {
@@ -332,7 +322,7 @@ export default class Pretty extends Reporter implements PrettyProperties {
 		if (!omitLogs && logLength > 0 && this._log.length) {
 			const allowed = { '×': true, '⚠': true, '!': true };
 			const logs = this._log.filter(line => {
-				return (<{ [key: string]: any }> allowed)[line.charAt(0)];
+				return (<{ [key: string]: any }>allowed)[line.charAt(0)];
 			}).slice(-logLength).map(line => {
 				// truncate long lines
 				const color = this._getColor(line);
@@ -363,6 +353,16 @@ export default class Pretty extends Reporter implements PrettyProperties {
 	}
 }
 
+export interface PrettyProperties extends ReporterProperties {
+	colorReplacement: { [key: string]: string };
+	dimensions: any;
+	maxProgressBarWidth: number;
+	titleWidth: number;
+	watermarks: Watermarks;
+}
+
+export type PrettyOptions = Partial<PrettyProperties>;
+
 /**
  * Model tracking test results
  * @param environment the environment associated with the report
@@ -371,10 +371,10 @@ export default class Pretty extends Reporter implements PrettyProperties {
 export class Report {
 	environment: string;
 	sessionId: string;
-	numTotal: number = 0;
-	numPassed: number = 0;
-	numFailed: number = 0;
-	numSkipped: number = 0;
+	numTotal = 0;
+	numPassed = 0;
+	numFailed = 0;
+	numSkipped = 0;
 	results: number[] = [];
 	coverage: Collector = new Collector();
 
@@ -390,15 +390,15 @@ export class Report {
 	record(result: number) {
 		this.results.push(result);
 		switch (result) {
-		case PASS:
-			++this.numPassed;
-			break;
-		case SKIP:
-			++this.numSkipped;
-			break;
-		case FAIL:
-			++this.numFailed;
-			break;
+			case PASS:
+				++this.numPassed;
+				break;
+			case SKIP:
+				++this.numSkipped;
+				break;
+			case FAIL:
+				++this.numFailed;
+				break;
 		}
 	}
 
@@ -417,7 +417,7 @@ export class Report {
 }
 
 const PAD = new Array(100).join(' ');
-const SPINNER_STATES = [ '/', '-', '\\', '|' ];
+const SPINNER_STATES = ['/', '-', '\\', '|'];
 const PASS = 0;
 const SKIP = 1;
 const FAIL = 2;
@@ -441,7 +441,7 @@ function pad(width: number): string {
 	return PAD.slice(0, Math.max(width, 0));
 }
 
-function fit(text: string|number, width: number, padLeft: boolean = false): string {
+function fit(text: string | number, width: number, padLeft: boolean = false): string {
 	text = String(text);
 	if (text.length < width) {
 		if (padLeft) {

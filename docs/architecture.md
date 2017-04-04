@@ -14,8 +14,8 @@ Intern has several major components:
 
 ### Executors
 
-Executors are the core of Intern. They manage the testing process, including emitting events for test lifecycle
-events. There are three main executors, each tailored to a particular runtime environment:
+Executors are the core of Intern. They manage the testing process, including emitting events for test lifecycle events.
+There are three main executors, each tailored to a particular runtime environment:
 
 * **Node**: Runs unit tests in Node
 * **Browser**: Runs unit tests in a browser
@@ -30,12 +30,13 @@ A runner is a script that instantiates an executor, configures it, and starts th
 runners for both Node and the browser. Runners are the easiest way to get started running Intern tests, and should be
 sufficient in many/most cases. More information about runners is available in [Running Intern](running.md).
 
-### Loaders
+### Loader
 
-A loader is an optional script that is used by Intern's runner scripts to set up the environment for testing, including
-configuring a module loader (if necessary) and loading suites. Loaders can be very simple; the only requirement is that
-the loader itself be a standalone script, not a module. For example, the built-in ‘dojo’ loader script looks like the
-following:
+A loader is an optional script that is used by Intern’s runner scripts to set up the environment for testing, including
+configuring a module loader (if necessary) and loading suites. Only a single loader script may be specified.
+
+Loaders can be very simple; the only requirement is that the loader itself be a standalone script, not a module. For
+example, the built-in ‘dojo’ loader script looks like the following:
 
 ```ts
 intern.registerLoader(config => {
@@ -63,14 +64,13 @@ user creates a fully custom runner script, a loader script will not be required.
 
 ### Preload Scripts
 
-A preload script is similar to loader script. The key differences are that more than one preload script may be
-specified, and preload scripts run before the loader scripts. These are a good place to load global scripts required for
-browser tests, or to register `runBefore` or `runAfter` event handlers.
+Preload scripts are simple scripts that are loaded before suites. These are a good place to load global scripts required
+for browser tests, or to register `beforeRun` or `afterRun` event handlers.
 
 ```ts
 // tests/pre.js
 if (intern.environmentType === 'browser') {
-    intern.on('runBefore', function () {
+    intern.on('beforeRun', function () {
 	    // ...
     });
 }
@@ -78,15 +78,22 @@ if (intern.environmentType === 'browser') {
 
 ### Interfaces
 
-An interface is a particular style of suite and test declaration. Intern comes with 4 built-in interfaces. For more
-information, see the [Interfaces](./writing_tests.md#interfaces) section in [Writing Tests](writing_tests.md).
+An interface is a particular style of suite and test declaration. Intern comes with several built-in interfaces. For
+more information, see the [Interfaces](./writing_tests.md#interfaces) section in [Writing Tests](writing_tests.md).
+
+```ts
+const { registerSuite } = intern.getInterface('object');
+registerSuite({
+    // ...
+});
+```
 
 ### Assertions
 
 An assertion is simply a check that throws an error if the check fails. This means that no special library is required
 to make assertions. However, assertion libraries can make tests easier to understand, and can automatically generate
-meanful failure messages. To that end, Intern includes the Chai assertion library, and exposes its 3 interface (“assert”,
-“expect”, and “should”) using the `getInterface` method.
+meaningful failure messages. To that end, Intern includes the Chai assertion library, and exposes its 3 interface
+(“assert”, “expect”, and “should”) using the `getInterface` method.
 
 ```ts
 const assert = intern.getInterface('assert');
@@ -96,7 +103,7 @@ assert.lengthOf(someArray, 2);
 ### Reporters
 
 Reporters are how Intern displays or outputs test results and coverage information. Since Intern is an event emitter,
-anything that registers for Intern events can be a "reporter". Classes that inherit from Reporter gain a few
+anything that registers for Intern events can be a “reporter”. Classes that inherit from Reporter gain a few
 conveniences. Reporter also exports a decorator that handles some of the event registration boilerplate.
 
 ## Extension points

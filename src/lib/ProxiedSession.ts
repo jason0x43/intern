@@ -121,25 +121,26 @@ export default class ProxiedSession extends Session {
 			// A heartbeat command is sent immediately when the interval is set because it is unknown how long ago
 			// the last command was sent and it simplifies the implementation by requiring only one call to
 			// `setTimeout`
-			const self = this;
-			(function sendHeartbeat() {
+			const sendHeartbeat = () => {
 				let timeoutId: NodeJS.Timer;
 				let cancelled = false;
 				let startTime = Date.now();
 
-				self._heartbeatIntervalHandle = {
+				this._heartbeatIntervalHandle = {
 					remove: function () {
 						cancelled = true;
 						clearTimeout(timeoutId);
 					}
 				};
 
-				self.getCurrentUrl().then(() => {
+				this.getCurrentUrl().then(() => {
 					if (!cancelled) {
 						timeoutId = setTimeout(sendHeartbeat, delay - (Date.now() - startTime));
 					}
-				}).catch(error => self.executor.emit('error', error));
-			})();
+				}).catch(error => this.executor.emit('error', error));
+			};
+
+			sendHeartbeat();
 		}
 
 		return Task.resolve();

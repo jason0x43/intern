@@ -2,43 +2,6 @@ import Formatter from '../common/Formatter';
 import { mixin } from 'dojo-core/lang';
 import Executor, { Events, Handle } from '../executors/Executor';
 
-/**
- * Create a decorator that will add a decorated method to a class's list of event handlers.
- */
-export function createEventHandler<E extends Events>() {
-	return function (name?: keyof E) {
-		return function<T extends keyof E> (
-			target: any,
-			propertyKey: T,
-			_descriptor: TypedPropertyDescriptor<(data: E[T]) => void>
-		) {
-			if (!target.hasOwnProperty('_eventHandlers')) {
-				target._eventHandlers = {};
-			}
-			target._eventHandlers[name || propertyKey] = propertyKey;
-		};
-	};
-}
-
-/**
- * The default event handler decorator.
- */
-export const eventHandler = createEventHandler<Events>();
-
-export interface ReporterProperties {
-	output: ReporterOutput;
-}
-
-export type ReporterOptions = Partial<ReporterProperties>;
-
-/**
- * A stream that reporters can write to
- */
-export interface ReporterOutput {
-	write(chunk: string | Buffer, encoding?: string, callback?: Function): void;
-	end(chunk: string | Buffer, encoding?: string, callback?: Function): void;
-}
-
 export default class Reporter implements ReporterProperties {
 	readonly executor: Executor;
 
@@ -120,6 +83,43 @@ export default class Reporter implements ReporterProperties {
 			});
 		});
 	}
+}
+
+/**
+ * Create a decorator that will add a decorated method to a class's list of event handlers.
+ */
+export function createEventHandler<E extends Events>() {
+	return function (name?: keyof E) {
+		return function<T extends keyof E> (
+			target: any,
+			propertyKey: T,
+			_descriptor: TypedPropertyDescriptor<(data: E[T]) => void>
+		) {
+			if (!target.hasOwnProperty('_eventHandlers')) {
+				target._eventHandlers = {};
+			}
+			target._eventHandlers[name || propertyKey] = propertyKey;
+		};
+	};
+}
+
+/**
+ * The default event handler decorator.
+ */
+export const eventHandler = createEventHandler<Events>();
+
+export interface ReporterProperties {
+	output: ReporterOutput;
+}
+
+export type ReporterOptions = Partial<ReporterProperties>;
+
+/**
+ * A stream that reporters can write to
+ */
+export interface ReporterOutput {
+	write(chunk: string | Buffer, encoding?: string, callback?: Function): void;
+	end(chunk: string | Buffer, encoding?: string, callback?: Function): void;
 }
 
 function getConsole() {

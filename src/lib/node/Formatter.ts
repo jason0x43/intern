@@ -1,5 +1,6 @@
 import BaseFormatter from '../common/Formatter';
 import { readFileSync } from 'fs';
+import { parse } from 'url';
 import { dirname, join, relative, resolve } from 'path';
 import { MappingItem, RawSourceMap, SourceMapConsumer } from 'source-map';
 
@@ -8,7 +9,6 @@ export default class Formatter extends BaseFormatter {
 	 * Dereference the source from a traceline.
 	 */
 	protected _getSource(tracepath: string) {
-		/* jshint maxcomplexity:13 */
 		let match: RegExpMatchArray;
 		let source: string;
 		let line: number;
@@ -30,12 +30,8 @@ export default class Formatter extends BaseFormatter {
 		line = Number(match[2]);
 		col = match[3] ? Number(match[3].substring(1)) : null;
 
-		// strip the host when we have a URL
-
-		if ((match = /^\w+:\/\/[^\/]+\/(.*)$/.exec(tracepath))) {
-			// resolve the URL path to a filesystem path
-			tracepath = resolve(match[1]);
-		}
+		// resolve URLs to a filesystem path
+		tracepath = resolve(parse(tracepath).pathname);
 
 		source = relative('.', tracepath);
 

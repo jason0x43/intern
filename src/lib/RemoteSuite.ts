@@ -7,6 +7,7 @@ import { InternError } from './types';
 import WebDriver, { Events } from './executors/WebDriver';
 import { Config } from './executors/Remote';
 import { Handle } from 'dojo-interfaces/core';
+import { toJSON } from './common/util';
 
 /**
  * RemoteSuite is a class that acts as a local server for one or more unit test suites being run in a remote browser.
@@ -157,25 +158,48 @@ export default class RemoteSuite extends Suite {
 				const query = new UrlSearchParams(queryParams);
 				const harness = `${config.serverUrl}__intern/browser/remote.html`;
 
-				// These are options that will be POSTed to the remote page and used to configure intern
+				// These are options that will be POSTed to the remote page and used to configure intern. Stringify and
+				// parse them to ensure that the config can be properly transmitted.
 				const remoteConfig: Config = {
 					basePath: serverUrlPath,
-					internPath: `${serverUrlPath}${this.executor.config.internPath}`,
+					internPath: `${serverUrlPath}${config.internPath}`,
 					name: this.id,
 					sessionId: sessionId
 				};
 
-				[ 'suites', 'debug', 'runInSync', 'preload', 'loader' ].forEach(key => {
+				const excludeKeys: { [key: string]: boolean } = {
+					basePath: true,
+					capabilities: true,
+					contactTimeout: true,
+					environmentRetries: true,
+					environments: true,
+					functionalSuites: true,
+					instrumenterOptions: true,
+					internPath: true,
+					maxConcurrency: true,
+					name: true,
+					reporters: true,
+					serverPort: true,
+					sessionId: true,
+					socketPort: true,
+					tunnel: true,
+					tunnelOptions: true,
+					webdriver: true
+				};
+
+				// Pass all non-excluded keys to the remote config
+				Object.keys(config).filter(key => !excludeKeys[key]).forEach(key => {
 					remoteConfig[key] = config[key];
 				});
 
 				remote
 					.get(`${harness}?${query}`)
 					// Send the config data in an execute block to avoid sending very large query strings
-					.execute(function (options: any) {
+					.execute(function (configString: any) {
+						const options = JSON.parse(configString);
 						intern.configure(options);
-						intern.run().catch(_error => {});
-					}, [remoteConfig])
+						intern.run().catch(_error => { });
+					}, [toJSON(remoteConfig)])
 					.then(() => {
 						// If the task hasn't been resolved yet, start a timer that will cancel this suite if no contact
 						// is received from the remote in a given time. The task could be resolved if, for example, the

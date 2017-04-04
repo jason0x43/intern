@@ -30,14 +30,14 @@ const assert = intern.getAssertions('assert');
 
 ## Interfaces
 
-There are several ways to write tests. The most common will be to use one of Intern's built-in interfaces, such as the
+There are several ways to write tests. The most common will be to use one of Intern’s built-in interfaces, such as the
 object interface. Another possibility is to register tests or suites directly on the Intern object.
 
 Interfaces may be accessed using the `getInterface` method.
 
 ### Object
 
-This is the default interface used for Intern's self-tests and most examples. A suite is a simple object, and tests are
+This is the default interface used for Intern’s self-tests and most examples. A suite is a simple object, and tests are
 functions in a `tests` property on that object.
 
 ```ts
@@ -112,6 +112,63 @@ QUnit.test('update values', () => {
 });
 ```
 
+### Benchmark
+
+The benchmark interface is an extension of the [object interface](#object) used to register [benchmark
+suites](#benchmark-tests). Tests in benchmark suites are concerned with code performance rather than code correctness.
+The interface looks very similar to the object interface, but it has a couple of extra properties.
+
+```ts
+const { registerSuite, async, skip } = intern.getInterface('benchmark');
+let component: Component;
+
+registerSuite({
+    name: 'Component performance',
+
+    beforeEach() {
+        component = new Component();
+    },
+
+    afterEach() {
+        component = null;
+    }
+
+    tests: {
+        'update values'() {
+            component.update({ value: 20 });
+        }
+    }
+});
+```
+
+The `async` and `skip` properties are functions that can be used to identify an asynchronous test or to skip a test.
+
+```ts
+registerSuite({
+    // ...
+
+    tests: {
+        'update values'() {
+            component.update({ value: 20 });
+        },
+
+        // A skipped test will not be run
+        skip(repaint() {
+            component.repaint();
+        }),
+
+        // An async test will be passed a Deferred object
+        async(request(dfd) {
+            component.request('something.html').then(() => {
+                dfd.resolve();
+            }, error => {
+                dfd.reject(error);
+            });
+        })
+    }
+});
+```
+
 ### Native
 
 The native interface is simply the `addTest` method on Executor, which is what the various test interfaces use behind
@@ -178,7 +235,8 @@ The examples on this page have all involved synchronous code, but tests may also
 is async, Intern will wait for a notification that the test is finished before starting the next test. There are two
 ways to let Intern know a test is async:
 
-1. Call `this.async` to get a Deferred object, and then resolve or reject that Deferred when the test is finished, or
+1. Call `this.async` (or `test.async`) to get a Deferred object, and then resolve or reject that Deferred when the test
+   is finished, or
 2. Return a Promise
 
 Internally both cases are handled in the same way; Intern will wait for the Deferred object created by the call to
@@ -238,6 +296,51 @@ or using callbacks:
 }
 ```
 
+### Test context
+
+Test methods are always called in the context of the test object itself. Consider the following case that uses the TDD
+interface:
+
+```ts
+test('update values', function () {
+    const dfd = this.async();
+    const component = new Component();
+    component.update({ value: 20 }, dfd.callback(error => {
+        assert.equal(component.children[0].value, 20);
+    }));
+});
+```
+
+The value of `this` is the containing Test object. However, that would not be the case here:
+
+```ts
+test('update values', () => {
+    const dfd = this.async();  // <-- Problem here!
+    const component = new Component();
+    component.update({ value: 20 }, dfd.callback(error => {
+        assert.equal(component.children[0].value, 20);
+    }));
+});
+```
+
+To make using fat arrow functions with Intern easier, test functions will always be passed the Test object itself as the
+first (and typically only) argument.
+
+```ts
+test('update values', test => {
+    const dfd = test.async();
+    const component = new Component();
+    component.update({ value: 20 }, dfd.callback(error => {
+        assert.equal(component.children[0].value, 20);
+    }));
+});
+```
+
+Similarly, suite lifecycle functions such as `before` and `afterEach` will always be passed the Suite object itself as
+the first parameter.
+
+### Environment
+
 Since unit tests involve running application code directly, they will typically run in the same environment as the
 application. If the application runs in a browser, the tests will likely also need to run in the browser. Similarly if
 the application runs in Node, so will the tests.
@@ -245,6 +348,16 @@ the application runs in Node, so will the tests.
 This is not a hard-and-fast rule, though. In many cases the code being tested may run in both environments, or mocks
 and/or shims may be employed to allow it to run in a non-native environment. For example, mock DOMs are often employed
 to allow browser code to be tested in Node.
+
+## Benchmark tests
+
+Benchmark tests are a type of unit test that measures the performance of code rather than checking it for proper
+behavior. A benchmark test assumes that the code it’s running will work without error; the test is whether it runs as
+fast as expected.
+
+Benchmark tests can only be added with the ‘benchmark’ interface, which is an extension of the ‘object’ interface. Also
+note that benchmark suites will only be run when the `benchmark` config property is `true`. When `benchmark` is not set
+or is false, calls to register benchmark suites will be ignored.
 
 ## Functional tests
 

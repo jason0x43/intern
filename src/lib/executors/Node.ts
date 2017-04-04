@@ -1,35 +1,31 @@
-import { Config, Events, GenericExecutor, initialize } from './Executor';
+import { Config as BaseConfig, Events, GenericExecutor, initialize } from './Executor';
 import Task from 'dojo-core/async/Task';
 import { instrument } from '../instrument';
-import { expandFiles, loadScript, normalizePath, reportUnhandledRejections } from '../node/util';
+import { parseValue } from '../common/util';
+import { expandFiles, loadScript, normalizePath, reportUncaughtErrors } from '../node/util';
+import { deepMixin } from 'dojo-core/lang';
 import Formatter from '../node/Formatter';
 import { dirname, relative, resolve, sep } from 'path';
 import { hook } from 'istanbul';
 import Pretty from '../reporters/Pretty';
 import Simple from '../reporters/Simple';
+import Benchmark from '../reporters/Benchmark';
 import Promise from 'dojo-shim/Promise';
 
 /**
  * The Node executor is used to run unit tests in a Node environment.
  */
-export default class Node extends GenericExecutor<Events, Config> {
-	static initialize(config?: Config) {
-		return initialize<Events, Config, Node>(Node, config);
-	}
-
-	constructor(config: Config) {
+export class GenericNode<E extends Events, C extends Config> extends GenericExecutor<E, C> {
+	constructor(config: C) {
 		super(config);
 
 		this.registerReporter('pretty', Pretty);
 		this.registerReporter('simple', Simple);
+		this.registerReporter('benchmark', Benchmark);
 
 		this._formatter = new Formatter(config);
 
-		if (this.config.excludeInstrumentation !== true) {
-			this._setInstrumentationHooks(this.config.excludeInstrumentation);
-		}
-
-		reportUnhandledRejections(this);
+		reportUncaughtErrors(this);
 	}
 
 	get environment() {
@@ -49,8 +45,8 @@ export default class Node extends GenericExecutor<Events, Config> {
 		return super._beforeRun().then(() => {
 			const config = this.config;
 
-			if (config.suites.length + config.benchmarkSuites.length === 0) {
-				throw new Error('No test suites to run');
+			if (this.config.excludeInstrumentation !== true) {
+				this._setInstrumentationHooks(this.config.excludeInstrumentation);
 			}
 
 			const suite = this._rootSuite;
@@ -60,20 +56,48 @@ export default class Node extends GenericExecutor<Events, Config> {
 		});
 	}
 
+	/**
+	 * Override Executor#_loadSuites to pass a combination of nodeSuites and suites to the loader
+	 */
+	protected _loadSuites(config?: C) {
+		config = config || this.config;
+		return super._loadSuites(deepMixin({}, config, { suites: config.suites.concat(config.nodeSuites) }));
+	}
+
+	protected _processOption(name: keyof Config, value: any) {
+		switch (name) {
+			case 'nodeSuites':
+				this.config[name] = parseValue(name, value, 'string[]');
+				break;
+
+			default:
+				super._processOption(name, value);
+				break;
+		}
+	}
+
 	protected _resolveConfig() {
 		return super._resolveConfig().then(() => {
 			const config = this.config;
 
+			if (!config.basePath) {
+				config.basePath = process.cwd() + sep;
+			}
+
 			if (!config.internPath) {
-				config.internPath = dirname(require.resolve('intern/package.json'));
+				config.internPath = dirname(dirname(__dirname));
 			};
-			config.internPath = `${relative(process.cwd(), config.internPath)}/`;
+			config.internPath = `${relative(process.cwd(), config.internPath)}${sep}`;
 
 			if (config.reporters.length === 0) {
 				config.reporters = ['simple'];
 			}
 
-			return Promise.all(['suites', 'benchmarkSuites'].map(property => {
+			if (!config.nodeSuites) {
+				config.nodeSuites = [];
+			}
+
+			return Promise.all(['suites', 'nodeSuites', 'benchmarkSuites'].map(property => {
 				return expandFiles(config[property]).then(expanded => {
 					config[property] = expanded;
 				});
@@ -87,7 +111,7 @@ export default class Node extends GenericExecutor<Events, Config> {
 	 */
 	protected _setInstrumentationHooks(excludeInstrumentation: RegExp) {
 		const { instrumenterOptions } = this.config;
-		const basePath = normalizePath(resolve(this.config.basePath || '') + sep);
+		const basePath = normalizePath(`${resolve(this.config.basePath || '')}${sep}`);
 
 		function shouldHook(filename: string) {
 			filename = normalizePath(filename);
@@ -112,4 +136,21 @@ export default class Node extends GenericExecutor<Events, Config> {
 	}
 }
 
-export { Config, Events };
+/**
+ * The Node executor is used to run unit tests in a browser.
+ */
+export default class Node extends GenericNode<Events, Config> {
+	static initialize(config?: Config) {
+		return initialize<Events, Config, Node>(Node, config);
+	}
+}
+
+export { Events };
+
+export interface Config extends BaseConfig {
+	/**
+	 * A list of paths to unit tests suite scripts (or some other suite identifier usable by the suite loader) that
+	 * will only be loaded in Node environments.
+	 */
+	nodeSuites?: string[];
+}

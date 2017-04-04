@@ -1,4 +1,5 @@
-import { Config as BaseConfig, Events as BaseEvents, GenericExecutor, initialize } from './Executor';
+import { initialize } from './Executor';
+import { Config as BaseConfig, Events as BaseEvents, GenericNode } from './Node';
 import Tunnel, { TunnelOptions } from 'digdug/Tunnel';
 import BrowserStackTunnel, { BrowserStackOptions } from 'digdug/BrowserStackTunnel';
 import SeleniumTunnel, { SeleniumOptions } from 'digdug/SeleniumTunnel';
@@ -7,7 +8,6 @@ import TestingBotTunnel from 'digdug/TestingBotTunnel';
 import CrossBrowserTestingTunnel from 'digdug/CrossBrowserTestingTunnel';
 import NullTunnel from 'digdug/NullTunnel';
 import Server from '../Server';
-import Formatter from '../node/Formatter';
 import { deepMixin } from 'dojo-core/lang';
 import Task from 'dojo-core/async/Task';
 import LeadfootServer from 'leadfoot/Server';
@@ -16,12 +16,12 @@ import resolveEnvironments from '../resolveEnvironments';
 import Suite from '../Suite';
 import RemoteSuite from '../RemoteSuite';
 import { parseValue, pullFromArray, retry } from '../common/util';
-import { expandFiles, loadScript, reportUnhandledRejections } from '../node/util';
+import { expandFiles } from '../node/util';
 import Environment from '../Environment';
 import Command from 'leadfoot/Command';
 import Pretty from '../reporters/Pretty';
+import Benchmark from '../reporters/Benchmark';
 import Runner from '../reporters/Runner';
-import { dirname, relative } from 'path';
 import Promise from 'dojo-shim/Promise';
 
 /**
@@ -32,12 +32,10 @@ import Promise from 'dojo-shim/Promise';
  * they will be loaded in a remote browser session, not in this executor. Functional tests, on the other hand, are loaded
  * and executed directly in this executor.
  */
-export default class WebDriver extends GenericExecutor<Events, Config> {
+export default class WebDriver extends GenericNode<Events, Config> {
 	static initialize(config?: Config) {
 		return initialize<Events, Config, WebDriver>(WebDriver, config);
 	}
-
-	config: Config;
 
 	server: Server;
 
@@ -61,7 +59,6 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 		super(deepMixin(defaults, config));
 
-		this._formatter = new Formatter(config);
 		this._tunnels = {};
 
 		this.registerTunnel('null', NullTunnel);
@@ -73,22 +70,11 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 		this.registerReporter('pretty', Pretty);
 		this.registerReporter('runner', Runner);
-
-		reportUnhandledRejections(this);
+		this.registerReporter('benchmark', Benchmark);
 	}
 
 	get environment() {
 		return 'webdriver';
-	}
-
-	/**
-	 * Load a script using Node's require. Note that this method only loads scripts in the local Node context, not in
-	 * remote browser contexts.
-	 *
-	 * @param script a path to a script
-	 */
-	loadScript(script: string | string[]) {
-		return loadScript(script);
 	}
 
 	registerTunnel(name: string, Class: typeof Tunnel) {
@@ -138,17 +124,15 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 					throw new Error('No environments specified');
 				}
 
-				if (config.functionalSuites.length + config.suites.length + config.benchmarkSuites.length === 0) {
-					throw new Error('No test suites to run');
-				}
-
 				if (config.tunnel === 'browserstack') {
 					const options = <BrowserStackOptions>config.tunnelOptions;
 					options.servers = (options.servers || []).concat(config.serverUrl);
 				}
 
-				let TunnelConstructor = this._tunnels[config.tunnel];
-				this.tunnel = new TunnelConstructor(this.config.tunnelOptions);
+				if (config.functionalSuites.length + config.suites.length + config.benchmarkSuites.length > 0) {
+					let TunnelConstructor = this._tunnels[config.tunnel];
+					this.tunnel = new TunnelConstructor(this.config.tunnelOptions);
+				}
 			})
 			.then(() => {
 				return Promise.all(['suites', 'functionalSuites', 'benchmarkSuites'].map(property => {
@@ -161,6 +145,9 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			.then(() => this._createSessionSuites())
 			.then(() => {
 				const tunnel = this.tunnel;
+				if (!tunnel) {
+					return;
+				}
 
 				tunnel.on('downloadprogress', progress => {
 					this.emit('tunnelDownloadProgress', { tunnel, progress });
@@ -201,6 +188,11 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 	 * Creates suites for each environment in which tests will be executed.
 	 */
 	protected _createSessionSuites() {
+		const tunnel = this.tunnel;
+		if (!this.tunnel) {
+			return;
+		}
+
 		const config = this.config;
 
 		if (config.environments.length === 0) {
@@ -208,7 +200,6 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 			return;
 		}
 
-		const tunnel = this.tunnel;
 		const leadfootServer = new LeadfootServer(tunnel.clientUrl, {
 			proxy: tunnel.proxy
 		});
@@ -385,11 +376,6 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 		const config = this.config;
 
 		return super._resolveConfig().then(() => {
-			if (!config.internPath) {
-				config.internPath = dirname(require.resolve('intern/package.json'));
-			};
-			config.internPath = `${relative(process.cwd(), config.internPath)}/`;
-
 			if (!config.serverPort) {
 				config.serverPort = 9000;
 			}
@@ -400,10 +386,6 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 
 			if (!config.serverUrl) {
 				config.serverUrl = 'http://localhost:' + config.serverPort;
-			}
-
-			if (!config.basePath) {
-				config.basePath = process.cwd();
 			}
 
 			config.serverUrl = config.serverUrl.replace(/\/*$/, '/');
@@ -421,11 +403,9 @@ export default class WebDriver extends GenericExecutor<Events, Config> {
 				config.capabilities.build = buildId;
 			}
 
-			return Promise.all(['suites', 'functionalSuites', 'benchmarkSuites'].map(property => {
-				return expandFiles(config[property]).then(expanded => {
-					config[property] = expanded;
-				});
-			})).then(() => null);
+			return expandFiles(config.functionalSuites).then(expanded => {
+					config.functionalSuites = expanded;
+			}).then(() => null);
 		});
 	}
 

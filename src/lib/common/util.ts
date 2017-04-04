@@ -14,8 +14,8 @@ export const hasFunctionName = function () {
  * @returns A unified diff formatted string representing the difference between the two objects.
  */
 export function createDiff(actual: Object, expected: Object): string {
-	actual = serialize(actual);
-	expected = serialize(expected);
+	actual = toJSON(actual);
+	expected = toJSON(expected);
 
 	let diff = diffUtil
 		.createPatch('', actual + '\n', expected + '\n', '', '')
@@ -124,6 +124,13 @@ export function parseJSON(json: string) {
 	return JSON.parse(removeComments(json));
 }
 
+/**
+ * Parse a particular type of value from a given value
+ *
+ * @param name The 'name' of the value being parsed (used for error messages)
+ * @param value A value to parse something from
+ * @param parser The type of thing to parse, or a parser function
+ */
 export function parseValue(name: string, value: any, parser: TypeName) {
 	if (typeof parser === 'string') {
 		switch (parser) {
@@ -176,8 +183,11 @@ export function parseValue(name: string, value: any, parser: TypeName) {
 				throw new Error(`Non-string value "${value}" for ${name}`);
 
 			case 'string[]':
+				if (!value) {
+					value = [];
+				}
 				if (typeof value === 'string') {
-					return [value];
+					value = [value];
 				}
 				if (Array.isArray(value) && value.every(v => typeof v === 'string')) {
 					return value;
@@ -240,141 +250,32 @@ export function retry<T>(callback: () => Promise<T>, numRetries: number) {
 }
 
 /**
- * Creates a serialised representation of an object.
+ * Convert an object to JSON, handling non-primitive properties
  *
  * @param object The object to serialise.
- * @returns A canonical, serialised representation of the object.
+ * @returns A JSON string
  */
-export function serialize(object: Object): string {
-	let indent = '';
-	let output = '';
-	let stack: any[] = [];
+export function toJSON(object: Object) {
+	return JSON.stringify(object, serializeReplacer, '  ');
+}
 
-	function writeDate(value: Date) {
-		output += value.toISOString();
+/**
+ * Replacer function used in toJSON
+ */
+function serializeReplacer(_key: string, value: any) {
+	if (!value) {
+		return value;
 	}
 
-	function writeObject(object: any) {
-		// jshint maxcomplexity:12
-
-		if (stack.indexOf(object) > -1) {
-			output += '[Circular]';
-			return;
-		}
-
-		const isArray = Array.isArray(object);
-		const isFunction = typeof object === 'function';
-
-		if (isArray) {
-			output += '[';
-		}
-		else if (isFunction) {
-			output += (hasFunctionName ? (object.name || '<anonymous>') : '<function>') + '({';
-		}
-		else {
-			output += '{';
-		}
-
-		const keys = Object.keys(object);
-
-		if (keys.length || isArray) {
-			stack.push(object);
-			indent += '  ';
-
-			keys.sort(function (a, b) {
-				const na = Number(a);
-				const nb = Number(b);
-
-				// Sort numeric keys to the top, in numeric order, to display arrays in their natural sort order
-				if (!isNaN(na) && !isNaN(nb)) {
-					return na - nb;
-				}
-
-				if (!isNaN(na) && isNaN(nb)) {
-					return -1;
-				}
-
-				if (isNaN(na) && !isNaN(nb)) {
-					return 1;
-				}
-
-				if (a < b) {
-					return -1;
-				}
-
-				if (a > b) {
-					return 1;
-				}
-
-				return 0;
-			}).forEach(function (key, index) {
-				output += (index > 0 ? ',' : '') + '\n' + indent;
-				isArray && !isNaN(Number(key)) ? writePrimitive(key) : writeString(key);
-				output += ': ';
-				write(object[key]);
-			});
-
-			if (isArray) {
-				output += (keys.length ? ',' : '') + '\n' + indent;
-				writePrimitive('length');
-				output += ': ';
-				write(object.length);
-			}
-
-			output += '\n';
-			indent = indent.slice(0, -2);
-			stack.pop();
-
-			output += indent;
-		}
-
-		if (isArray) {
-			output += ']';
-		}
-		else if (isFunction) {
-			output += '})';
-		}
-		else {
-			output += '}';
-		}
+	if (value instanceof RegExp) {
+		return value.source;
 	}
 
-	function writePrimitive(value: any) {
-		output += String(value);
+	if (typeof value === 'function') {
+		return value.toString();
 	}
 
-	function writeString(value: string) {
-		output += JSON.stringify(value);
-	}
-
-	function write(value: any) {
-		switch (typeof value) {
-		case 'object':
-		case 'function':
-			if (value === null) {
-				writePrimitive(value);
-			}
-			else if (value instanceof Date) {
-				writeDate(value);
-			}
-			else if (value instanceof RegExp) {
-				writePrimitive(value);
-			}
-			else {
-				writeObject(value);
-			}
-			break;
-		case 'string':
-			writeString(value);
-			break;
-		default:
-			writePrimitive(value);
-			break;
-		}
-	}
-
-	write(object);
-	return output;
+	return value;
 }
 
 /**

@@ -421,15 +421,14 @@ export default class Suite implements SuiteProperties {
 							if (!error.relatedTest) {
 								error.relatedTest = <Test>test;
 							}
-							return Promise.resolve();
 						};
 
 						function runWithCatch() {
 							// Errors raised when running child tests should be reported but should not cause
 							// this suite’s run to reject, since this suite itself has not failed.
-							return new Task<void>((resolve, reject) => {
-								test.run().then(resolve, reject);
-							}).catch(handleError);
+							return test.run().catch(error => {
+								handleError(error);
+							});
 						}
 
 						// If the suite will be skipped, mark the current test as skipped. This will skip both
@@ -449,17 +448,17 @@ export default class Suite implements SuiteProperties {
 							}
 
 							if (test.skipped != null) {
-								this.executor.emit('testEnd', <Test>test).then(next);
-								return;
+								current = this.executor.emit('testEnd', <Test>test);
 							}
-
-							current = runTestLifecycle('beforeEach', <Test>test)
-								.then(runWithCatch)
-								.finally(() => runTestLifecycle('afterEach', <Test>test))
-								.catch((error: InternError) => {
-									firstError = firstError || error;
-									return handleError(error);
-								});
+							else {
+								current = runTestLifecycle('beforeEach', test)
+									.then(runWithCatch)
+									.finally(() => runTestLifecycle('afterEach', test))
+									.catch(error => {
+										firstError = firstError || error;
+										return handleError(error);
+									});
+							}
 						}
 
 						current.then(() => {
@@ -469,7 +468,7 @@ export default class Suite implements SuiteProperties {
 
 							// If the test was a suite and the suite was skipped due to bailing, skip the rest of this
 							// suite
-							if ((<Suite>test).tests && test.skipped === BAIL_REASON) {
+							if (isSuite(test) && test.skipped === BAIL_REASON) {
 								skipRestOfSuite();
 							}
 							// If the test errored and bail mode is enabled, skip the rest of this suite

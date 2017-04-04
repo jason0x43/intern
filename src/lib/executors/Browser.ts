@@ -1,5 +1,6 @@
 import { Config as BaseConfig, Events, GenericExecutor, initialize } from './Executor';
 import { normalizePath, parseValue } from '../common/util';
+import { deepMixin } from 'dojo-core/lang';
 import Formatter from '../browser/Formatter';
 import Task from 'dojo-core/async/Task';
 
@@ -39,7 +40,7 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 	protected _beforeRun(): Task<any> {
 		return super._beforeRun().then(() => {
 			const config = this.config;
-			for (let suite of config.suites) {
+			for (let suite of config.suites.concat(config.browserSuites)) {
 				if (/[*?]/.test(suite)) {
 					throw new Error(`Globs may not be used for browser suites: "${suite}"`);
 				}
@@ -47,10 +48,22 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 		});
 	}
 
+	/**
+	 * Override Executor#_loadSuites to pass a combination of browserSuites and suites to the loader
+	 */
+	protected _loadSuites() {
+		const config = this.config;
+		return super._loadSuites(deepMixin({}, config, { suites: config.suites.concat(config.browserSuites) }));
+	}
+
 	protected _processOption(name: keyof Config, value: any) {
 		switch (name) {
 			case 'basePath':
 				this.config[name] = parseValue(name, value, 'string');
+				break;
+
+			case 'browserSuites':
+				this.config[name] = parseValue(name, value, 'string[]');
 				break;
 
 			default:
@@ -68,6 +81,10 @@ export class GenericBrowser<E extends Events, C extends Config> extends GenericE
 
 			if (!config.internPath) {
 				config.internPath = config.basePath + 'node_modules/intern/';
+			}
+
+			if (!config.browserSuites) {
+				config.browserSuites = [];
 			}
 
 			[ 'basePath', 'internPath' ].forEach(key => {
@@ -89,6 +106,12 @@ export default class Browser extends GenericBrowser<Events, Config> {
 export interface Config extends BaseConfig {
 	/** The absolute path to the project base (defaults to '/') */
 	basePath?: string;
+
+	/**
+	 * A list of paths to unit tests suite scripts (or some other suite identifier usable by the suite loader) that
+	 * will only be loaded in Node environments.
+	 */
+	browserSuites?: string[];
 }
 
 export { Events };

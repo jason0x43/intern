@@ -1,12 +1,12 @@
 # Configuration
 
-Each executor can be configured by passing an object of configuration properties to the executor's `initialize` static
-method, its construtor, or to its `config` method. Any config property may also be specified as a command line or query
-arg using the format `property=value`. Simply serialize the value to a string (e.g.,
-`environments='{"browserName":"chrome"}'`).
+Configuring Intern means passing some configuration information to the currently running executor. Each executor can be
+configured by passing an object of configuration properties to the executor’s `initialize` static method, its
+constructor, or to its `config` method. Any config property may also be specified as a command line or query arg using
+the format `property=value`. Simply serialize the value to a string (e.g., `environments='{"browserName":"chrome"}'`).
 
 The executor will validate and normalize any supplied config properties. This means that the property values on the
-`config` property on the executor may not correspond exaclty to the values provided via a config file or config object.
+`config` property on the executor may not correspond exactly to the values provided via a config file or config object.
 For example, several properties such as `suites` and `environments` may be specified as a single string for convenience,
 but they will always be normalized to a canonical format on the executor config object. For example,
 `environments=chrome` will end up as
@@ -36,6 +36,24 @@ The config file is simply a JSON file specifying config properties, for example:
 
 ## Properties
 
+These are some of the most often used configuration properties:
+
+* bail
+* baseline
+* benchmark
+* debug
+* [environments](#environments)
+* excludeInstrumentation
+* filterErrorStack
+* [grep](#grep)
+* [loader](#loader)
+* [preload](#preload)
+* reporters
+* [suites](#suites-nodesuites-browsersuites-functionalsuites)
+* [nodeSuites](#suites-nodesuites-browsersuites-functionalsuites)
+* [browserSuites](#suites-nodesuites-browsersuites-functionalsuites)
+* [functionalSuites](#suites-nodesuites-browsersuites-functionalsuites)
+
 #### `environments`
 
 The `environments` property specifies the environments that will be used to run WebDriver tests. Its value can be a
@@ -53,7 +71,11 @@ using a local Selenium server, the browser name should be the lowercase name of 
 testing service such as [Sauce
 Labs](https://wiki.saucelabs.com/display/DOCS/Test+Configuration+Options#TestConfigurationOptions-RequiredSeleniumTestConfigurationSettings)
 or [BrowserStack](https://www.browserstack.com/automate/capabilities), browser names and other properties may have
-different accetable values (e.g., ‘googlechrome’ instead of ‘chrome’, or ‘MacOS’ vs ‘OSX’).
+different acceptable values (e.g., ‘googlechrome’ instead of ‘chrome’, or ‘MacOS’ vs ‘OSX’).
+
+### `grep`
+
+The `grep` property is used to filter which tests are run. Grep operates on test IDs. A test ID is the concatenation
 
 #### `loader`
 
@@ -72,20 +94,20 @@ loader: { script: 'dojo', config: { packages: [ { name: 'app', location: './js' 
 The `preload` property can be a single string or an array of strings, where each string is the path to a [preload
 script](./architecture.md#preload-scripts) file.
 
-#### `suites`, `functionalSuites`, `benchmarkSuites`
+#### `suites`, `nodeSuites`, `browserSuites`, `functionalSuites`
 
-There are several properties that specify suites, depending on the executor:
+There are several properties that specify suites. Which properties are used depends on the executor:
 
-* Node and Browser
-  * `suites` - unit tests suites
-  * `benchmarkSuites` - benchmark suites
+* Node
+  * `suites` + `nodeSuites`
+* Browser
+  * `suites` + `browserSuites`
 * WebDriver
-  * `suites` - unit test suites that are run in a remote browser
-  * `benchmarkSuites` - benchmark suites run in a remote browser
-  * `functionalSuites` - suites run locally that drive a remote browser
+  * `suites` + `browserSuites` (in remote browsers)
+  * `functionalSuites` (locally)
 
 In each case, the property value may be given as a single string or an array of strings, where each string is the path
 to a script file.
 
-Note that executors themselves don't load suites; this is handled by a loader script (either one of Intern's built-in
+Note that executors themselves don’t load suites; this is handled by a loader script (either one of Intern’s built-in
 scripts or a user-supplied one).

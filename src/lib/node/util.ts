@@ -46,7 +46,12 @@ export function getConfig() {
 		// If no config parameter was provided, try 'intern.json', or just resolve to the original args
 		return loadConfig('intern.json').then(
 			config => deepMixin(config, args),
-			_error => args
+			error => {
+				if (error.code === 'ENOENT') {
+					return args;
+				}
+				throw error;
+			}
 		);
 	}
 }
@@ -94,8 +99,13 @@ export function projectRequire(mod: string) {
 	require(resolve(mod));
 }
 
-export function reportUnhandledRejections(executor: Executor) {
-	process.on('unhandledRejection', (reason: Error) => {
+export function reportUncaughtErrors(executor: Executor) {
+	process.on('unhandledRejection', (reason: Error, promise: Promise<any>) => {
+		console.warn('Unhandled rejection:', promise);
+		executor.emit('error', reason);
+	});
+	process.on('uncaughtException', (reason: Error) => {
+		console.warn('Unhandled error');
 		executor.emit('error', reason);
 	});
 }

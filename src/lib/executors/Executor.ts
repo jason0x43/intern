@@ -9,12 +9,15 @@ import Reporter, { ReporterOptions } from '../reporters/Reporter';
 import getObjectInterface, { ObjectInterface } from '../interfaces/object';
 import getTddInterface, { TddInterface } from '../interfaces/tdd';
 import getBddInterface, { BddInterface } from '../interfaces/bdd';
+import getBenchmarkInterface, { BenchmarkInterface } from '../interfaces/benchmark';
 import Promise from 'dojo-shim/Promise';
 import * as chai from 'chai';
 import global from 'dojo-core/global';
 import Deferred from '../Deferred';
 
 export abstract class GenericExecutor<E extends Events, C extends Config> {
+	protected _assertions: { [name: string]: any };
+
 	protected _availableReporters: { [name: string]: typeof Reporter };
 
 	/** The resolved configuration for this executor. */
@@ -52,7 +55,17 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		this._availableReporters = {};
 		this._listeners = {};
 		this._reporters = [];
+		this._assertions = {};
 		this._interfaces = {};
+
+		this.registerInterface('object', getObjectInterface(this));
+		this.registerInterface('tdd', getTddInterface(this));
+		this.registerInterface('bdd', getBddInterface(this));
+		this.registerInterface('benchmark', getBenchmarkInterface(this));
+
+		this.registerAssertions('assert', chai.assert);
+		this.registerAssertions('expect', chai.expect);
+		this.registerAssertions('should', chai.should);
 
 		if (config) {
 			this.configure(config);
@@ -167,23 +180,19 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 		});
 	}
 
-	getAssertions(name: 'chai'): Chai.ChaiStatic;
 	getAssertions(name: 'assert'): Chai.AssertStatic;
 	getAssertions(name: 'expect'): Chai.ExpectStatic;
 	getAssertions(name: 'should'): Chai.Should;
+	getAssertions(name: string): any;
 	getAssertions(name: string): any {
-		switch (name) {
-			case 'chai':
-				return chai;
-			case 'assert':
-				return chai.assert;
-			case 'expect':
-				return chai.expect;
-			case 'should':
-				return chai.should();
-			default:
-				throw new Error(`Invalid assertion name ${name}`);
+		const assertions = this._assertions[name];
+
+		// `should` is a weird case because it extends Object
+		if (name === 'should') {
+			return assertions();
 		}
+
+		return assertions;
 	}
 
 	/**
@@ -192,24 +201,9 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 	getInterface(name: 'object'): ObjectInterface;
 	getInterface(name: 'tdd'): TddInterface;
 	getInterface(name: 'bdd'): BddInterface;
+	getInterface(name: 'benchmark'): BenchmarkInterface;
 	getInterface(name: string): any;
 	getInterface(name: string): any {
-		switch (name) {
-			case 'object':
-				if (!this._interfaces['object']) {
-					this._interfaces['object'] = getObjectInterface(this);
-				}
-			case 'tdd':
-				if (!this._interfaces['tdd']) {
-					this._interfaces['tdd'] = getTddInterface(this);
-				}
-				break;
-			case 'bdd':
-				if (!this._interfaces['bdd']) {
-					this._interfaces['bdd'] = getBddInterface(this);
-				}
-				break;
-		}
 		return this._interfaces[name];
 	}
 
@@ -259,6 +253,20 @@ export abstract class GenericExecutor<E extends Events, C extends Config> {
 			}
 		};
 		return handle;
+	}
+
+	/**
+	 * Register an assertion library.
+	 */
+	registerAssertions(name: string, assertions: any) {
+		this._assertions[name] = assertions;
+	}
+
+	/**
+	 * Register an interface.
+	 */
+	registerInterface(name: string, iface: any) {
+		this._interfaces[name] = iface;
 	}
 
 	/**

@@ -9,7 +9,7 @@ There are several ways to run Intern:
 
 ## Node Runner
 
-The node runner is a built in script for runnnig Node-based unit tests and WebDriver tests. Usage can be very simple:
+The node runner is a built in script for running Node-based unit tests and WebDriver tests. Usage can be very simple:
 
     $ node_modules/.bin/intern
 
@@ -23,7 +23,7 @@ properties as command line arguments. For example,
 
     $ node_modules/.bin/intern suites=tests/foo.js grep=feature1
 
-would only load the suite in `tests/foo.js`, and would only run tests containing the string 'feature1' in their IDs.
+would only load the suite in `tests/foo.js`, and would only run tests containing the string ‘feature1’ in their IDs.
 
 ## Browser Runner
 
