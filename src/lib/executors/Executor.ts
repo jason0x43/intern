@@ -9,7 +9,7 @@ import Test from '../Test';
 import ErrorFormatter, { ErrorFormatOptions } from '../common/ErrorFormatter';
 import { normalizePathEnding } from '../common/path';
 import { isTask, pullFromArray } from '../common/util';
-import { parseValue } from '../common/config';
+import { loadConfig, parseValue, splitConfigPath } from '../common/config';
 import Reporter, { ReporterOptions } from '../reporters/Reporter';
 import {
 	getInterface as getObjectInterface,
@@ -34,13 +34,14 @@ import * as console from '../common/console';
 /**
  * This interface represents the core functionality of an Executor
  */
-export interface Executor {
+export interface Executor extends Configurable {
 	readonly config: Config;
 	readonly suites: Suite[];
 
 	addSuite(factory: (parentSuite: Suite) => void): void;
 
-	configure(options: { [key: string]: any }): void;
+	configure(path: string): Promise<void>;
+	configure(options: { [key: string]: any }): Promise<void>;
 
 	emit<T extends NoDataEvents>(eventName: T): Task<void>;
 	emit<T extends keyof Events>(eventName: T, data: Events[T]): Task<void>;
@@ -54,6 +55,8 @@ export interface Executor {
 		listener: Listener<Events[T]>
 	): Handle;
 	on(listener: Listener<{ name: string; data?: any }>): Handle;
+
+	setOption(name: string, value: any): void;
 }
 
 /**
@@ -195,6 +198,13 @@ export default abstract class BaseExecutor<
 	abstract loadScript(script: string | string[]): Task<void>;
 
 	/**
+	 * Load a text resource.
+	 *
+	 * @param path: a path to a resource
+	 */
+	abstract loadText(path: string): Task<string>;
+
+	/**
 	 * Add a suite to the set of suites that will be run when `run` is called.
 	 *
 	 * The suite is added by calling a factory function. The use of a factory
@@ -227,14 +237,23 @@ export default abstract class BaseExecutor<
 	 * Configure the executor with an object containing
 	 * [[lib/executors/Executor.Config]] properties.
 	 */
-	configure(options: { [key in keyof C]?: any }): PromiseLike<void> {
-		options = options || {};
-		Object.keys(options).forEach(option => {
-			const key = <keyof C>option;
-			const { name, addToExisting } = this._evalProperty(key);
-			this._processOption(<keyof C>name, options[key], addToExisting);
-		});
-		return Promise.resolve();
+	configure(path: string): Promise<void>;
+	configure(options: { [key: string]: any }): Promise<void>;
+	configure(pathOrOptions: string | { [key: string]: any }) {
+		if (typeof pathOrOptions === 'string') {
+			const path = pathOrOptions;
+			const args = this.getArgs();
+			const { configFile, childConfig } = splitConfigPath(path);
+			return loadConfig(configFile, this, args, childConfig).then(() => {
+				this.config.config = path;
+			});
+		} else {
+			Object.keys(pathOrOptions).forEach(key => {
+				const option = <keyof C>key;
+				this.setOption(option, pathOrOptions[option]);
+			});
+			return Promise.resolve();
+		}
 	}
 
 	/**
@@ -340,6 +359,8 @@ export default abstract class BaseExecutor<
 
 		return notifications;
 	}
+
+	abstract getArgs(): { [key: string]: any };
 
 	/**
 	 * Get a registered interface plugin.
@@ -488,6 +509,221 @@ export default abstract class BaseExecutor<
 	}
 
 	/**
+	 * Set a config option value. Subclasses can override this method to
+	 * pre-process arguments or handle them instead of allowing Executor to.
+	 */
+	setOption(option: string, value: any) {
+		const { name, addToExisting } = this._evalProperty(option);
+
+		switch (name) {
+			case 'loader':
+				this._setOption(
+					name,
+					parseValue(name, value, 'object', 'script')
+				);
+				break;
+
+			case 'bail':
+			case 'baseline':
+			case 'benchmark':
+			case 'debug':
+			case 'filterErrorStack':
+				this._setOption(name, parseValue(name, value, 'boolean'));
+				break;
+
+			case 'showConfig':
+				try {
+					this._setOption(name, parseValue(name, value, 'boolean'));
+				} catch (_err) {
+					this._setOption(name, parseValue(name, value, 'string'));
+				}
+				break;
+
+			case 'basePath':
+			case 'coverageVariable':
+			case 'description':
+			case 'internPath':
+			case 'name':
+			case 'sessionId':
+				this._setOption(name, parseValue(name, value, 'string'));
+				break;
+
+			case 'defaultTimeout':
+				this._setOption(name, parseValue(name, value, 'number'));
+				break;
+
+			case 'grep':
+				this._setOption(name, parseValue(name, value, 'regexp'));
+				break;
+
+			case 'reporters':
+				this._setOption(
+					name,
+					parseValue(name, value, 'object[]', 'name'),
+					addToExisting
+				);
+				break;
+
+			case 'plugins':
+			case 'requires':
+			case 'require':
+			case 'scripts':
+				let useLoader = false;
+				let _name = name;
+				if (name === 'scripts') {
+					this.emit('deprecated', {
+						original: 'scripts',
+						replacement: 'plugins'
+					});
+					_name = 'plugins';
+				} else if (name === 'require') {
+					this.emit('deprecated', {
+						original: 'require',
+						replacement: 'plugins'
+					});
+					_name = 'plugins';
+				} else if (name === 'requires') {
+					this.emit('deprecated', {
+						original: 'require',
+						replacement: 'plugins',
+						message: 'Set `useLoader: true`'
+					});
+					_name = 'plugins';
+					useLoader = true;
+				}
+				const parsed = parseValue(_name, value, 'object[]', 'script');
+				if (useLoader) {
+					parsed.forEach((entry: PluginDescriptor) => {
+						entry.useLoader = true;
+					});
+				}
+				this._setOption(_name, parsed, addToExisting);
+				break;
+
+			case 'suites':
+				this._setOption(
+					name,
+					parseValue(name, value, 'string[]'),
+					addToExisting
+				);
+				break;
+
+			case 'node':
+			case 'browser':
+				const envConfig: ResourceConfig = this.config[name];
+				const envName = name;
+				value = parseValue(name, value, 'object');
+				if (value) {
+					Object.keys(value).forEach(valueKey => {
+						const key = <keyof ResourceConfig>valueKey;
+						let resource = value[key];
+						let { name, addToExisting } = this._evalProperty(key);
+						switch (name) {
+							case 'loader':
+								resource = parseValue(
+									name,
+									resource,
+									'object',
+									'script'
+								);
+								this._setOption(
+									name,
+									resource,
+									false,
+									<C>envConfig
+								);
+								break;
+							case 'reporters':
+								resource = parseValue(
+									'reporters',
+									resource,
+									'object[]',
+									'name'
+								);
+								this._setOption(
+									name,
+									resource,
+									addToExisting,
+									<C>envConfig
+								);
+								break;
+							case 'plugins':
+							case 'require':
+							case 'requires':
+							case 'scripts':
+								let useLoader = false;
+								if (name === 'scripts') {
+									this.emit('deprecated', {
+										original: 'scripts',
+										replacement: 'plugins'
+									});
+									name = 'plugins';
+								} else if (name === 'require') {
+									this.emit('deprecated', {
+										original: 'require',
+										replacement: 'plugins'
+									});
+									name = 'plugins';
+								} else if (name === 'requires') {
+									this.emit('deprecated', {
+										original: 'requires',
+										replacement: 'plugins',
+										message: 'Set `useLoader: true`'
+									});
+									name = 'plugins';
+									useLoader = true;
+								}
+								resource = parseValue(
+									name,
+									resource,
+									'object[]',
+									'script'
+								);
+								if (useLoader) {
+									resource.forEach(
+										(entry: PluginDescriptor) => {
+											entry.useLoader = true;
+										}
+									);
+								}
+								this._setOption(
+									name,
+									resource,
+									addToExisting,
+									<C>envConfig
+								);
+								break;
+							case 'suites':
+								resource = parseValue(
+									name,
+									resource,
+									'string[]'
+								);
+								this._setOption(
+									name,
+									resource,
+									addToExisting,
+									<C>envConfig
+								);
+								break;
+							default:
+								throw new Error(
+									`Invalid property ${key} in ${
+										envName
+									} config`
+								);
+						}
+					});
+				}
+				break;
+
+			default:
+				this.log(`Config has unknown option "${name}"`);
+				this._setOption(name, value);
+		}
+	}
+
+	/**
 	 * Register an interface plugin
 	 *
 	 * This is a convenience method for registering test interfaces. This method
@@ -633,24 +869,42 @@ export default abstract class BaseExecutor<
 				if (this.config.showConfig) {
 					this._runTask = this._runTask
 						.then(() => {
-							// Emit the config as JSON deeply sorted by key
-							const sort = (value: any) => {
-								if (Array.isArray(value)) {
-									value = value.map(sort).sort();
-								} else if (typeof value === 'object') {
-									const newObj: { [key: string]: any } = {};
-									Object.keys(value)
-										.sort()
-										.forEach(key => {
-											newObj[key] = sort(value[key]);
-										});
-									value = newObj;
-								}
-								return value;
-							};
-							console.log(
-								JSON.stringify(sort(this.config), null, '    ')
-							);
+							if (typeof this.config.showConfig === 'boolean') {
+								// Emit the config as JSON deeply sorted by key
+								const sort = (value: any) => {
+									if (Array.isArray(value)) {
+										value = value.map(sort).sort();
+									} else if (typeof value === 'object') {
+										const newObj: {
+											[key: string]: any;
+										} = {};
+										Object.keys(value)
+											.sort()
+											.forEach(key => {
+												newObj[key] = sort(value[key]);
+											});
+										value = newObj;
+									}
+									return value;
+								};
+								console.log(
+									JSON.stringify(
+										sort(this.config),
+										null,
+										'    '
+									)
+								);
+							} else {
+								const parts = this.config.showConfig.split('.');
+								const value = parts
+									.slice(1)
+									.reduce((value, part) => {
+										return value[part];
+									}, this.config[<keyof C>parts[0]]);
+								console.log(
+									JSON.stringify(value, null, '    ')
+								);
+							}
 						})
 						.catch(error => {
 							// Display resolution errors because reporters
@@ -1012,215 +1266,6 @@ export default abstract class BaseExecutor<
 	}
 
 	/**
-	 * Process an arbitrary config value. Subclasses can override this method to
-	 * pre-process arguments or handle them instead of allowing Executor to.
-	 */
-	protected _processOption(
-		name: keyof C,
-		value: any,
-		addToExisting: boolean
-	) {
-		switch (name) {
-			case 'loader':
-				this._setOption(
-					name,
-					parseValue(name, value, 'object', 'script')
-				);
-				break;
-
-			case 'bail':
-			case 'baseline':
-			case 'benchmark':
-			case 'debug':
-			case 'filterErrorStack':
-			case 'showConfig':
-				this._setOption(name, parseValue(name, value, 'boolean'));
-				break;
-
-			case 'basePath':
-			case 'coverageVariable':
-			case 'description':
-			case 'internPath':
-			case 'name':
-			case 'sessionId':
-				this._setOption(name, parseValue(name, value, 'string'));
-				break;
-
-			case 'defaultTimeout':
-				this._setOption(name, parseValue(name, value, 'number'));
-				break;
-
-			case 'grep':
-				this._setOption(name, parseValue(name, value, 'regexp'));
-				break;
-
-			case 'reporters':
-				this._setOption(
-					name,
-					parseValue(name, value, 'object[]', 'name'),
-					addToExisting
-				);
-				break;
-
-			case 'plugins':
-			case 'requires':
-			case 'require':
-			case 'scripts':
-				let useLoader = false;
-				if (name === 'scripts') {
-					this.emit('deprecated', {
-						original: 'scripts',
-						replacement: 'plugins'
-					});
-					name = 'plugins';
-				} else if (name === 'require') {
-					this.emit('deprecated', {
-						original: 'require',
-						replacement: 'plugins'
-					});
-					name = 'plugins';
-				} else if (name === 'requires') {
-					this.emit('deprecated', {
-						original: 'require',
-						replacement: 'plugins',
-						message: 'Set `useLoader: true`'
-					});
-					name = 'plugins';
-					useLoader = true;
-				}
-				const parsed = parseValue(name, value, 'object[]', 'script');
-				if (useLoader) {
-					parsed.forEach((entry: PluginDescriptor) => {
-						entry.useLoader = true;
-					});
-				}
-				this._setOption(name, parsed, addToExisting);
-				break;
-
-			case 'suites':
-				this._setOption(
-					name,
-					parseValue(name, value, 'string[]'),
-					addToExisting
-				);
-				break;
-
-			case 'node':
-			case 'browser':
-				const envConfig: ResourceConfig = this.config[name];
-				const envName = name;
-				value = parseValue(name, value, 'object');
-				if (value) {
-					Object.keys(value).forEach(valueKey => {
-						const key = <keyof ResourceConfig>valueKey;
-						let resource = value[key];
-						let { name, addToExisting } = this._evalProperty(key);
-						switch (name) {
-							case 'loader':
-								resource = parseValue(
-									name,
-									resource,
-									'object',
-									'script'
-								);
-								this._setOption(
-									name,
-									resource,
-									false,
-									<C>envConfig
-								);
-								break;
-							case 'reporters':
-								resource = parseValue(
-									'reporters',
-									resource,
-									'object[]',
-									'name'
-								);
-								this._setOption(
-									name,
-									resource,
-									addToExisting,
-									<C>envConfig
-								);
-								break;
-							case 'plugins':
-							case 'require':
-							case 'requires':
-							case 'scripts':
-								let useLoader = false;
-								if (name === 'scripts') {
-									this.emit('deprecated', {
-										original: 'scripts',
-										replacement: 'plugins'
-									});
-									name = 'plugins';
-								} else if (name === 'require') {
-									this.emit('deprecated', {
-										original: 'require',
-										replacement: 'plugins'
-									});
-									name = 'plugins';
-								} else if (name === 'requires') {
-									this.emit('deprecated', {
-										original: 'requires',
-										replacement: 'plugins',
-										message: 'Set `useLoader: true`'
-									});
-									name = 'plugins';
-									useLoader = true;
-								}
-								resource = parseValue(
-									name,
-									resource,
-									'object[]',
-									'script'
-								);
-								if (useLoader) {
-									resource.forEach(
-										(entry: PluginDescriptor) => {
-											entry.useLoader = true;
-										}
-									);
-								}
-								this._setOption(
-									name,
-									resource,
-									addToExisting,
-									<C>envConfig
-								);
-								break;
-							case 'suites':
-								resource = parseValue(
-									name,
-									resource,
-									'string[]'
-								);
-								this._setOption(
-									name,
-									resource,
-									addToExisting,
-									<C>envConfig
-								);
-								break;
-							default:
-								throw new Error(
-									`Invalid property ${key} in ${
-										envName
-									} config`
-								);
-						}
-					});
-				}
-				break;
-
-			default:
-				this.log(`Config has unknown option "${name}"`);
-				this._setOption(name, value);
-		}
-	}
-
-	/**
 	 * Resolve the config object.
 	 */
 	protected _resolveConfig() {
@@ -1416,9 +1461,17 @@ export interface Config extends ResourceConfig {
 	 */
 	benchmark: boolean;
 
-	benchmarkConfig?: BenchmarkConfig;
+	benchmarkConfig: BenchmarkConfig;
 
 	browser: ResourceConfig;
+
+	/** The path (file or URL) to the config source */
+	config: string;
+
+	/**
+	 * Child configurations
+	 */
+	configs: { [name: string]: Config };
 
 	/**
 	 * The global variable that will be used to store coverage data
@@ -1474,7 +1527,7 @@ export interface Config extends ResourceConfig {
 	sessionId: string;
 
 	/** If true, display the resolved config and exit */
-	showConfig: boolean;
+	showConfig: boolean | keyof Config;
 }
 
 /**
@@ -1574,6 +1627,15 @@ export interface Events {
 
 	/** A non-fatal error occurred */
 	warning: string;
+}
+
+export type Args = { [key: string]: any };
+
+export interface Configurable {
+	configure(options: { [key: string]: any }): void;
+	getArgs(): Args;
+	loadText(path: string): Task<string>;
+	setOption(key: string, value: any): void;
 }
 
 /** A list of event names that don't have associated data */

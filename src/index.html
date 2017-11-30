@@ -23,21 +23,22 @@
 		<script src="browser/intern.js"></script>
 		<script src="browser/config.js"></script>
 		<script>
-		internConfig.getConfig()
-			.then(function (result) {
-				var config = result.config;
-				if (config.showConfigs) {
-					console.log(getConfigDescription(config));
+		// Add the HTML and console reporters to the default
+		intern
+			.configure({ 'reporters+': ['html', 'console'] })
+			.then(function () {
+				return intern.configure(internConfig.getConfigFile());
+			})
+			.then(function () {
+				var args = internConfig.getArgs();
+				if (args.showConfigs) {
+					console.log(getConfigDescription(intern.config));
 					return true;
 				}
 
-				if (!result.file) {
+				if (!intern.config.config) {
 					console.warn('No config file was found');
 				}
-
-				// Add the HTML and console reporters to the default
-				intern.configure({ 'reporters+': ['html', 'console'] });
-				intern.configure(config);
 			})
 			.then(
 				function (skipTests) {

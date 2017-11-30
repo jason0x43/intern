@@ -22,7 +22,7 @@ const process = global.process;
  * Get any arguments supplied on the command line or through INTERN_ARGS
  */
 export function getArgs() {
-	const args = process.argv.slice(2);
+	const args = parseArgs(process.argv.slice(2));
 
 	if (process.env['INTERN_ARGS']) {
 		mixin(args, parseArgs(parse(process.env['INTERN_ARGS'] || '')));

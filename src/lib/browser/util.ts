@@ -9,6 +9,10 @@ import {
 	splitConfigPath
 } from '../common/config';
 
+export function getArgs() {
+	return parseArgs(parseQuery());
+}
+
 /**
  * Resolve the user-supplied config data, which may include query args and a
  * config file.
@@ -57,6 +61,12 @@ export function getConfig(file?: string) {
 			return config;
 		})
 		.then(config => ({ config, file }));
+}
+
+export function getConfigFile() {
+	const args = getArgs();
+	const basePath = args.basePath || getDefaultBasePath();
+	return args.config || resolvePath('intern.json', basePath);
 }
 
 /**

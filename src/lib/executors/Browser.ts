@@ -4,11 +4,10 @@ import Task from '@dojo/core/async/Task';
 import global from '@dojo/shim/global';
 
 import * as console from '../common/console';
-import Executor, { Config, Events, Plugins } from './Executor';
-import { loadConfig, splitConfigPath } from '../common/config';
-import { loadText, parseQuery } from '../browser/util';
+import Executor, { Config as BaseConfig, Events, Plugins } from './Executor';
+import { getArgs } from '../browser/util';
 import { dirname, join, normalizePathEnding } from '../common/path';
-import { getDefaultBasePath } from '../browser/util';
+import { getDefaultBasePath, loadText } from '../browser/util';
 import { RuntimeEnvironment } from '../types';
 
 // Reporters
@@ -58,23 +57,8 @@ export default class Browser extends Executor<Events, Config, Plugins> {
 		return 'browser';
 	}
 
-	configure(url: string): PromiseLike<void>;
-	configure(options: { [key in keyof Config]?: any }): PromiseLike<void>;
-	configure(urlOrOptions: string | { [key in keyof Config]?: any }) {
-		if (typeof urlOrOptions === 'string') {
-			const url = urlOrOptions;
-			const args = parseQuery();
-			const { configFile, childConfig } = splitConfigPath(url, '/');
-			return loadConfig(
-				configFile,
-				loadText,
-				args,
-				childConfig,
-				this._processOption.bind(this)
-			);
-		} else {
-			return super.configure(urlOrOptions);
-		}
+	getArgs() {
+		return getArgs();
 	}
 
 	/**
@@ -93,6 +77,10 @@ export default class Browser extends Executor<Events, Config, Plugins> {
 			}
 			return previous.then(() => injectScript(script, isEsm));
 		}, Task.resolve());
+	}
+
+	loadText(path: string) {
+		return loadText(path);
 	}
 
 	protected _resolveConfig() {
@@ -151,7 +139,12 @@ export default class Browser extends Executor<Events, Config, Plugins> {
 	}
 }
 
-export { Events, Config };
+export { Events };
+
+export interface Config extends BaseConfig {
+	/** A path or URL pointing to a config */
+	config: string;
+}
 
 function injectScript(path: string, isEsm: boolean) {
 	return new Task<void>((resolve, reject) => {

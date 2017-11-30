@@ -1,26 +1,13 @@
-import { deepMixin, mixin } from '@dojo/core/lang';
+import { deepMixin } from '@dojo/core/lang';
 import Task from '@dojo/core/async/Task';
 
-import {
-	Config,
-	Events,
-	Executor,
-	PluginDescriptor,
-	ResourceConfig
-} from '../executors/Executor';
+import { Config, Configurable, ResourceConfig } from '../executors/Executor';
 import { getPathSep, join, normalize } from './path';
-import { TextLoader } from './util';
 
 export interface EvaluatedProperty<C extends Config = Config> {
 	name: keyof C;
 	addToExisting: boolean;
 }
-
-export type OptionProcessor<C extends Config> = (
-	key: keyof C,
-	value: any,
-	config: C
-) => boolean;
 
 export type TypeName =
 	| 'string'
@@ -127,34 +114,27 @@ export function getConfigDescription(config: any, prefix = '') {
  * Load config data from a given path, using a given text loader, and mixing
  * args and/or a childConfig into the final config value if provided.
  */
-export function loadConfig<C extends Config>(
+export function loadConfig(
 	configPath: string,
-	loadText: TextLoader,
+	configurable: Configurable,
 	args?: { [key: string]: any },
-	childConfig?: string | string[],
-	processOpt?: OptionProcessor<C>
+	childConfig?: string | string[]
 ): Task<any> {
-	const _processOption = processOpt || processOption;
+	return _loadConfig(configPath, configurable, args, childConfig).then(
+		config => {
+			// 'config' and 'extends' are only applicable to the config loader, not
+			// the Executors
+			delete config.config;
+			delete config.extends;
 
-	return _loadConfig(
-		configPath,
-		loadText,
-		_processOption,
-		args,
-		childConfig
-	).then(config => {
-		// 'config' and 'extends' are only applicable to the config loader, not
-		// the Executors
-		delete config.config;
-		delete config.extends;
+			if (!(args && (args.showConfigs || args.help))) {
+				// 'configs' is only relevant if we're showing configs
+				delete config.configs;
+			}
 
-		if (!(args && (args.showConfigs || args.help))) {
-			// 'configs' is only relevant if we're showing configs
-			delete config.configs;
+			return config;
 		}
-
-		return config;
-	});
+	);
 }
 
 /**
@@ -322,222 +302,6 @@ export function parseValue(
 }
 
 /**
- * Process a Config option, transforming it to a canonical form and storing it
- * on the given config object.
- *
- * If an executor is provided, it will be used to emit deprecation and log
- * events.
- */
-export function processOption<C extends Config>(
-	key: keyof C,
-	value: any,
-	config: C,
-	executor?: Executor
-) {
-	const { name, addToExisting } = evalProperty(key);
-	const emit = executor
-		? (eventName: keyof Events, data?: any) => {
-				executor.emit(eventName, data);
-			}
-		: (..._args: any[]) => {};
-
-	switch (name) {
-		case 'loader':
-			setOption(
-				config,
-				name,
-				parseValue(name, value, 'object', 'script')
-			);
-			break;
-
-		case 'bail':
-		case 'baseline':
-		case 'benchmark':
-		case 'debug':
-		case 'filterErrorStack':
-		case 'showConfig':
-			setOption(config, name, parseValue(name, value, 'boolean'));
-			break;
-
-		case 'basePath':
-		case 'coverageVariable':
-		case 'description':
-		case 'internPath':
-		case 'name':
-		case 'sessionId':
-			setOption(config, name, parseValue(name, value, 'string'));
-			break;
-
-		case 'defaultTimeout':
-			setOption(config, name, parseValue(name, value, 'number'));
-			break;
-
-		case 'grep':
-			setOption(config, name, parseValue(name, value, 'regexp'));
-			break;
-
-		case 'reporters':
-			setOption(
-				config,
-				name,
-				parseValue(name, value, 'object[]', 'name'),
-				addToExisting
-			);
-			break;
-
-		case 'plugins':
-		case 'requires':
-		case 'require':
-		case 'scripts':
-			let useLoader = false;
-			let _name = name;
-			if (name === 'scripts') {
-				emit('deprecated', {
-					original: 'scripts',
-					replacement: 'plugins'
-				});
-				_name = 'plugins';
-			} else if (name === 'require') {
-				emit('deprecated', {
-					original: 'require',
-					replacement: 'plugins'
-				});
-				_name = 'plugins';
-			} else if (name === 'requires') {
-				emit('deprecated', {
-					original: 'require',
-					replacement: 'plugins',
-					message: 'Set `useLoader: true`'
-				});
-				_name = 'plugins';
-				useLoader = true;
-			}
-			const parsed = parseValue(_name, value, 'object[]', 'script');
-			if (useLoader) {
-				parsed.forEach((entry: PluginDescriptor) => {
-					entry.useLoader = true;
-				});
-			}
-			setOption(config, _name, parsed, addToExisting);
-			break;
-
-		case 'suites':
-			setOption(
-				config,
-				name,
-				parseValue(name, value, 'string[]'),
-				addToExisting
-			);
-			break;
-
-		case 'node':
-		case 'browser':
-			const envConfig: ResourceConfig = config[name] || {};
-			if (!config[name]) {
-				config[name] = envConfig;
-			}
-			const envName = name;
-			const _value = parseValue(name, value, 'object');
-			if (_value) {
-				Object.keys(_value).forEach(valueKey => {
-					const key = <keyof ResourceConfig>valueKey;
-					let resource = _value[key];
-					let { name, addToExisting } = evalProperty(key);
-					switch (name) {
-						case 'loader':
-							resource = parseValue(
-								name,
-								resource,
-								'object',
-								'script'
-							);
-							setOption(<C>envConfig, name, resource, false);
-							break;
-						case 'reporters':
-							resource = parseValue(
-								'reporters',
-								resource,
-								'object[]',
-								'name'
-							);
-							setOption(
-								<C>envConfig,
-								name,
-								resource,
-								addToExisting
-							);
-							break;
-						case 'plugins':
-						case 'require':
-						case 'requires':
-						case 'scripts':
-							let useLoader = false;
-							if (name === 'scripts') {
-								emit('deprecated', {
-									original: 'scripts',
-									replacement: 'plugins'
-								});
-								name = 'plugins';
-							} else if (name === 'require') {
-								emit('deprecated', {
-									original: 'require',
-									replacement: 'plugins'
-								});
-								name = 'plugins';
-							} else if (name === 'requires') {
-								emit('deprecated', {
-									original: 'requires',
-									replacement: 'plugins',
-									message: 'Set `useLoader: true`'
-								});
-								name = 'plugins';
-								useLoader = true;
-							}
-							resource = parseValue(
-								name,
-								resource,
-								'object[]',
-								'script'
-							);
-							if (useLoader) {
-								resource.forEach((entry: PluginDescriptor) => {
-									entry.useLoader = true;
-								});
-							}
-							setOption(
-								<C>envConfig,
-								<keyof C>name,
-								resource,
-								addToExisting
-							);
-							break;
-						case 'suites':
-							resource = parseValue(name, resource, 'string[]');
-							setOption(
-								<C>envConfig,
-								name,
-								resource,
-								addToExisting
-							);
-							break;
-						default:
-							throw new Error(
-								`Invalid property ${key} in ${envName} config`
-							);
-					}
-				});
-			}
-			break;
-
-		default:
-			emit('log', `Config has unknown option "${name}"`);
-			setOption(config, name, value);
-	}
-
-	return true;
-}
-
-/**
  * Remove JS-style line and block comments from a string
  */
 function removeComments(text: string) {
@@ -642,15 +406,18 @@ export function setOption<C extends Config>(
  * separator (e.g., a scoped npm package).
  */
 export function splitConfigPath(
-	path: string,
-	separator = '/'
+	path: string
 ): { configFile: string; childConfig?: string } {
 	const lastSep = path.lastIndexOf(configPathSeparator);
 	if (lastSep === 0) {
 		// path is like '@foo' -- specifies a child config
 		return { configFile: '', childConfig: path.slice(1) };
 	}
-	if (lastSep === -1 || path[lastSep - 1] === separator) {
+	if (
+		lastSep === -1 ||
+		path[lastSep - 1] === '/' ||
+		path[lastSep - 1] === '\\'
+	) {
 		// path is like 'foo' or 'node_modules/@foo' -- specifies a
 		// path
 		return { configFile: path };
@@ -669,18 +436,12 @@ export function splitConfigPath(
 
 function _loadConfig<C extends Config>(
 	configPath: string,
-	loadText: TextLoader,
-	processOpt: OptionProcessor<C>,
+	configurable: Configurable,
 	args?: { [key: string]: any },
 	childConfig?: string | string[]
 ): Task<any> {
-	const _setOption = (option: keyof C, value: any, target: any) => {
-		if (!processOpt(option, value, target)) {
-			processOption(option, value, target);
-		}
-	};
-
-	return loadText(configPath)
+	return configurable
+		.loadText(configPath)
 		.then(text => {
 			const preConfig = parseJson(text);
 
@@ -697,8 +458,7 @@ function _loadConfig<C extends Config>(
 
 				return _loadConfig(
 					extensionPath,
-					loadText,
-					processOpt,
+					configurable,
 					undefined,
 					childConfig
 				).then(extension => {
@@ -707,7 +467,10 @@ function _loadConfig<C extends Config>(
 					Object.keys(preConfig)
 						.filter(key => key !== 'configs')
 						.forEach(key => {
-							_setOption(<keyof C>key, preConfig[key], extension);
+							configurable.setOption(
+								<keyof C>key,
+								preConfig[key]
+							);
 						});
 
 					// If config has a 'configs' property, mix its values into
@@ -725,7 +488,7 @@ function _loadConfig<C extends Config>(
 			} else {
 				const config: any = {};
 				Object.keys(preConfig).forEach(key => {
-					_setOption(<keyof C>key, preConfig[key], config);
+					configurable.setOption(<keyof C>key, preConfig[key]);
 				});
 				return config;
 			}
@@ -752,38 +515,9 @@ function _loadConfig<C extends Config>(
 							mixinConfig(child.extends);
 						}
 
-						// Mix the child into the current config. Properties
-						// other than the environment resource keys ('node' and
-						// 'browser') will replace values on the parent. The
-						// environment resource objects will be mixed into the
-						// corresponding objects on the parent.
-						Object.keys(child)
-							.filter(key => key !== 'node' && key !== 'browser')
-							.forEach(key => {
-								_setOption(<keyof C>key, child[key], config);
-							});
-
-						['node', 'browser'].forEach(key => {
-							if (child[key]) {
-								if (config[key]) {
-									// Run the environment config through
-									// setOption, then mix it into the main
-									// config
-									const envConfig: any = {};
-									_setOption(
-										<keyof C>key,
-										child[key],
-										envConfig
-									);
-									mixin(config[key], envConfig[key]);
-								} else {
-									_setOption(
-										<keyof C>key,
-										child[key],
-										config
-									);
-								}
-							}
+						// Mix the child into the current config.
+						Object.keys(child).forEach(key => {
+							configurable.setOption(<keyof C>key, child[key]);
 						});
 					});
 				};
@@ -817,7 +551,7 @@ function _loadConfig<C extends Config>(
 					});
 
 				Object.keys(args).forEach(key => {
-					_setOption(<keyof C>key, args[key], config);
+					configurable.setOption(<keyof C>key, args[key]);
 				});
 			}
 			return config;

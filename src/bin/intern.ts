@@ -13,49 +13,43 @@ import Node from '../lib/executors/Node';
 import _intern from '../index';
 import * as console from '../lib/common/console';
 
-let file: string;
 const intern: Node = _intern;
 
-intern
-	.configure({ reporters: 'runner' })
-	.then(() => {
-		file = getConfigFile();
-		if (file) {
-			return intern.configure(file);
-		}
-	})
-	.then(() => {
-		const args = getArgs();
-		if (args.help) {
-			printHelp(intern.config, file);
-		} else if (args.showConfigs) {
-			console.log(getConfigDescription(intern.config));
-		} else {
-			if (!file) {
-				console.warn('No config file was loaded');
+const args = getArgs();
+if (args.help) {
+	printHelp(intern.config);
+} else {
+	intern
+		.configure(getConfigFile())
+		.then(() => {
+			const args = getArgs();
+			if (args.help) {
+			} else if (args.showConfigs) {
+				console.log(getConfigDescription(intern.config));
+			} else {
+				if (!intern.config.config) {
+					console.warn('No config file was loaded');
+				}
+				return intern.run();
 			}
-
-			intern.configure({ reporters: 'runner' });
-			intern.configure(config);
-			return intern.run();
-		}
-	})
-	.catch(error => {
-		// If intern wasn't initialized, then this error won't have been
-		// reported
-		if (!error.reported) {
-			try {
-				console.error(intern.formatError(error));
-			} catch (e) {
-				console.error(error);
+		})
+		.catch(error => {
+			// If intern wasn't initialized, then this error won't have been
+			// reported
+			if (!error.reported) {
+				try {
+					console.error(intern.formatError(error));
+				} catch (e) {
+					console.error(error);
+				}
 			}
-		}
-		global.process.exitCode = 1;
-	});
+			global.process.exitCode = 1;
+		});
+}
 
-function printHelp(config: any, file?: string) {
+function printHelp(config: any) {
 	const $ = (cmd: string) => execSync(cmd, { encoding: 'utf8' }).trim();
-	const pkg = require('../package.json');
+	const pkg = require(`${__dirname}/../../../package.json`);
 	const npmVersion = $('npm -v');
 	const nodeVersion = $('node -v');
 	console.log(`intern version ${pkg.version}`);
@@ -93,6 +87,7 @@ function printHelp(config: any, file?: string) {
 		console.log(`  ${name}${pad} - ${value}`);
 	}
 
+	const file = config.config;
 	if (file) {
 		console.log();
 		const description = getConfigDescription(config, '  ');

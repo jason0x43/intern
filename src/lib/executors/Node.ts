@@ -34,7 +34,7 @@ import NullTunnel from '@theintern/digdug/NullTunnel';
 import Executor, { Config as BaseConfig, Events, Plugins } from './Executor';
 import { normalizePathEnding } from '../common/path';
 import { pullFromArray } from '../common/util';
-import { loadConfig, parseValue, splitConfigPath } from '../common/config';
+import { parseValue } from '../common/config';
 import { getArgs } from '../node/config';
 import { expandFiles, loadText, readSourceMap } from '../node/util';
 import ErrorFormatter from '../node/ErrorFormatter';
@@ -87,7 +87,7 @@ export default class Node extends Executor<NodeEvents, Config, NodePlugins> {
 			instrumenterOptions: {},
 			maxConcurrency: Infinity,
 			name: 'node',
-			reporters: [],
+			reporters: ['runner'],
 			runInSync: false,
 			serveOnly: false,
 			serverPort: 9000,
@@ -207,27 +207,8 @@ export default class Node extends Executor<NodeEvents, Config, NodePlugins> {
 		}
 	}
 
-	/**
-	 * Configure the executor with an object containing
-	 * [[lib/executors/Node.Config]] properties.
-	 */
-	configure(file: string): PromiseLike<void>;
-	configure(options: { [key in keyof Config]?: any }): PromiseLike<void>;
-	configure(fileOrOptions: string | { [key in keyof Config]?: any }) {
-		if (typeof fileOrOptions === 'string') {
-			const file = fileOrOptions;
-			const args = getArgs();
-			const { configFile, childConfig } = splitConfigPath(file, sep);
-			return loadConfig(
-				configFile,
-				loadText,
-				args,
-				childConfig,
-				this._processOption.bind(this)
-			);
-		} else {
-			return super.configure(fileOrOptions);
-		}
+	getArgs() {
+		return getArgs();
 	}
 
 	/**
@@ -296,12 +277,150 @@ export default class Node extends Executor<NodeEvents, Config, NodePlugins> {
 		return Task.resolve();
 	}
 
+	loadText(path: string) {
+		return loadText(path);
+	}
+
 	/**
 	 * Register a tunnel constructor with the plugin system. It can be retrieved
 	 * later with getTunnel or getPlugin.
 	 */
 	registerTunnel(name: string, Ctor: typeof Tunnel) {
 		this.registerPlugin('tunnel', name, () => Ctor);
+	}
+
+	setOption(option: string, value: any) {
+		const { name, addToExisting } = this._evalProperty(option);
+
+		switch (name) {
+			case 'functionalBaseUrl':
+			case 'serverUrl':
+				this._setOption(name, parseValue(name, value, 'string'));
+				break;
+
+			case 'proxy':
+				if (value == null) {
+					this._setOption(name, undefined);
+				} else {
+					this._setOption(name, parseValue(name, value, 'string'));
+				}
+				break;
+
+			case 'capabilities':
+			case 'instrumenterOptions':
+			case 'tunnelOptions':
+				this._setOption(
+					name,
+					parseValue(name, value, 'object'),
+					addToExisting
+				);
+				break;
+
+			// Must be a string, object, or array of (string | object)
+			case 'environments':
+				if (!value) {
+					value = [];
+				} else if (!Array.isArray(value)) {
+					value = [value];
+				}
+				value = value.map((val: any) => {
+					if (typeof val === 'object' && val.browserName == null) {
+						val.browserName = val.browser;
+					}
+					return val;
+				});
+				this._setOption(
+					name,
+					parseValue(name, value, 'object[]', 'browserName'),
+					addToExisting
+				);
+				break;
+
+			case 'excludeInstrumentation':
+				this.emit('deprecated', {
+					original: 'excludeInstrumentation',
+					replacement: 'coverage'
+				});
+				break;
+
+			case 'tunnel':
+				this._setOption(name, parseValue(name, value, 'string'));
+				break;
+
+			case 'functionalCoverage':
+			case 'leaveRemoteOpen':
+			case 'serveOnly':
+			case 'runInSync':
+				this._setOption(name, parseValue(name, value, 'boolean'));
+				break;
+
+			case 'coverage':
+				let parsed: boolean | string[];
+				try {
+					parsed = parseValue(name, value, 'boolean');
+				} catch (error) {
+					parsed = parseValue(name, value, 'string[]');
+				}
+				if (typeof parsed === 'boolean' && parsed !== false) {
+					throw new Error("Non-false boolean for 'coverage'");
+				}
+				this._setOption(name, parsed);
+				break;
+
+			case 'functionalSuites':
+				this._setOption(
+					name,
+					parseValue(name, value, 'string[]'),
+					addToExisting
+				);
+				break;
+
+			case 'functionalTimeouts':
+				if (!this.config.functionalTimeouts) {
+					this.config.functionalTimeouts = {};
+				}
+				const parsedTimeout = parseValue(name, value, 'object');
+				if (parsedTimeout) {
+					// If the given value was an object, mix it in to the
+					// default functionalTimeouts
+					Object.keys(parsedTimeout).forEach(timeoutKey => {
+						const key = <keyof Config['functionalTimeouts']>timeoutKey;
+						if (key === 'connectTimeout') {
+							this.emit('deprecated', {
+								original: 'functionalTimeouts.connectTimeout',
+								replacement: 'connectTimeout'
+							});
+							this._setOption(
+								key,
+								parseValue(key, parsedTimeout[key], 'number')
+							);
+						} else {
+							this.config.functionalTimeouts[key] = parseValue(
+								`functionalTimeouts.${key}`,
+								parsedTimeout[key],
+								'number'
+							);
+						}
+					});
+				} else {
+					// If the given value was null/undefined, clear out
+					// functionalTimeouts
+					this._setOption(name, {});
+				}
+				break;
+
+			case 'connectTimeout':
+			case 'heartbeatInterval':
+			case 'maxConcurrency':
+			case 'serverPort':
+			case 'socketPort':
+				this._setOption(name, parseValue(name, value, 'number'));
+				break;
+
+			default:
+				super.setOption(option, value);
+				break;
+		}
 	}
 
 	/**
@@ -641,146 +760,6 @@ export default class Node extends Executor<NodeEvents, Config, NodePlugins> {
 			this._setInstrumentationHooks();
 		}
 		return super._loadSuites();
-	}
-
-	protected _processOption(
-		name: keyof Config,
-		value: any,
-		addToExisting: boolean
-	) {
-		switch (name) {
-			case 'functionalBaseUrl':
-			case 'serverUrl':
-				this._setOption(name, parseValue(name, value, 'string'));
-				break;
-
-			case 'proxy':
-				if (value == null) {
-					this._setOption(name, undefined);
-				} else {
-					this._setOption(name, parseValue(name, value, 'string'));
-				}
-				break;
-
-			case 'capabilities':
-			case 'instrumenterOptions':
-			case 'tunnelOptions':
-				this._setOption(
-					name,
-					parseValue(name, value, 'object'),
-					addToExisting
-				);
-				break;
-
-			// Must be a string, object, or array of (string | object)
-			case 'environments':
-				if (!value) {
-					value = [];
-				} else if (!Array.isArray(value)) {
-					value = [value];
-				}
-				value = value.map((val: any) => {
-					if (typeof val === 'object' && val.browserName == null) {
-						val.browserName = val.browser;
-					}
-					return val;
-				});
-				this._setOption(
-					name,
-					parseValue(name, value, 'object[]', 'browserName'),
-					addToExisting
-				);
-				break;
-
-			case 'excludeInstrumentation':
-				this.emit('deprecated', {
-					original: 'excludeInstrumentation',
-					replacement: 'coverage'
-				});
-				break;
-
-			case 'tunnel':
-				this._setOption(name, parseValue(name, value, 'string'));
-				break;
-
-			case 'functionalCoverage':
-			case 'leaveRemoteOpen':
-			case 'serveOnly':
-			case 'runInSync':
-				this._setOption(name, parseValue(name, value, 'boolean'));
-				break;
-
-			case 'coverage':
-				let parsed: boolean | string[];
-				try {
-					parsed = parseValue(name, value, 'boolean');
-				} catch (error) {
-					parsed = parseValue(name, value, 'string[]');
-				}
-				if (typeof parsed === 'boolean' && parsed !== false) {
-					throw new Error("Non-false boolean for 'coverage'");
-				}
-				this._setOption(name, parsed);
-				break;
-
-			case 'functionalSuites':
-				this._setOption(
-					name,
-					parseValue(name, value, 'string[]'),
-					addToExisting
-				);
-				break;
-
-			case 'functionalTimeouts':
-				if (!this.config.functionalTimeouts) {
-					this.config.functionalTimeouts = {};
-				}
-				const parsedTimeout = parseValue(name, value, 'object');
-				if (parsedTimeout) {
-					// If the given value was an object, mix it in to the
-					// default functionalTimeouts
-					Object.keys(parsedTimeout).forEach(timeoutKey => {
-						const key = <keyof Config['functionalTimeouts']>timeoutKey;
-						if (key === 'connectTimeout') {
-							this.emit('deprecated', {
-								original: 'functionalTimeouts.connectTimeout',
-								replacement: 'connectTimeout'
-							});
-							this._setOption(
-								key,
-								parseValue(key, parsedTimeout[key], 'number')
-							);
-						} else {
-							this.config.functionalTimeouts[key] = parseValue(
-								`functionalTimeouts.${key}`,
-								parsedTimeout[key],
-								'number'
-							);
-						}
-					});
-				} else {
-					// If the given value was null/undefined, clear out
-					// functionalTimeouts
-					this._setOption(name, {});
-				}
-				break;
-
-			case 'connectTimeout':
-			case 'heartbeatInterval':
-			case 'maxConcurrency':
-			case 'serverPort':
-			case 'socketPort':
-				this._setOption(name, parseValue(name, value, 'number'));
-				break;
-
-			default:
-				super._processOption(
-					<keyof BaseConfig>name,
-					value,
-					addToExisting
-				);
-				break;
-		}
 	}
 
 	protected _resolveConfig() {
