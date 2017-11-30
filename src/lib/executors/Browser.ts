@@ -5,6 +5,8 @@ import global from '@dojo/shim/global';
 
 import * as console from '../common/console';
 import Executor, { Config, Events, Plugins } from './Executor';
+import { loadConfig, splitConfigPath } from '../common/config';
+import { loadText, parseQuery } from '../browser/util';
 import { dirname, join, normalizePathEnding } from '../common/path';
 import { getDefaultBasePath } from '../browser/util';
 import { RuntimeEnvironment } from '../types';
@@ -54,6 +56,25 @@ export default class Browser extends Executor<Events, Config, Plugins> {
 
 	get environment(): RuntimeEnvironment {
 		return 'browser';
+	}
+
+	configure(url: string): PromiseLike<void>;
+	configure(options: { [key in keyof Config]?: any }): PromiseLike<void>;
+	configure(urlOrOptions: string | { [key in keyof Config]?: any }) {
+		if (typeof urlOrOptions === 'string') {
+			const url = urlOrOptions;
+			const args = parseQuery();
+			const { configFile, childConfig } = splitConfigPath(url, '/');
+			return loadConfig(
+				configFile,
+				loadText,
+				args,
+				childConfig,
+				this._processOption.bind(this)
+			);
+		} else {
+			return super.configure(urlOrOptions);
+		}
 	}
 
 	/**

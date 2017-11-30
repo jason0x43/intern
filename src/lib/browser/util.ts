@@ -161,7 +161,7 @@ export function parseUrl(url: string): Url | undefined {
 /**
  * Load a text resource
  */
-function loadText(path: string): Task<any> {
+export function loadText(path: string): Task<any> {
 	return request(path).then(response => {
 		if (!response.ok) {
 			throw new Error('Request failed: ' + response.status);

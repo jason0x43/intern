@@ -19,6 +19,19 @@ import { loadText } from './util';
 const process = global.process;
 
 /**
+ * Get any arguments supplied on the command line or through INTERN_ARGS
+ */
+export function getArgs() {
+	const args = process.argv.slice(2);
+
+	if (process.env['INTERN_ARGS']) {
+		mixin(args, parseArgs(parse(process.env['INTERN_ARGS'] || '')));
+	}
+
+	return args;
+}
+
+/**
  * Get the user-supplied config data, which may include command line args and a
  * config file.
  *
@@ -90,6 +103,11 @@ export function getConfig(fileOrArgv?: string | string[], argv?: string[]) {
 			return config;
 		})
 		.then(config => ({ config, file }));
+}
+
+export function getConfigFile() {
+	const args = getArgs();
+	return args.config || 'intern.json';
 }
 
 export function processOption(

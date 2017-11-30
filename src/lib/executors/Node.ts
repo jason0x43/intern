@@ -34,8 +34,9 @@ import NullTunnel from '@theintern/digdug/NullTunnel';
 import Executor, { Config as BaseConfig, Events, Plugins } from './Executor';
 import { normalizePathEnding } from '../common/path';
 import { pullFromArray } from '../common/util';
-import { processOption } from '../node/config';
-import { expandFiles, readSourceMap } from '../node/util';
+import { loadConfig, parseValue, splitConfigPath } from '../common/config';
+import { getArgs } from '../node/config';
+import { expandFiles, loadText, readSourceMap } from '../node/util';
 import ErrorFormatter from '../node/ErrorFormatter';
 import ProxiedSession from '../ProxiedSession';
 import Environment from '../Environment';
@@ -203,6 +204,29 @@ export default class Node extends Executor<NodeEvents, Config, NodePlugins> {
 			this._sessionSuites.forEach(factory);
 		} else {
 			super.addSuite(factory);
+		}
+	}
+
+	/**
+	 * Configure the executor with an object containing
+	 * [[lib/executors/Node.Config]] properties.
+	 */
+	configure(file: string): PromiseLike<void>;
+	configure(options: { [key in keyof Config]?: any }): PromiseLike<void>;
+	configure(fileOrOptions: string | { [key in keyof Config]?: any }) {
+		if (typeof fileOrOptions === 'string') {
+			const file = fileOrOptions;
+			const args = getArgs();
+			const { configFile, childConfig } = splitConfigPath(file, sep);
+			return loadConfig(
+				configFile,
+				loadText,
+				args,
+				childConfig,
+				this._processOption.bind(this)
+			);
+		} else {
+			return super.configure(fileOrOptions);
 		}
 	}
 
@@ -619,15 +643,151 @@ export default class Node extends Executor<NodeEvents, Config, NodePlugins> {
 		return super._loadSuites();
 	}
 
-	protected _processOption(key: keyof Config, value: any) {
-		if (!processOption(key, value, this.config, this)) {
-			super._processOption(key, value);
+	protected _processOption(
+		name: keyof Config,
+		value: any,
+		addToExisting: boolean
+	) {
+		switch (name) {
+			case 'functionalBaseUrl':
+			case 'serverUrl':
+				this._setOption(name, parseValue(name, value, 'string'));
+				break;
+
+			case 'proxy':
+				if (value == null) {
+					this._setOption(name, undefined);
+				} else {
+					this._setOption(name, parseValue(name, value, 'string'));
+				}
+				break;
+
+			case 'capabilities':
+			case 'instrumenterOptions':
+			case 'tunnelOptions':
+				this._setOption(
+					name,
+					parseValue(name, value, 'object'),
+					addToExisting
+				);
+				break;
+
+			// Must be a string, object, or array of (string | object)
+			case 'environments':
+				if (!value) {
+					value = [];
+				} else if (!Array.isArray(value)) {
+					value = [value];
+				}
+				value = value.map((val: any) => {
+					if (typeof val === 'object' && val.browserName == null) {
+						val.browserName = val.browser;
+					}
+					return val;
+				});
+				this._setOption(
+					name,
+					parseValue(name, value, 'object[]', 'browserName'),
+					addToExisting
+				);
+				break;
+
+			case 'excludeInstrumentation':
+				this.emit('deprecated', {
+					original: 'excludeInstrumentation',
+					replacement: 'coverage'
+				});
+				break;
+
+			case 'tunnel':
+				this._setOption(name, parseValue(name, value, 'string'));
+				break;
+
+			case 'functionalCoverage':
+			case 'leaveRemoteOpen':
+			case 'serveOnly':
+			case 'runInSync':
+				this._setOption(name, parseValue(name, value, 'boolean'));
+				break;
+
+			case 'coverage':
+				let parsed: boolean | string[];
+				try {
+					parsed = parseValue(name, value, 'boolean');
+				} catch (error) {
+					parsed = parseValue(name, value, 'string[]');
+				}
+				if (typeof parsed === 'boolean' && parsed !== false) {
+					throw new Error("Non-false boolean for 'coverage'");
+				}
+				this._setOption(name, parsed);
+				break;
+
+			case 'functionalSuites':
+				this._setOption(
+					name,
+					parseValue(name, value, 'string[]'),
+					addToExisting
+				);
+				break;
+
+			case 'functionalTimeouts':
+				if (!this.config.functionalTimeouts) {
+					this.config.functionalTimeouts = {};
+				}
+				const parsedTimeout = parseValue(name, value, 'object');
+				if (parsedTimeout) {
+					// If the given value was an object, mix it in to the
+					// default functionalTimeouts
+					Object.keys(parsedTimeout).forEach(timeoutKey => {
+						const key = <keyof Config['functionalTimeouts']>timeoutKey;
+						if (key === 'connectTimeout') {
+							this.emit('deprecated', {
+								original: 'functionalTimeouts.connectTimeout',
+								replacement: 'connectTimeout'
+							});
+							this._setOption(
+								key,
+								parseValue(key, parsedTimeout[key], 'number')
+							);
+						} else {
+							this.config.functionalTimeouts[key] = parseValue(
+								`functionalTimeouts.${key}`,
+								parsedTimeout[key],
+								'number'
+							);
+						}
+					});
+				} else {
+					// If the given value was null/undefined, clear out
+					// functionalTimeouts
+					this._setOption(name, {});
+				}
+				break;
+
+			case 'connectTimeout':
+			case 'heartbeatInterval':
+			case 'maxConcurrency':
+			case 'serverPort':
+			case 'socketPort':
+				this._setOption(name, parseValue(name, value, 'number'));
+				break;
+
+			default:
+				super._processOption(
+					<keyof BaseConfig>name,
+					value,
+					addToExisting
+				);
+				break;
 		}
 	}
 
 	protected _resolveConfig() {
 		return super._resolveConfig().then(() => {
 			const config = this.config;
+
+			// TODO: mixin args here
 
 			if (config.environments.length === 0) {
 				this.log("Adding default 'node' environment");
@@ -896,6 +1056,9 @@ export interface Config extends BaseConfig {
 		build?: string;
 		[key: string]: any;
 	};
+
+	/** A path to a config file */
+	config: string;
 
 	/** Time to wait for contact from a remote server */
 	connectTimeout: number;

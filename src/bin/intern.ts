@@ -7,17 +7,29 @@
 import { execSync } from 'child_process';
 import global from '@dojo/shim/global';
 
-import { getConfig } from '../lib/node/config';
+import { getArgs, getConfigFile } from '../lib/node/config';
 import { getConfigDescription } from '../lib/common/config';
-import intern from '../index';
+import Node from '../lib/executors/Node';
+import _intern from '../index';
 import * as console from '../lib/common/console';
 
-getConfig()
-	.then(({ config, file }) => {
-		if (config.help) {
-			printHelp(config, file);
-		} else if (config.showConfigs) {
-			console.log(getConfigDescription(config));
+let file: string;
+const intern: Node = _intern;
+
+intern
+	.configure({ reporters: 'runner' })
+	.then(() => {
+		file = getConfigFile();
+		if (file) {
+			return intern.configure(file);
+		}
+	})
+	.then(() => {
+		const args = getArgs();
+		if (args.help) {
+			printHelp(intern.config, file);
+		} else if (args.showConfigs) {
+			console.log(getConfigDescription(intern.config));
 		} else {
 			if (!file) {
 				console.warn('No config file was loaded');
