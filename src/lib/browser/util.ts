@@ -2,12 +2,7 @@ import request from '@dojo/core/request/providers/xhr';
 import Task from '@dojo/core/async/Task';
 import global from '@dojo/shim/global';
 
-import {
-	getBasePath,
-	loadConfig,
-	parseArgs,
-	splitConfigPath
-} from '../common/config';
+import { parseArgs } from '../common/config';
 
 export function getArgs() {
 	return parseArgs(parseQuery());
@@ -17,51 +12,51 @@ export function getArgs() {
  * Resolve the user-supplied config data, which may include query args and a
  * config file.
  */
-export function getConfig(file?: string) {
-	const args = parseArgs(parseQuery());
-	const basePath = args.basePath || getDefaultBasePath();
-	if (file) {
-		args.config = file;
-	}
+// export function getConfig(file?: string) {
+// 	const args = parseArgs(parseQuery());
+// 	const basePath = args.basePath || getDefaultBasePath();
+// 	if (file) {
+// 		args.config = file;
+// 	}
 
-	let load: Task<{ [key: string]: any }>;
+// 	let load: Task<{ [key: string]: any }>;
 
-	if (args.config) {
-		// If a config parameter was provided, load it, mix in any other query
-		// params, then initialize the executor with that
-		const { configFile, childConfig } = splitConfigPath(args.config);
-		file = resolvePath(configFile || 'intern.json', basePath);
-		load = loadConfig(file, loadText, args, childConfig);
-	} else {
-		// If no config parameter was provided, try 'intern.json'. If that file
-		// doesn't exist, just return the args
-		file = resolvePath('intern.json', basePath);
-		load = loadConfig(file, loadText, args).catch(error => {
-			if (error.message.indexOf('Request failed') === 0) {
-				// The file wasn't found, clear the file name
-				file = undefined;
-				return args;
-			}
-			throw error;
-		});
-	}
+// 	if (args.config) {
+// 		// If a config parameter was provided, load it, mix in any other query
+// 		// params, then initialize the executor with that
+// 		const { configFile, childConfig } = splitConfigPath(args.config);
+// 		file = resolvePath(configFile || 'intern.json', basePath);
+// 		load = loadConfig(file, loadText, args, childConfig);
+// 	} else {
+// 		// If no config parameter was provided, try 'intern.json'. If that file
+// 		// doesn't exist, just return the args
+// 		file = resolvePath('intern.json', basePath);
+// 		load = loadConfig(file, loadText, args).catch(error => {
+// 			if (error.message.indexOf('Request failed') === 0) {
+// 				// The file wasn't found, clear the file name
+// 				file = undefined;
+// 				return args;
+// 			}
+// 			throw error;
+// 		});
+// 	}
 
-	return load
-		.then(config => {
-			// If a basePath wasn't set in the config or via a query arg, and we
-			// have a config file path, use that.
-			if (file) {
-				config.basePath = getBasePath(
-					file,
-					config.basePath,
-					path => path[0] === '/',
-					'/'
-				);
-			}
-			return config;
-		})
-		.then(config => ({ config, file }));
-}
+// 	return load
+// 		.then(config => {
+// 			// If a basePath wasn't set in the config or via a query arg, and we
+// 			// have a config file path, use that.
+// 			if (file) {
+// 				config.basePath = getBasePath(
+// 					file,
+// 					config.basePath,
+// 					path => path[0] === '/',
+// 					'/'
+// 				);
+// 			}
+// 			return config;
+// 		})
+// 		.then(config => ({ config, file }));
+// }
 
 export function getConfigFile() {
 	const args = getArgs();

@@ -10,6 +10,7 @@ import Task from '@dojo/core/async/Task';
  * Note that exclusion rules will not apply to simple paths.
  */
 export function expandFiles(patterns?: string[] | string) {
+	console.trace('expanding', patterns);
 	if (!patterns) {
 		patterns = [];
 	} else if (!Array.isArray(patterns)) {

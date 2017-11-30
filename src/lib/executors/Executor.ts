@@ -242,9 +242,8 @@ export default abstract class BaseExecutor<
 	configure(pathOrOptions: string | { [key: string]: any }) {
 		if (typeof pathOrOptions === 'string') {
 			const path = pathOrOptions;
-			const args = this.getArgs();
 			const { configFile, childConfig } = splitConfigPath(path);
-			return loadConfig(configFile, this, args, childConfig).then(() => {
+			return loadConfig(configFile, this, childConfig).then(() => {
 				this.config.config = path;
 			});
 		} else {

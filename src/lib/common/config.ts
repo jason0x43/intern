@@ -117,24 +117,86 @@ export function getConfigDescription(config: any, prefix = '') {
 export function loadConfig(
 	configPath: string,
 	configurable: Configurable,
-	args?: { [key: string]: any },
 	childConfig?: string | string[]
 ): Task<any> {
-	return _loadConfig(configPath, configurable, args, childConfig).then(
-		config => {
-			// 'config' and 'extends' are only applicable to the config loader, not
-			// the Executors
-			delete config.config;
-			delete config.extends;
+	return configurable
+		.loadText(configPath)
+		.then(text => {
+			const preConfig = parseJson(text);
 
-			if (!(args && (args.showConfigs || args.help))) {
-				// 'configs' is only relevant if we're showing configs
-				delete config.configs;
+			// extends paths are assumed to be relative and use '/'
+			if (preConfig.extends) {
+				const parts = configPath.split('/');
+				const { configFile, childConfig } = splitConfigPath(
+					preConfig.extends
+				);
+				const extensionPath = parts
+					.slice(0, parts.length - 1)
+					.concat(configFile)
+					.join('/');
+
+				return loadConfig(
+					extensionPath,
+					configurable,
+					undefined,
+					childConfig
+				).then(extension => {
+					// Process all keys except 'configs' from the config to the
+					// thing it's extending
+					Object.keys(preConfig)
+						.filter(key => key !== 'configs')
+						.forEach(key => {
+							configurable.setOption(key, preConfig[key]);
+						});
+
+					// If config has a 'configs' property, mix its values into
+					// extension.configs (slightly deeper mixin)
+					if (preConfig.configs) {
+						if (extension.configs == null) {
+							extension.configs = {};
+						}
+						Object.keys(preConfig.configs).forEach(key => {
+							extension.configs[key] = preConfig.configs[key];
+						});
+					}
+					return extension;
+				});
+			} else {
+				const config: any = {};
+				Object.keys(preConfig).forEach(key => {
+					configurable.setOption(key, preConfig[key]);
+				});
+				return config;
 			}
+		})
+		.then(config => {
+			if (childConfig) {
+				const mixinConfig = (childConfig: string | string[]) => {
+					const configs = Array.isArray(childConfig)
+						? childConfig
+						: [childConfig];
+					configs.forEach(childConfig => {
+						const child = config.configs[childConfig];
+						if (!child) {
+							throw new Error(
+								`Unknown child config "${childConfig}"`
+							);
+						}
+						if (child.extends) {
+							mixinConfig(child.extends);
+						}
 
+						// Mix the child into the current config.
+						Object.keys(child).forEach(key => {
+							configurable.setOption(key, child[key]);
+						});
+					});
+				};
+
+				mixinConfig(childConfig);
+			}
 			return config;
-		}
-	);
+		});
 }
 
 /**
@@ -429,133 +491,6 @@ export function splitConfigPath(
 		configFile: path.slice(0, lastSep),
 		childConfig: path.slice(lastSep + 1)
 	};
-}
-
-// ============================================================================
-// support functions
-
-function _loadConfig<C extends Config>(
-	configPath: string,
-	configurable: Configurable,
-	args?: { [key: string]: any },
-	childConfig?: string | string[]
-): Task<any> {
-	return configurable
-		.loadText(configPath)
-		.then(text => {
-			const preConfig = parseJson(text);
-
-			// extends paths are assumed to be relative and use '/'
-			if (preConfig.extends) {
-				const parts = configPath.split('/');
-				const { configFile, childConfig } = splitConfigPath(
-					preConfig.extends
-				);
-				const extensionPath = parts
-					.slice(0, parts.length - 1)
-					.concat(configFile)
-					.join('/');
-
-				return _loadConfig(
-					extensionPath,
-					configurable,
-					undefined,
-					childConfig
-				).then(extension => {
-					// Process all keys except 'configs' from the config to the
-					// thing it's extending
-					Object.keys(preConfig)
-						.filter(key => key !== 'configs')
-						.forEach(key => {
-							configurable.setOption(
-								<keyof C>key,
-								preConfig[key]
-							);
-						});
-
-					// If config has a 'configs' property, mix its values into
-					// extension.configs (slightly deeper mixin)
-					if (preConfig.configs) {
-						if (extension.configs == null) {
-							extension.configs = {};
-						}
-						Object.keys(preConfig.configs).forEach(key => {
-							extension.configs[key] = preConfig.configs[key];
-						});
-					}
-					return extension;
-				});
-			} else {
-				const config: any = {};
-				Object.keys(preConfig).forEach(key => {
-					configurable.setOption(<keyof C>key, preConfig[key]);
-				});
-				return config;
-			}
-		})
-		.then(config => {
-			if (args && (args.showConfigs || args.help)) {
-				// If we're showing the configs, don't mix in children
-				return config;
-			}
-
-			if (childConfig) {
-				const mixinConfig = (childConfig: string | string[]) => {
-					const configs = Array.isArray(childConfig)
-						? childConfig
-						: [childConfig];
-					configs.forEach(childConfig => {
-						const child = config.configs[childConfig];
-						if (!child) {
-							throw new Error(
-								`Unknown child config "${childConfig}"`
-							);
-						}
-						if (child.extends) {
-							mixinConfig(child.extends);
-						}
-
-						// Mix the child into the current config.
-						Object.keys(child).forEach(key => {
-							configurable.setOption(<keyof C>key, child[key]);
-						});
-					});
-				};
-
-				mixinConfig(childConfig);
-			}
-			return config;
-		})
-		.then(config => {
-			if (args) {
-				// If any non-additive resources are specified in args, they
-				// will apply to all environments and will override any
-				// environment specific resources.
-				const resources: (keyof ResourceConfig)[] = [
-					'plugins',
-					'reporters',
-					'suites'
-				];
-				resources
-					.filter(resource => resource in args)
-					.forEach(resource => {
-						const environments: (keyof Config)[] = [
-							'node',
-							'browser'
-						];
-						environments
-							.filter(environment => config[environment])
-							.forEach(environment => {
-								delete config[environment][resource];
-							});
-					});
-
-				Object.keys(args).forEach(key => {
-					configurable.setOption(<keyof C>key, args[key]);
-				});
-			}
-			return config;
-		});
 }
 
 const configPathSeparator = '@';

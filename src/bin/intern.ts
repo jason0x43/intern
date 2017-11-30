@@ -9,27 +9,53 @@ import global from '@dojo/shim/global';
 
 import { getArgs, getConfigFile } from '../lib/node/config';
 import { getConfigDescription } from '../lib/common/config';
-import Node from '../lib/executors/Node';
+import { ResourceConfig } from '../lib/executors/Executor';
+import Node, { Config } from '../lib/executors/Node';
 import _intern from '../index';
 import * as console from '../lib/common/console';
 
 const intern: Node = _intern;
-
 const args = getArgs();
+
 if (args.help) {
 	printHelp(intern.config);
 } else {
 	intern
 		.configure(getConfigFile())
 		.then(() => {
-			const args = getArgs();
-			if (args.help) {
-			} else if (args.showConfigs) {
+			if (args.showConfigs) {
 				console.log(getConfigDescription(intern.config));
 			} else {
 				if (!intern.config.config) {
 					console.warn('No config file was loaded');
 				}
+
+				if (args) {
+					// If any non-additive resources are specified in args, they
+					// will apply to all environments and will override any
+					// environment specific resources.
+					const resources = ['plugins', 'reporters', 'suites'];
+					const config = <any>intern.config;
+					resources
+						.filter(resource => resource in args)
+						.forEach(res => {
+							const resource = <keyof ResourceConfig>res;
+							const environments = ['node', 'browser'];
+							environments
+								.filter(environment => config[environment])
+								.forEach(environment => {
+									config[environment][resource] = [];
+								});
+						});
+
+					Object.keys(args).forEach(arg => {
+						console.log('setting ' + arg + ' to', args[arg]);
+						intern.setOption(arg, args[arg]);
+					});
+				}
+
+				console.log('config:', intern.config);
+
 				return intern.run();
 			}
 		})
