@@ -79,8 +79,13 @@ export function createMockExecutor(
 
 				configure(options: any) {
 					if (typeof options === 'string') {
-						this.config = this._fileData[options];
-						this.config.config = options;
+						const data = this._fileData[options];
+						if (data) {
+							this.config = data || {};
+							this.config.file = options;
+						} else {
+							this.config = {};
+						}
 					} else {
 						if (options) {
 							Object.keys(options).forEach(key => {

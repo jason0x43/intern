@@ -40,7 +40,13 @@ import Executor, {
 import { normalizePathEnding } from '../common/path';
 import { pullFromArray } from '../common/util';
 import { parseValue } from '../common/config';
-import { expandFiles, getArgs, loadText, readSourceMap } from '../node/util';
+import {
+	expandFiles,
+	getArgs,
+	getDefaultConfigFile,
+	loadText,
+	readSourceMap
+} from '../node/util';
 import ErrorFormatter from '../node/ErrorFormatter';
 import ProxiedSession from '../ProxiedSession';
 import Environment from '../Environment';
@@ -213,6 +219,10 @@ export default class Node extends Executor<NodeEvents, Config, NodePlugins> {
 
 	getArgs() {
 		return getArgs();
+	}
+
+	getDefaultConfigFile() {
+		return getDefaultConfigFile();
 	}
 
 	/**
@@ -779,8 +789,6 @@ export default class Node extends Executor<NodeEvents, Config, NodePlugins> {
 		return super._resolveConfig().then(() => {
 			const config = this.config;
 
-			// TODO: mixin args here
-
 			if (config.environments.length === 0) {
 				this.log("Adding default 'node' environment");
 				config.environments.push({ browserName: 'node' });
@@ -1048,9 +1056,6 @@ export interface Config extends BaseConfig {
 		build?: string;
 		[key: string]: any;
 	};
-
-	/** A path to a config file */
-	config: string;
 
 	/** Time to wait for contact from a remote server */
 	connectTimeout: number;

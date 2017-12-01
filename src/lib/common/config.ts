@@ -1,4 +1,4 @@
-import { deepMixin } from '@dojo/core/lang';
+import { deepMixin, mixin } from '@dojo/core/lang';
 import Task from '@dojo/core/async/Task';
 
 import { Config, Configurable } from '../executors/Executor';
@@ -139,24 +139,20 @@ export function loadConfig(
 					configurable,
 					childConfig
 				).then(baseConfig => {
-					// Process all keys except 'configs' from the config to the
-					// thing it's extending
 					Object.keys(config)
-						.filter(key => key !== 'configs')
+						.filter(key => key !== 'extends')
 						.forEach(key => {
 							configurable.setOption(key, config[key]);
 						});
 
-					// If config has a 'configs' property, mix its values into
-					// extension.configs (slightly deeper mixin)
 					if (config.configs) {
-						if (baseConfig.configs == null) {
-							baseConfig.configs = {};
-						}
-						Object.keys(config.configs).forEach(key => {
-							baseConfig.configs[key] = config.configs[key];
-						});
+						baseConfig.configs = mixin(
+							{},
+							baseConfig.configs,
+							config.configs
+						);
 					}
+
 					return baseConfig;
 				});
 			} else {
@@ -169,31 +165,39 @@ export function loadConfig(
 		})
 		.then(config => {
 			if (childConfig) {
+				// Mix a child config into the main config
 				const mixinConfig = (childConfig: string | string[]) => {
 					const configs = Array.isArray(childConfig)
 						? childConfig
 						: [childConfig];
+
+					// A child config entry may be a string or an array, because
+					// a child config can extend multiple other child configs
 					configs.forEach(childConfig => {
+						// `configs` will have been set on the main config even
+						// though it's not a real Config property
 						const child = config.configs[childConfig];
 						if (!child) {
 							throw new Error(
 								`Unknown child config "${childConfig}"`
 							);
 						}
+
 						if (child.extends) {
 							mixinConfig(child.extends);
 						}
 
 						// Mix the child into the current config.
-						Object.keys(child).forEach(key => {
-							configurable.setOption(key, child[key]);
-						});
+						Object.keys(child)
+							.filter(key => key !== 'extends')
+							.forEach(key => {
+								configurable.setOption(key, child[key]);
+							});
 					});
 				};
 
 				mixinConfig(childConfig);
 			}
-			return config;
 		});
 }
 

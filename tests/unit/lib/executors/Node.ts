@@ -961,19 +961,22 @@ registerSuite('lib/executors/Node', function() {
 				},
 
 				'benchmark mode'() {
-					executor.configure({ benchmark: true });
-					return executor.run().then(() => {
-						assert.propertyVal(
-							executor.config.reporters[0],
-							'name',
-							'benchmark',
-							'expected benchmark reporter to be selected'
-						);
-						assert.lengthOf(
-							executor.config.reporters,
-							1,
-							'should only have been 1 reporter selected'
-						);
+					return executor.configure({ benchmark: true }).then(() => {
+						return executor.run().then(() => {
+							assert.propertyVal(
+								executor.config.reporters[1],
+								'name',
+								'benchmark',
+								'expected benchmark reporter to be selected'
+							);
+
+							// expect 'runner' and 'benchmark' to be selected
+							assert.lengthOf(
+								executor.config.reporters,
+								2,
+								'should only have been 2 reporter selected'
+							);
+						});
 					});
 				},
 

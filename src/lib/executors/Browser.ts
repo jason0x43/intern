@@ -4,10 +4,14 @@ import Task from '@dojo/core/async/Task';
 import global from '@dojo/shim/global';
 
 import * as console from '../common/console';
-import Executor, { Config as BaseConfig, Events, Plugins } from './Executor';
+import Executor, { Config, Events, Plugins } from './Executor';
 import { getArgs } from '../browser/util';
 import { dirname, join, normalizePathEnding } from '../common/path';
-import { getDefaultBasePath, loadText } from '../browser/util';
+import {
+	getDefaultConfigFile,
+	getDefaultBasePath,
+	loadText
+} from '../browser/util';
 import { RuntimeEnvironment } from '../types';
 
 // Reporters
@@ -20,9 +24,10 @@ import ConsoleReporter from '../reporters/Console';
  */
 export default class Browser extends Executor<Events, Config, Plugins> {
 	constructor(options?: { [key in keyof Config]?: any }) {
-		super(<Config>{
+		super({
 			basePath: '',
-			internPath: ''
+			internPath: '',
+			reporters: ['html', 'console']
 		});
 
 		// Report uncaught errors
@@ -59,6 +64,10 @@ export default class Browser extends Executor<Events, Config, Plugins> {
 
 	getArgs() {
 		return getArgs();
+	}
+
+	getDefaultConfigFile() {
+		return getDefaultConfigFile();
 	}
 
 	/**
@@ -139,12 +148,7 @@ export default class Browser extends Executor<Events, Config, Plugins> {
 	}
 }
 
-export { Events };
-
-export interface Config extends BaseConfig {
-	/** A path or URL pointing to a config */
-	config: string;
-}
+export { Config, Events };
 
 function injectScript(path: string, isEsm: boolean) {
 	return new Task<void>((resolve, reject) => {

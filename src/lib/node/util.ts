@@ -64,9 +64,8 @@ export function getArgs() {
  * This is determined by looking at command line args, the INTERN_ARGS variable,
  * and the default filename.
  */
-export function getConfigFile() {
-	const args = getArgs();
-	return args.config || 'intern.json';
+export function getDefaultConfigFile() {
+	return 'intern.json';
 }
 
 /**

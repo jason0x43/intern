@@ -62,52 +62,22 @@ registerSuite('bin/intern', function() {
 				});
 			},
 
-			'bad run': {
-				'intern defined'() {
-					return mockRequire(require, 'src/bin/intern', {
-						'src/lib/common/console': mockConsole,
-						'src/lib/common/config': mockCommonConfig,
-						'src/index': { default: createMockNodeExecutor() },
-						'@dojo/shim/global': {
-							default: { process: {} }
-						}
-					}).then(handle => {
-						removeMocks = handle.remove;
-						assert.equal(
-							mockConsole.error.callCount,
-							0,
-							'expected error not to be called'
-						);
-					});
-				},
-
-				'intern not defined'() {
-					mockCommonConfig.getConfigDescription.throws();
-
-					return mockRequire(require, 'src/bin/intern', {
-						'src/lib/common/console': mockConsole,
-						'src/lib/common/config': mockCommonConfig,
-						'src/index': { default: createMockNodeExecutor() },
-						'@dojo/shim/global': {
-							default: {
-								process: { stdout: process.stdout }
-							}
-						}
-					})
-						.then(handle => {
-							removeMocks = handle.remove;
-							return new Promise(resolve =>
-								setTimeout(resolve, 10)
-							);
-						})
-						.then(() => {
-							assert.equal(
-								mockConsole.error.callCount,
-								1,
-								'expected error to be called once'
-							);
-						});
-				}
+			'bad run'() {
+				return mockRequire(require, 'src/bin/intern', {
+					'src/lib/common/console': mockConsole,
+					'src/lib/common/config': mockCommonConfig,
+					'src/index': { default: createMockNodeExecutor() },
+					'@dojo/shim/global': {
+						default: { process: {} }
+					}
+				}).then(handle => {
+					removeMocks = handle.remove;
+					assert.equal(
+						mockConsole.error.callCount,
+						0,
+						'expected error not to be called'
+					);
+				});
 			},
 
 			help() {

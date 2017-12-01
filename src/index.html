@@ -24,11 +24,7 @@
 		<script src="browser/config.js"></script>
 		<script>
 		// Add the HTML and console reporters to the default
-		intern
-			.configure({ 'reporters+': ['html', 'console'] })
-			.then(function () {
-				return intern.configure(internConfig.getConfigFile());
-			})
+		intern.configure(internConfig.getConfigFile());
 			.then(function () {
 				var args = internConfig.getArgs();
 				if (args.showConfigs) {
@@ -38,6 +34,12 @@
 
 				if (!intern.config.config) {
 					console.warn('No config file was found');
+				}
+
+				if (args) {
+					Object.keys(args).forEach(arg => {
+						intern.setOption(arg, args[arg], true);
+					});
 				}
 			})
 			.then(

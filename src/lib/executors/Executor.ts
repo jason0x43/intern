@@ -177,15 +177,14 @@ export default abstract class BaseExecutor<
 	}
 
 	/**
-	 * Format an error, normalizing the stack trace and resolving source map
-	 * references
+	 * Return any user supplied arguments.
 	 */
-	formatError(error: Error, options?: ErrorFormatOptions) {
-		if (!this._errorFormatter) {
-			this._errorFormatter = new ErrorFormatter(this);
-		}
-		return this._errorFormatter.format(error, options);
-	}
+	abstract getArgs(): { [key: string]: any };
+
+	/**
+	 * Return the default path to an intern config file.
+	 */
+	abstract getDefaultConfigFile(): string;
 
 	/**
 	 * Load a script or scripts. This is a convenience method for loading and
@@ -196,6 +195,17 @@ export default abstract class BaseExecutor<
 	 * @param script a path to a script
 	 */
 	abstract loadScript(script: string | string[]): Task<void>;
+
+	/**
+	 * Format an error, normalizing the stack trace and resolving source map
+	 * references
+	 */
+	formatError(error: Error, options?: ErrorFormatOptions) {
+		if (!this._errorFormatter) {
+			this._errorFormatter = new ErrorFormatter(this);
+		}
+		return this._errorFormatter.format(error, options);
+	}
 
 	/**
 	 * Load a text resource.
@@ -242,9 +252,12 @@ export default abstract class BaseExecutor<
 	configure(pathOrOptions: string | { [key: string]: any }) {
 		if (typeof pathOrOptions === 'string') {
 			const path = pathOrOptions;
-			const { configFile, childConfig } = splitConfigPath(path);
+			let { configFile, childConfig } = splitConfigPath(path);
+			if (!configFile) {
+				configFile = this.getDefaultConfigFile();
+			}
 			return loadConfig(configFile, this, childConfig).then(() => {
-				this.config.config = path;
+				this.config.file = path;
 			});
 		} else {
 			Object.keys(pathOrOptions).forEach(key => {
@@ -358,8 +371,6 @@ export default abstract class BaseExecutor<
 
 		return notifications;
 	}
-
-	abstract getArgs(): { [key: string]: any };
 
 	/**
 	 * Get a registered interface plugin.
@@ -1464,14 +1475,6 @@ export interface Config extends ResourceConfig {
 
 	browser: ResourceConfig;
 
-	/** The path (file or URL) to the config source */
-	config: string;
-
-	/**
-	 * Child configurations
-	 */
-	configs: { [name: string]: Config };
-
 	/**
 	 * The global variable that will be used to store coverage data
 	 */
@@ -1494,6 +1497,9 @@ export interface Config extends ResourceConfig {
 
 	/** A description for this test run */
 	description: string;
+
+	/** The file (path or URL) that the active config was loaded from */
+	file: string;
 
 	/**
 	 * If true, filter external library calls and runtime calls out of error
@@ -1631,6 +1637,7 @@ export interface Events {
 export type Args = { [key: string]: any };
 
 export interface Configurable {
+	readonly config: Config;
 	configure(options: { [key: string]: any }): void;
 	getArgs(): Args;
 	loadText(path: string): Task<string>;

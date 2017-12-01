@@ -20,10 +20,9 @@ registerSuite('tasks/intern', function() {
 		options: sandbox.stub()
 	};
 
-	const mockRun = sandbox.stub();
-	const mockConfigure = sandbox.stub();
+	const mockRun = sandbox.stub().resolves();
+	const mockConfigure = sandbox.stub().resolves();
 
-	const mockGetConfig = sandbox.stub();
 	class MockNode {
 		run: Function;
 		configure: Function;
@@ -42,8 +41,7 @@ registerSuite('tasks/intern', function() {
 		before() {
 			return mockRequire(require, 'src/tasks/intern', {
 				'src/lib/executors/Node': { default: MockNode },
-				'@dojo/shim/global': { default: {} },
-				'src/lib/node/config': { getConfig: mockGetConfig }
+				'@dojo/shim/global': { default: {} }
 			}).then(handle => {
 				removeMocks = handle.remove;
 				gruntTask = handle.module;
@@ -55,8 +53,7 @@ registerSuite('tasks/intern', function() {
 		},
 
 		beforeEach() {
-			sandbox.reset();
-			mockRun.resolves();
+			sandbox.resetHistory();
 			executors = [];
 		},
 
@@ -83,11 +80,6 @@ registerSuite('tasks/intern', function() {
 						config: '@coverage',
 						foo: 'bar'
 					});
-					mockGetConfig.resolves({
-						config: {
-							spam: 'ham'
-						}
-					});
 					const done = setupDone();
 
 					gruntTask(<any>mockGrunt);
@@ -103,18 +95,8 @@ registerSuite('tasks/intern', function() {
 							1,
 							'intern should have been run'
 						);
-						assert.equal(mockGetConfig.callCount, 1);
-						assert.equal(
-							mockGetConfig.getCall(0).args[0],
-							'@coverage'
-						);
+						assert.equal(mockConfigure.args[0][0], '@coverage');
 						assert.equal(mockConfigure.callCount, 2);
-						assert.deepEqual(mockConfigure.getCall(0).args[0], {
-							spam: 'ham'
-						});
-						assert.deepEqual(mockConfigure.getCall(1).args[0], {
-							foo: 'bar'
-						});
 						assert.equal(mockDone.callCount, 1);
 						// First arg is an error, so it should be undefined here
 						assert.isUndefined(mockDone.getCall(0).args[0]);
@@ -141,10 +123,8 @@ registerSuite('tasks/intern', function() {
 							1,
 							'intern should have been run'
 						);
-						assert.equal(mockGetConfig.callCount, 0);
-						assert.equal(mockConfigure.callCount, 2);
-						assert.deepEqual(mockConfigure.getCall(0).args[0], {});
-						assert.deepEqual(mockConfigure.getCall(1).args[0], {
+						assert.equal(mockConfigure.callCount, 1);
+						assert.deepEqual(mockConfigure.getCall(0).args[0], {
 							foo: 'bar'
 						});
 						assert.equal(mockDone.callCount, 1);

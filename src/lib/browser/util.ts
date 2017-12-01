@@ -8,12 +8,6 @@ export function getArgs() {
 	return parseArgs(parseQuery());
 }
 
-export function getConfigFile() {
-	const args = getArgs();
-	const basePath = args.basePath || getDefaultBasePath();
-	return args.config || resolvePath('intern.json', basePath);
-}
-
 /**
  * Return a base path based on the current location pathname
  */
@@ -29,6 +23,12 @@ export function getDefaultBasePath() {
 	} else {
 		return '/';
 	}
+}
+
+export function getDefaultConfigFile() {
+	const args = getArgs();
+	const basePath = args.basePath || getDefaultBasePath();
+	return resolvePath('intern.json', basePath);
 }
 
 /**

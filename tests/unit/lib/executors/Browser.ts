@@ -138,6 +138,7 @@ registerSuite('lib/executors/Browser', function() {
 							throw new Error('run should have failed');
 						},
 						error => {
+							console.log(logger.args);
 							assert.equal(logger.callCount, 1);
 							assert.strictEqual(
 								logger.getCall(0).args[0],

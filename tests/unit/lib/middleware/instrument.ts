@@ -34,7 +34,10 @@ registerSuite('lib/middleware/instrument', function() {
 		before() {
 			return mockRequire(require, 'src/lib/middleware/instrument', {
 				fs,
-				path
+				path,
+				'src/lib/node/util': {
+					normalizePath: (path: string) => path
+				}
 			}).then(resource => {
 				removeMocks = resource.remove;
 				instrument = resource.module.default;

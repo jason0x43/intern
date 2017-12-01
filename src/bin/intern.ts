@@ -7,7 +7,7 @@
 import { execSync } from 'child_process';
 import global from '@dojo/shim/global';
 
-import { getArgs, getConfigFile } from '../lib/node/util';
+import { getArgs, getDefaultConfigFile } from '../lib/node/util';
 import { getConfigDescription } from '../lib/common/config';
 import Node from '../lib/executors/Node';
 import _intern from '../index';
@@ -15,16 +15,17 @@ import * as console from '../lib/common/console';
 
 const intern: Node = _intern;
 const args = getArgs();
+const file = args.config || getDefaultConfigFile();
 
 intern
-	.configure(getConfigFile())
+	.configure(file)
 	.then(() => {
 		if (args.help) {
 			printHelp(intern.config);
 		} else if (args.showConfigs) {
 			console.log(getConfigDescription(intern.config));
 		} else {
-			if (!intern.config.config) {
+			if (!intern.config.file) {
 				console.warn('No config file was loaded');
 			}
 
@@ -72,9 +73,7 @@ function printHelp(config: any) {
 	const opts = Object.keys(config)
 		.filter(
 			key =>
-				key !== 'config' &&
-				key !== 'showConfig' &&
-				key !== 'showConfigs'
+				key !== 'file' && key !== 'showConfig' && key !== 'showConfigs'
 		)
 		.map(key => {
 			return { name: key, value: JSON.stringify(config[key]) };
@@ -95,7 +94,7 @@ function printHelp(config: any) {
 		console.log(`  ${name}${pad} - ${value}`);
 	}
 
-	const file = config.config;
+	const file = config.file;
 	if (file) {
 		console.log();
 		const description = getConfigDescription(config, '  ');
