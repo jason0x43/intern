@@ -71,16 +71,24 @@ export function createMockExecutor(
 			{
 				_ran: false,
 
+				_fileData: <{ [key: string]: any }>{},
+
 				events: <{ name: string; data: any }[]>[],
 
-				config: {},
+				config: <{ [key: string]: any }>{},
 
 				configure(options: any) {
-					if (options) {
-						Object.keys(options).forEach(key => {
-							(<any>this).config[key] = options[key];
-						});
+					if (typeof options === 'string') {
+						this.config = this._fileData[options];
+						this.config.config = options;
+					} else {
+						if (options) {
+							Object.keys(options).forEach(key => {
+								(<any>this).config[key] = options[key];
+							});
+						}
 					}
+					return Promise.resolve();
 				},
 
 				emit(eventName: keyof Events, data?: any) {

@@ -4,8 +4,15 @@ import * as _util from 'src/lib/node/util';
 
 const mockRequire = intern.getPlugin<mocking.MockRequire>('mockRequire');
 
-registerSuite('lib/node/util', function() {
+registerSuite('lib/node/util', () => {
 	let util: typeof _util;
+
+	const logCall = (name: string, args: any[]) => {
+		if (!calls[name]) {
+			calls[name] = [];
+		}
+		calls[name].push(args);
+	};
 
 	const mockFs = {
 		readFile(
@@ -31,6 +38,46 @@ registerSuite('lib/node/util', function() {
 		}
 	};
 
+	const mockGlob = {
+		sync(pattern: string, options: any) {
+			logCall('sync', [pattern, options]);
+			if (glob) {
+				return glob(pattern, options);
+			}
+			return ['globby'];
+		},
+
+		hasMagic(pattern: string) {
+			logCall('hasMagic', [pattern]);
+			return hasMagic || false;
+		}
+	};
+
+	const mockGlobal = {
+		process: {
+			argv: ['node', 'intern.js'],
+			env: {}
+		}
+	};
+
+	const mockPath = {
+		dirname(path: string) {
+			return dirname(path);
+		},
+
+		join(...paths: string[]) {
+			return join(...paths);
+		},
+
+		normalize(path: string) {
+			return path;
+		},
+
+		resolve(path: string) {
+			return path;
+		}
+	};
+
 	const mockUtil = {
 		loadConfig(
 			filename: string,
@@ -53,53 +100,6 @@ registerSuite('lib/node/util', function() {
 			logCall('splitConfigPath', [path]);
 			const parts = path.split('@');
 			return { configFile: parts[0], childConfig: parts[1] };
-		}
-	};
-
-	const mockGlob = {
-		sync(pattern: string, options: any) {
-			logCall('sync', [pattern, options]);
-			if (glob) {
-				return glob(pattern, options);
-			}
-			return ['globby'];
-		},
-
-		hasMagic(pattern: string) {
-			logCall('hasMagic', [pattern]);
-			return hasMagic || false;
-		}
-	};
-
-	const mockPath = {
-		dirname(path: string) {
-			return dirname(path);
-		},
-
-		join(...paths: string[]) {
-			return join(...paths);
-		},
-
-		normalize(path: string) {
-			return path;
-		},
-
-		resolve(path: string) {
-			return path;
-		}
-	};
-
-	const logCall = (name: string, args: any[]) => {
-		if (!calls[name]) {
-			calls[name] = [];
-		}
-		calls[name].push(args);
-	};
-
-	const mockGlobal = {
-		process: {
-			argv: ['node', 'intern.js'],
-			env: {}
 		}
 	};
 

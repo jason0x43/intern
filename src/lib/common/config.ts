@@ -1,7 +1,7 @@
 import { deepMixin } from '@dojo/core/lang';
 import Task from '@dojo/core/async/Task';
 
-import { Config, Configurable, ResourceConfig } from '../executors/Executor';
+import { Config, Configurable } from '../executors/Executor';
 import { getPathSep, join, normalize } from './path';
 
 export interface EvaluatedProperty<C extends Config = Config> {
@@ -111,8 +111,7 @@ export function getConfigDescription(config: any, prefix = '') {
 }
 
 /**
- * Load config data from a given path, using a given text loader, and mixing
- * args and/or a childConfig into the final config value if provided.
+ * Load config data from a given path into a given Configurable object.
  */
 export function loadConfig(
 	configPath: string,
@@ -122,13 +121,13 @@ export function loadConfig(
 	return configurable
 		.loadText(configPath)
 		.then(text => {
-			const preConfig = parseJson(text);
+			const config = parseJson(text);
 
 			// extends paths are assumed to be relative and use '/'
-			if (preConfig.extends) {
+			if (config.extends) {
 				const parts = configPath.split('/');
 				const { configFile, childConfig } = splitConfigPath(
-					preConfig.extends
+					config.extends
 				);
 				const extensionPath = parts
 					.slice(0, parts.length - 1)
@@ -138,34 +137,33 @@ export function loadConfig(
 				return loadConfig(
 					extensionPath,
 					configurable,
-					undefined,
 					childConfig
-				).then(extension => {
+				).then(baseConfig => {
 					// Process all keys except 'configs' from the config to the
 					// thing it's extending
-					Object.keys(preConfig)
+					Object.keys(config)
 						.filter(key => key !== 'configs')
 						.forEach(key => {
-							configurable.setOption(key, preConfig[key]);
+							configurable.setOption(key, config[key]);
 						});
 
 					// If config has a 'configs' property, mix its values into
 					// extension.configs (slightly deeper mixin)
-					if (preConfig.configs) {
-						if (extension.configs == null) {
-							extension.configs = {};
+					if (config.configs) {
+						if (baseConfig.configs == null) {
+							baseConfig.configs = {};
 						}
-						Object.keys(preConfig.configs).forEach(key => {
-							extension.configs[key] = preConfig.configs[key];
+						Object.keys(config.configs).forEach(key => {
+							baseConfig.configs[key] = config.configs[key];
 						});
 					}
-					return extension;
+					return baseConfig;
 				});
 			} else {
-				const config: any = {};
-				Object.keys(preConfig).forEach(key => {
-					configurable.setOption(key, preConfig[key]);
+				Object.keys(config).forEach(key => {
+					configurable.setOption(key, config[key]);
 				});
+
 				return config;
 			}
 		})

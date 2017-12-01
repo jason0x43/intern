@@ -1,8 +1,12 @@
 import { readFile, readFileSync } from 'fs';
 import { dirname, join, normalize } from 'path';
 import { RawSourceMap } from 'source-map';
+import { parse } from 'shell-quote';
 import { sync as glob, hasMagic } from 'glob';
 import Task from '@dojo/core/async/Task';
+import { mixin } from '@dojo/core/lang';
+
+import { parseArgs } from '../common/config';
 
 /**
  * Expand a list of glob patterns into a flat file list. Patterns may be simple
@@ -10,7 +14,6 @@ import Task from '@dojo/core/async/Task';
  * Note that exclusion rules will not apply to simple paths.
  */
 export function expandFiles(patterns?: string[] | string) {
-	console.trace('expanding', patterns);
 	if (!patterns) {
 		patterns = [];
 	} else if (!Array.isArray(patterns)) {
@@ -40,6 +43,30 @@ export function expandFiles(patterns?: string[] | string) {
 	allPaths.forEach(path => (uniquePaths[path] = true));
 
 	return Object.keys(uniquePaths);
+}
+
+/**
+ * Get any arguments supplied on the command line or through INTERN_ARGS
+ */
+export function getArgs() {
+	const args = parseArgs(process.argv.slice(2));
+
+	if (process.env['INTERN_ARGS']) {
+		mixin(args, parseArgs(parse(process.env['INTERN_ARGS'] || '')));
+	}
+
+	return args;
+}
+
+/**
+ * Get the config file name.
+ *
+ * This is determined by looking at command line args, the INTERN_ARGS variable,
+ * and the default filename.
+ */
+export function getConfigFile() {
+	const args = getArgs();
+	return args.config || 'intern.json';
 }
 
 /**

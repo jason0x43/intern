@@ -31,12 +31,16 @@ import TestingBotTunnel from '@theintern/digdug/TestingBotTunnel';
 import CrossBrowserTestingTunnel from '@theintern/digdug/CrossBrowserTestingTunnel';
 import NullTunnel from '@theintern/digdug/NullTunnel';
 
-import Executor, { Config as BaseConfig, Events, Plugins } from './Executor';
+import Executor, {
+	Config as BaseConfig,
+	Events,
+	Plugins,
+	ResourceConfig
+} from './Executor';
 import { normalizePathEnding } from '../common/path';
 import { pullFromArray } from '../common/util';
 import { parseValue } from '../common/config';
-import { getArgs } from '../node/config';
-import { expandFiles, loadText, readSourceMap } from '../node/util';
+import { expandFiles, getArgs, loadText, readSourceMap } from '../node/util';
 import ErrorFormatter from '../node/ErrorFormatter';
 import ProxiedSession from '../ProxiedSession';
 import Environment from '../Environment';
@@ -289,7 +293,7 @@ export default class Node extends Executor<NodeEvents, Config, NodePlugins> {
 		this.registerPlugin('tunnel', name, () => Ctor);
 	}
 
-	setOption(option: string, value: any) {
+	setOption(option: string, value: any, override = false) {
 		const { name, addToExisting } = this._evalProperty(option);
 
 		switch (name) {
@@ -420,6 +424,15 @@ export default class Node extends Executor<NodeEvents, Config, NodePlugins> {
 			default:
 				super.setOption(option, value);
 				break;
+		}
+
+		if (
+			override &&
+			['plugins', 'reporters', 'suites'].indexOf(name) !== -1
+		) {
+			const resource = <keyof ResourceConfig>name;
+			this.config.node[resource] = [];
+			this.config.browser[resource] = [];
 		}
 	}
 

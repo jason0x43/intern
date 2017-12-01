@@ -314,7 +314,23 @@ registerSuite('lib/executors/Executor', function() {
 						benchmark: booleanTest('benchmark'),
 						debug: booleanTest('debug'),
 						filterErrorStack: booleanTest('filterErrorStack'),
-						showConfig: booleanTest('showConfig'),
+
+						showConfig() {
+							test(
+								'showConfig',
+								5,
+								true,
+								true,
+								/Non-string value/
+							);
+							test(
+								'showConfig',
+								5,
+								'foo',
+								'foo',
+								/Non-string value/
+							);
+						},
 
 						basePath: stringTest('basePath'),
 						coverageVariable: stringTest('coverageVariable'),

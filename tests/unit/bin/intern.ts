@@ -1,5 +1,4 @@
-import { sandbox as Sandbox, SinonStub, SinonSpy } from 'sinon';
-import Task from '@dojo/core/async/Task';
+import { sandbox as Sandbox, SinonStub } from 'sinon';
 import global from '@dojo/shim/global';
 
 import {
@@ -13,15 +12,9 @@ const originalIntern = global.intern;
 
 registerSuite('bin/intern', function() {
 	const sandbox = Sandbox.create();
-	const mockNodeConfig: { [name: string]: SinonSpy } = {
-		getConfig: sandbox.spy(() => {
-			return Task.resolve({ config: configData, file: 'intern.json' });
-		})
-	};
 
 	const originalExitCode = process.exitCode;
 
-	let configData: any;
 	let removeMocks: (() => void) | undefined;
 	let mockConsole: MockConsole;
 	let mockCommonConfig: { [name: string]: SinonStub };
@@ -30,11 +23,12 @@ registerSuite('bin/intern', function() {
 		beforeEach() {
 			mockConsole = createMockConsole();
 			mockCommonConfig = {
-				getConfigDescription: sandbox.stub().returns('test config')
+				getConfigDescription: sandbox.stub().returns('test config'),
+				getArgs: sandbox.stub().returns({}),
+				parseArgs: sandbox.stub().returns({})
 			};
 
 			sandbox.resetHistory();
-			configData = {};
 		},
 
 		afterEach() {
@@ -51,14 +45,12 @@ registerSuite('bin/intern', function() {
 			'basic run'() {
 				const mockExecutor = createMockNodeExecutor();
 				return mockRequire(require, 'src/bin/intern', {
-					'src/lib/node/config': mockNodeConfig,
 					'src/lib/common/console': mockConsole,
 					'src/lib/common/config': mockCommonConfig,
 					'src/index': { default: mockExecutor },
 					'@dojo/shim/global': { default: { process: {} } }
 				}).then(handle => {
 					removeMocks = handle.remove;
-					assert.equal(mockNodeConfig.getConfig.callCount, 1);
 					assert.equal(
 						mockCommonConfig.getConfigDescription.callCount,
 						0
@@ -70,32 +62,9 @@ registerSuite('bin/intern', function() {
 				});
 			},
 
-			'show configs'() {
-				configData = { showConfigs: true };
-
-				return mockRequire(require, 'src/bin/intern', {
-					'src/lib/node/config': mockNodeConfig,
-					'src/lib/common/console': mockConsole,
-					'src/lib/common/config': mockCommonConfig,
-					'src/index': { default: createMockNodeExecutor() },
-					'@dojo/shim/global': {
-						default: { process: {} }
-					}
-				}).then(handle => {
-					removeMocks = handle.remove;
-					assert.equal(mockNodeConfig.getConfig.callCount, 1);
-					assert.equal(
-						mockCommonConfig.getConfigDescription.callCount,
-						1
-					);
-					assert.deepEqual(mockConsole.log.args, [['test config']]);
-				});
-			},
-
 			'bad run': {
 				'intern defined'() {
 					return mockRequire(require, 'src/bin/intern', {
-						'src/lib/node/config': mockNodeConfig,
 						'src/lib/common/console': mockConsole,
 						'src/lib/common/config': mockCommonConfig,
 						'src/index': { default: createMockNodeExecutor() },
@@ -113,11 +82,9 @@ registerSuite('bin/intern', function() {
 				},
 
 				'intern not defined'() {
-					configData = { showConfigs: true };
 					mockCommonConfig.getConfigDescription.throws();
 
 					return mockRequire(require, 'src/bin/intern', {
-						'src/lib/node/config': mockNodeConfig,
 						'src/lib/common/console': mockConsole,
 						'src/lib/common/config': mockCommonConfig,
 						'src/index': { default: createMockNodeExecutor() },
@@ -145,18 +112,22 @@ registerSuite('bin/intern', function() {
 
 			help() {
 				const mockExecutor = createMockNodeExecutor(<any>{
-					_config: {
-						foo: 'one',
-						bar: [2, 3],
-						baz: { value: false }
+					_fileData: {
+						'intern.json': {
+							foo: 'one',
+							bar: [2, 3],
+							baz: { value: false }
+						}
 					}
 				});
-				configData = { help: true };
 
 				return mockRequire(require, 'src/bin/intern', {
-					'src/lib/node/config': mockNodeConfig,
 					'src/lib/common/console': mockConsole,
 					'src/lib/common/config': mockCommonConfig,
+					'src/lib/node/util': {
+						getArgs: () => ({ help: true }),
+						getConfigFile: () => 'intern.json'
+					},
 					'src/index': { default: mockExecutor },
 					'@dojo/shim/global': {
 						default: { process: {} }

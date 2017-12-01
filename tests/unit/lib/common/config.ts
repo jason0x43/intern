@@ -2,105 +2,104 @@ import Task from '@dojo/core/async/Task';
 import * as _config from 'src/lib/common/config';
 
 registerSuite('lib/common/config', {
-	loadConfig: {
-		'empty config'() {
-			return _config.loadConfig('empty', loadText).then(config => {
-				assert.deepEqual(config, {});
-			});
-		},
+	loadConfig: (() => {
+		let configurable: MockConfigurable;
 
-		args() {
-			return _config
-				.loadConfig('extends', loadText, { bar: 123 })
-				.then(config => {
-					assert.deepEqual(config, { foo: 111, bar: 123 });
-				});
-		},
+		return {
+			beforeEach() {
+				configurable = new MockConfigurable();
+			},
 
-		'config is cleaned up'() {
-			return _config
-				.loadConfig('children', loadText, { config: 'foo' }, 'extender')
-				.then(config => {
-					assert.notProperty(config, 'config');
-					assert.notProperty(config, 'configs');
-					assert.notProperty(config, 'extends');
-				});
-		},
+			tests: {
+				'empty config'() {
+					return _config
+						.loadConfig('empty', configurable)
+						.then(() => {
+							assert.deepEqual(configurable.config, {});
+						});
+				},
 
-		showConfigs() {
-			return _config
-				.loadConfig('described', loadText, { showConfigs: true })
-				.then(config => {
-					assert.property(
-						config,
-						'configs',
-						'expected configs not to have been cleaned up'
-					);
-					assert.property(
-						config,
-						'showConfigs',
-						'expected args to be mixed in'
-					);
-				});
-		},
+				'config is cleaned up'() {
+					return _config
+						.loadConfig('children', configurable, 'extender')
+						.then(() => {
+							const config = configurable.config;
+							assert.notProperty(config, 'config');
+							assert.notProperty(config, 'configs');
+							assert.notProperty(config, 'extends');
+						});
+				},
 
-		extends() {
-			return _config.loadConfig('extends', loadText).then(config => {
-				assert.deepEqual(config, { foo: 111, bar: 'bye' });
-			});
-		},
+				extends() {
+					return _config
+						.loadConfig('extends', configurable)
+						.then(() => {
+							assert.deepEqual(configurable.config, {
+								foo: 111,
+								bar: 'bye'
+							});
+						});
+				},
 
-		'child config'() {
-			return _config
-				.loadConfig('children', loadText, undefined, 'child')
-				.then(config => {
-					assert.deepEqual(config, {
-						baz: 'hello',
-						foo: 222,
-						bar: 345
-					});
-				});
-		},
+				'child config'() {
+					return _config
+						.loadConfig('children', configurable, 'child')
+						.then(() => {
+							assert.deepEqual(configurable.config, {
+								baz: 'hello',
+								foo: 222,
+								bar: 345
+							});
+						});
+				},
 
-		'child config extends'() {
-			return _config
-				.loadConfig('children', loadText, undefined, 'extender')
-				.then(config => {
-					assert.deepEqual(config, {
-						foo: 123,
-						bar: 345,
-						baz: 'hello'
-					});
-				});
-		},
+				'child config extends'() {
+					return _config
+						.loadConfig('children', configurable, 'extender')
+						.then(() => {
+							assert.deepEqual(configurable.config, {
+								foo: 123,
+								bar: 345,
+								baz: 'hello'
+							});
+						});
+				},
 
-		'missing child config'() {
-			return _config
-				.loadConfig('children', loadText, undefined, 'bad_child')
-				.then(
-					() => {
-						throw new Error(
-							'Missing child config should have errored'
+				'missing child config'() {
+					return _config
+						.loadConfig('children', configurable, 'bad_child')
+						.then(
+							() => {
+								throw new Error(
+									'Missing child config should have errored'
+								);
+							},
+							error => {
+								assert.match(
+									error.message,
+									/Unknown child config/
+								);
+							}
 						);
-					},
-					error => {
-						assert.match(error.message, /Unknown child config/);
-					}
-				);
-		},
+				},
 
-		'child environment config'() {
-			return _config
-				.loadConfig('childEnvironment', loadText, undefined, 'child')
-				.then(config => {
-					assert.deepEqual(
-						config.node,
-						{ suites: ['baz'], plugins: [{ script: 'bar' }] },
-						'child node config should have mixed into parent'
-					);
-				});
-		}
-	},
+				'child environment config'() {
+					return _config
+						.loadConfig('childEnvironment', configurable, 'child')
+						.then(config => {
+							assert.deepEqual(
+								config.node,
+								{
+									suites: ['baz'],
+									plugins: [{ script: 'bar' }]
+								},
+								'child node config should have mixed into parent'
+							);
+						});
+				}
+			}
+		};
+	})(),
 
 	getBasePath() {
 		// posix path with absolute base
@@ -145,15 +144,14 @@ registerSuite('lib/common/config', {
 	},
 
 	getConfigDescription() {
-		return _config
-			.loadConfig('described', loadText, { showConfigs: true })
-			.then(config => {
-				const desc = _config.getConfigDescription(config);
-				assert.equal(
-					desc,
-					'has children\n\nConfigs:\n  child    (a child)\n  extender'
-				);
-			});
+		const configurable = new MockConfigurable();
+		return _config.loadConfig('described', configurable).then(() => {
+			const desc = _config.getConfigDescription(configurable.config);
+			assert.equal(
+				desc,
+				'has children\n\nConfigs:\n  child    (a child)\n  extender'
+			);
+		});
 	},
 
 	parseArgs() {
@@ -478,69 +476,85 @@ registerSuite('lib/common/config', {
 	}
 });
 
-function loadText(path: string) {
-	if (path === 'extends') {
-		return Task.resolve(
-			JSON.stringify({
-				foo: 111,
-				bar: 'bye',
-				extends: 'empty'
-			})
-		);
+class MockConfigurable {
+	config: { [key: string]: any };
+
+	constructor() {
+		this.config = {};
 	}
-	if (path === 'children') {
-		return Task.resolve(
-			JSON.stringify({
-				baz: 'hello',
-				bar: 'bye',
-				foo: 222,
-				configs: {
-					child: {
-						bar: 345
-					},
-					extender: {
-						extends: 'child',
-						foo: 123
-					}
-				}
-			})
-		);
+
+	configure(_options: { [key: string]: any }) {}
+
+	getArgs() {
+		return {};
 	}
-	if (path === 'childEnvironment') {
-		return Task.resolve(
-			JSON.stringify({
-				node: {
-					suites: ['foo'],
-					plugins: ['bar']
-				},
-				baz: 'hello',
-				bar: 'bye',
-				foo: 222,
-				configs: {
-					child: {
-						bar: 345,
-						node: {
-							suites: ['baz']
+
+	loadText(path: string) {
+		if (path === 'extends') {
+			return Task.resolve(
+				JSON.stringify({
+					foo: 111,
+					bar: 'bye',
+					extends: 'empty'
+				})
+			);
+		}
+		if (path === 'children') {
+			return Task.resolve(
+				JSON.stringify({
+					baz: 'hello',
+					bar: 'bye',
+					foo: 222,
+					configs: {
+						child: {
+							bar: 345
+						},
+						extender: {
+							extends: 'child',
+							foo: 123
 						}
 					}
-				}
-			})
-		);
-	}
-	if (path === 'described') {
-		return Task.resolve(
-			JSON.stringify({
-				description: 'has children',
-				configs: {
-					child: {
-						description: 'a child'
+				})
+			);
+		}
+		if (path === 'childEnvironment') {
+			return Task.resolve(
+				JSON.stringify({
+					node: {
+						suites: ['foo'],
+						plugins: ['bar']
 					},
-					extender: {
-						extends: 'child'
+					baz: 'hello',
+					bar: 'bye',
+					foo: 222,
+					configs: {
+						child: {
+							bar: 345,
+							node: {
+								suites: ['baz']
+							}
+						}
 					}
-				}
-			})
-		);
+				})
+			);
+		}
+		if (path === 'described') {
+			return Task.resolve(
+				JSON.stringify({
+					description: 'has children',
+					configs: {
+						child: {
+							description: 'a child'
+						},
+						extender: {
+							extends: 'child'
+						}
+					}
+				})
+			);
+		}
+		return Task.resolve('{}');
 	}
-	return Task.resolve('{}');
+
+	setOption(_key: string, _value: any) {}
 }
