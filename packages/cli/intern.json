@@ -4,6 +4,10 @@
   "node": {
     "tsconfig": "tests/tsconfig.json"
   },
+  "reporters": {
+    "name": "runner",
+    "options": { "hideSkipped": false, "hidePassed": "." }
+  },
   "configs": {
     "ci": {
       "reporters+": "lcov"
