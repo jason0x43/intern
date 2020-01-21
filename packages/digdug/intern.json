@@ -1,7 +1,4 @@
 {
-  "capabilities": {
-    "fixSessionCapabilities": false
-  },
   "coverage": ["src/**/*.ts"],
   "filterErrorStack": true,
   "plugins": "tests/globalUi.ts",
