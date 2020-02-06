@@ -76,6 +76,8 @@
 
   "filterErrorStack": true,
 
+  "functionalRetries": 1,
+
   "functionalSuites": "tests/functional/**/*.ts",
 
   "maxConcurrency": 2,
