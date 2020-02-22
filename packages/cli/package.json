@@ -42,7 +42,7 @@
     "test": "intern"
   },
   "engines": {
-    "node": ">=4.0.0"
+    "node": ">=10.0.0"
   },
   "devDependencies": {
     "@theintern-dev/eslint-config": "workspace:*",
