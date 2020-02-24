@@ -32,7 +32,10 @@
     "build": "tsc -b",
     "pretest": "tsc -b tests",
     "test": "intern",
-    "test:chrome": "intern --config @wd"
+    "test:chrome": "intern --config @chrome",
+    "test:edge": "intern --config @edge",
+    "test:firefox": "intern --config @firefox",
+    "test:safari": "intern --config @safari"
   },
   "bugs": "https://github.com/theintern/intern/issues",
   "keywords": [
