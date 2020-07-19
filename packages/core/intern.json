@@ -30,7 +30,6 @@
       "tests/integration/**/*.ts",
       "tests/unit/cli/*.ts",
       "tests/unit/index.ts",
-      "tests/unit/bin/intern.ts",
       "tests/unit/lib/ProxiedSession.ts",
       "tests/unit/lib/Server.ts",
       "tests/unit/lib/executors/Node.ts",
@@ -61,7 +60,7 @@
     ],
     "reporters": {
       "name": "runner",
-      "options": { "hideSkipped": false, "hidePassed": "." }
+      "options": { "hideSkipped": true, "hidePassed": "." }
     },
 
     "tsconfig": "tests/tsconfig.json"
@@ -112,7 +111,6 @@
           "tests/integration/**/*.ts",
           "tests/unit/cli/*.ts",
           "tests/unit/index.ts",
-          "tests/unit/bin/intern.ts",
           "tests/unit/lib/ProxiedSession.ts",
           "tests/unit/lib/Server.ts",
           "tests/unit/lib/executors/Node.ts",

@@ -1,4 +1,4 @@
-import { mockImport } from 'tests/support/mockUtil';
+import { mockImport } from '@theintern-dev/test-util';
 import { NormalizedEnvironment } from '@theintern/digdug/dist/Tunnel';
 import { sep } from 'path';
 
